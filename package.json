@@ -1,0 +1,22 @@
+{
+  "name": "intellifarm-mvp",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "postinstall": "pnpm --filter @intellifarm/contracts build && pnpm --filter @intellifarm/api db:generate",
+    "predev": "pnpm --filter @intellifarm/contracts build",
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "turbo run format",
+    "db:generate": "pnpm --filter @intellifarm/api db:generate",
+    "db:migrate": "pnpm --filter @intellifarm/api db:migrate",
+    "db:deploy": "pnpm --filter @intellifarm/api db:deploy",
+    "db:seed": "pnpm --filter @intellifarm/api db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.6"
+  }
+}

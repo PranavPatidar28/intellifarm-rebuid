@@ -1,0 +1,10 @@
+{
+  "name": "@intellifarm/config",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./typescript/base": "./typescript/base.json",
+    "./prettier": "./prettier/index.cjs"
+  }
+}

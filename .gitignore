@@ -1,0 +1,29 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# build outputs
+.next
+dist
+coverage
+
+# environment
+.env
+.env.local
+.env.*.local
+
+# uploads and generated content
+apps/api/uploads
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor
+.idea
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db

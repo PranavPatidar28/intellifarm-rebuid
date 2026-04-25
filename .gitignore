@@ -1,28 +1,46 @@
 # dependencies
-node_modules
-.pnpm-store
+node_modules/
+.pnpm-store/
+
+# workspace cache
+.turbo/
 
 # build outputs
-.next
-dist
-coverage
+.next/
+out/
+dist/
+coverage/
+build/
+
+# TypeScript / Next.js
+*.tsbuildinfo
+next-env.d.ts
+
+# deployment
+.vercel/
 
 # environment
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env*.example
 
 # uploads and generated content
-apps/api/uploads
+apps/api/uploads/
+apps/api/apps/api/uploads/
+.codex-logs/
+.codex-run/
 
 # logs
 *.log
 npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # editor
-.idea
-.vscode
+.idea/
+.vscode/
 
 # OS
 .DS_Store

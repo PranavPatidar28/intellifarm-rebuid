@@ -151,7 +151,7 @@ export const weatherLocationQuerySchema = z
 export const createDiseaseReportSchema = z.object({
   cropSeasonId: z.string().uuid(),
   userNote: z.string().trim().max(500).optional(),
-  captureMode: z.enum(diseaseCaptureModes).default('STANDARD'),
+  captureMode: z.enum(diseaseCaptureModes).default('CAMERA_DUAL_ANGLE'),
 });
 
 export const soilMetricsSchema = z

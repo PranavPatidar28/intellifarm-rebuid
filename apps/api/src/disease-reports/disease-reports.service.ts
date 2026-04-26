@@ -67,6 +67,8 @@ export class DiseaseReportsService {
     },
     files: {
       images?: Express.Multer.File[];
+      diseasedImage?: Express.Multer.File[];
+      cropImage?: Express.Multer.File[];
       voiceNote?: Express.Multer.File[];
     },
   ) {
@@ -83,22 +85,22 @@ export class DiseaseReportsService {
       throw new NotFoundException('Crop season not found');
     }
 
-    const images = files.images ?? [];
-    if (!images.length) {
-      throw new BadRequestException('At least one crop image is required');
+    if (payload.captureMode !== 'CAMERA_DUAL_ANGLE') {
+      throw new BadRequestException(
+        'Disease reports require dual-angle capture with a diseased photo and a healthy/reference crop photo.',
+      );
     }
 
-    if (payload.captureMode === 'CAMERA_DUAL_ANGLE' && images.length !== 2) {
+    const { diseasedImage, cropImage, images } = this.resolveDiseaseImages(files);
+    if (!diseasedImage || !cropImage) {
       throw new BadRequestException(
-        'Dual-angle camera capture requires exactly two images.',
+        'Dual-angle capture requires both a diseased photo and a healthy/reference crop photo.',
       );
     }
 
     const [image1Url, image2Url] = await Promise.all([
-      this.storageService.saveFile(images[0], 'disease-reports'),
-      images[1]
-        ? this.storageService.saveFile(images[1], 'disease-reports')
-        : Promise.resolve<string | undefined>(undefined),
+      this.storageService.saveFile(diseasedImage, 'disease-reports'),
+      this.storageService.saveFile(cropImage, 'disease-reports'),
     ]);
 
     const voiceNoteUrl = files.voiceNote?.[0]
@@ -112,6 +114,8 @@ export class DiseaseReportsService {
         userNote: payload.userNote,
         captureMode: payload.captureMode,
         images,
+        diseasedImage,
+        cropImage,
       });
     } catch {
       analysis = {
@@ -147,5 +151,20 @@ export class DiseaseReportsService {
     });
 
     return { report };
+  }
+
+  private resolveDiseaseImages(files: {
+    images?: Express.Multer.File[];
+    diseasedImage?: Express.Multer.File[];
+    cropImage?: Express.Multer.File[];
+  }) {
+    const legacyImages = files.images ?? [];
+    const diseasedImage = files.diseasedImage?.[0] ?? legacyImages[0];
+    const cropImage = files.cropImage?.[0] ?? legacyImages[1];
+    const images = [diseasedImage, cropImage].filter(
+      (image): image is Express.Multer.File => Boolean(image),
+    );
+
+    return { diseasedImage, cropImage, images };
   }
 }

@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { z } from 'zod';
 
 export type DiseaseAnalysisInput = {
   cropName: string;
   userNote?: string;
   captureMode: 'STANDARD' | 'CAMERA_DUAL_ANGLE';
   images: Express.Multer.File[];
+  cropImage?: Express.Multer.File;
+  diseasedImage?: Express.Multer.File;
 };
 
 export type DiseaseAnalysisResult = {
@@ -117,86 +120,72 @@ export class HttpDiseaseProvider implements DiseaseProvider {
       throw new Error('Disease provider URL is not configured');
     }
 
+    const { cropImage, diseasedImage } = resolveLiveProviderImages(input);
     const formData = new FormData();
-    formData.set('cropName', input.cropName);
-    formData.set('captureMode', input.captureMode);
-    if (input.userNote) {
-      formData.set('userNote', input.userNote);
-    }
+    formData.set('crop_image', toBlob(cropImage), cropImage.originalname);
+    formData.set(
+      'diseased_image',
+      toBlob(diseasedImage),
+      diseasedImage.originalname,
+    );
 
-    for (const image of input.images) {
-      formData.append(
-        'images',
-        new Blob([new Uint8Array(image.buffer)], { type: image.mimetype }),
-        image.originalname,
-      );
-    }
-
-    const response = await fetch(`${baseUrl}/analyze`, {
-      method: 'POST',
-      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
-      body: formData,
-    });
+    const response = await fetch(
+      `${baseUrl.replace(/\/$/, '')}/api/v1/predict`,
+      {
+        method: 'POST',
+        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+        body: formData,
+      },
+    );
 
     if (!response.ok) {
       throw new Error(`Disease provider failed with ${response.status}`);
     }
 
-    const payload = (await response.json()) as Record<string, unknown>;
-
-    const status: 'ANALYZED' | 'ESCALATED' =
-      (readString(payload.status) ?? 'ESCALATED') === 'ANALYZED'
-        ? 'ANALYZED'
-        : 'ESCALATED';
+    const payload = liveDiseaseResponseSchema.parse(await response.json());
+    const diseaseName = payload.disease_name.trim();
+    const hasDiseaseName = diseaseName.length > 0;
 
     return {
-      predictedIssue:
-        readString(payload.predictedIssue) ??
-        readString(payload.issue) ??
-        'Unclear issue',
-      confidenceScore: readNumber(
-        payload.confidenceScore ?? payload.confidence ?? 0.35,
-      ),
-      recommendation:
-        readString(payload.recommendation) ??
-        'Please consult a local expert before taking action.',
-      escalationRequired: readBoolean(payload.escalationRequired) ?? true,
-      status,
-      provider: 'http-disease-provider',
-      providerRef:
-        readString(payload.providerRef) ??
-        readString(payload.requestId) ??
-        undefined,
+      predictedIssue: hasDiseaseName ? diseaseName : 'Unclear issue',
+      confidenceScore: hasDiseaseName ? 0.6 : 0.25,
+      recommendation: appendConfidenceNote(payload.final_answer),
+      escalationRequired: !hasDiseaseName,
+      status: hasDiseaseName ? 'ANALYZED' : 'ESCALATED',
+      provider: 'crop-disease-detection-api',
+      providerRef: payload.request_id,
       analysisSource: 'LIVE_PROVIDER' as const,
     };
   }
 }
 
-function readString(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+const liveDiseaseResponseSchema = z.object({
+  request_id: z.string().trim().min(1),
+  image_path: z.string(),
+  disease_name: z.string().default(''),
+  final_answer: z.string().trim().min(1),
+});
+
+function resolveLiveProviderImages(input: DiseaseAnalysisInput) {
+  const diseasedImage = input.diseasedImage ?? input.images[0];
+  const cropImage = input.cropImage ?? input.images[1];
+
+  if (!cropImage || !diseasedImage) {
+    throw new Error(
+      'Live disease provider requires both crop_image and diseased_image files',
+    );
+  }
+
+  return { cropImage, diseasedImage };
 }
 
-function readNumber(value: unknown) {
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : 0.35;
-  }
-
-  return 0.35;
+function toBlob(image: Express.Multer.File) {
+  return new Blob([new Uint8Array(image.buffer)], { type: image.mimetype });
 }
 
-function readBoolean(value: unknown) {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    return value.toLowerCase() === 'true';
-  }
-
-  return null;
+function appendConfidenceNote(recommendation: string) {
+  return [
+    recommendation.trim(),
+    'Live provider did not return numeric confidence, so Intellifarm is using a conservative confidence estimate.',
+  ].join(' ');
 }

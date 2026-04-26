@@ -39,6 +39,8 @@ export class DiseaseReportsController {
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'images', maxCount: 2 },
+      { name: 'diseasedImage', maxCount: 1 },
+      { name: 'cropImage', maxCount: 1 },
       { name: 'voiceNote', maxCount: 1 },
     ]),
   )
@@ -48,6 +50,8 @@ export class DiseaseReportsController {
     @UploadedFiles()
     files: {
       images?: Express.Multer.File[];
+      diseasedImage?: Express.Multer.File[];
+      cropImage?: Express.Multer.File[];
       voiceNote?: Express.Multer.File[];
     },
   ) {

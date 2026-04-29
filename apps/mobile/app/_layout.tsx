@@ -104,6 +104,16 @@ function RootLayoutNav() {
       <Stack.Screen name="sell-store" options={{ presentation: 'card' }} />
       <Stack.Screen name="expert-help" options={{ presentation: 'card' }} />
       <Stack.Screen name="offline" options={{ presentation: 'card' }} />
+      <Stack.Screen name="crop-prediction" options={{ presentation: 'card' }} />
+      <Stack.Screen name="personal-tasks" options={{ presentation: 'card' }} />
+      <Stack.Screen
+        name="personal-task/[id]"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.62, 0.92],
+        }}
+      />
       <Stack.Screen name="season/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="task/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="weather/[farmPlotId]" options={{ presentation: 'card' }} />

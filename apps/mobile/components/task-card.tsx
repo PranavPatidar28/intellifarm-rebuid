@@ -1,104 +1,132 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { Check, CheckCircle2, Sprout } from 'lucide-react-native';
+import { CheckCircle2, Circle, Pencil, Trash2 } from 'lucide-react-native';
 
-import { CompactListCard } from '@/components/compact-list-card';
-import { MetricBadge } from '@/components/metric-badge';
-import type { TaskItem } from '@/lib/api-types';
-import { formatShortDate } from '@/lib/format';
-import { palette, radii, spacing, typography } from '@/theme/tokens';
+import type { HomeTaskEntry } from '@/lib/home-tasks';
+import { palette, radii, shadow, spacing, typography } from '@/theme/tokens';
 
 export function TaskCard({
   task,
+  meta,
   onPress,
-  onQuickComplete,
-  quickCompleting = false,
+  onDelete,
+  onToggleComplete,
 }: {
-  task: TaskItem;
+  task: HomeTaskEntry;
+  meta?: string;
   onPress?: () => void;
-  onQuickComplete?: () => void;
-  quickCompleting?: boolean;
+  onDelete?: () => void;
+  onToggleComplete?: () => void;
 }) {
-  const badgeTone =
-    task.priority === 'HIGH'
-      ? 'danger'
-      : task.priority === 'MEDIUM'
-        ? 'warning'
-        : 'success';
+  const content = (
+    <View
+      style={{
+        minHeight: meta ? 72 : 58,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 10,
+        borderRadius: radii.xl,
+        borderCurve: 'continuous',
+        borderWidth: 1,
+        borderColor: task.completed ? 'rgba(47, 125, 78, 0.18)' : palette.outline,
+        backgroundColor: task.completed ? 'rgba(227, 240, 227, 0.72)' : palette.white,
+        boxShadow: shadow.soft,
+      }}
+    >
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 13,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: task.completed ? palette.white : palette.parchmentSoft,
+        }}
+      >
+        <Pencil color={task.completed ? palette.leaf : palette.inkMuted} size={16} />
+      </View>
 
-  const priorityLabel =
-    task.priority === 'HIGH'
-      ? 'Priority'
-      : task.priority === 'MEDIUM'
-        ? 'Plan soon'
-        : 'Routine';
-
-  const trailing = onQuickComplete && task.status !== 'COMPLETED'
-    ? (
-        <Pressable
-          onPress={(event) => {
-            event.stopPropagation();
-            onQuickComplete();
-          }}
+      <View style={{ flex: 1, gap: meta ? 3 : 0 }}>
+        <Text
+          numberOfLines={1}
           style={{
-            width: 34,
-            height: 34,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: radii.pill,
-            borderWidth: 1,
-            borderColor: palette.leaf,
-            backgroundColor: palette.leafMist,
+            color: task.completed ? palette.inkMuted : palette.ink,
+            fontFamily: typography.bodyStrong,
+            fontSize: 14,
+            textDecorationLine: task.completed ? 'line-through' : 'none',
           }}
         >
-          {quickCompleting ? (
-            <ActivityIndicator color={palette.leafDark} size="small" />
-          ) : (
-            <Check color={palette.leafDark} size={16} />
-          )}
-        </Pressable>
-      )
-    : (
-        <MetricBadge
-          label={task.status === 'COMPLETED' ? 'Done' : priorityLabel}
-          tone={task.status === 'COMPLETED' ? 'success' : badgeTone}
-        />
-      );
-
-  return (
-    <CompactListCard
-      title={task.title}
-      subtitle={task.description}
-      meta={`Due ${formatShortDate(task.dueDate)}`}
-      onPress={onPress}
-      tone={task.priority === 'HIGH' ? 'alert' : task.priority === 'MEDIUM' ? 'soft' : 'neutral'}
-      prefix={
-        task.status === 'COMPLETED' ? (
-          <CheckCircle2 color={palette.leaf} size={20} />
-        ) : (
-          <Sprout color={palette.leafDark} size={18} />
-        )
-      }
-      trailing={trailing}
-    >
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-        {task.status === 'COMPLETED' ? (
-          <MetricBadge label="Done" tone="success" />
-        ) : task.priority !== 'LOW' ? (
-          <MetricBadge label={priorityLabel} tone={badgeTone} />
-        ) : null}
-        {onQuickComplete && task.status !== 'COMPLETED' ? (
+          {task.title}
+        </Text>
+        {meta ? (
           <Text
+            numberOfLines={1}
             style={{
               color: palette.inkMuted,
               fontFamily: typography.bodyRegular,
               fontSize: 11,
             }}
           >
-            Tap the check to complete quickly
+            {meta}
           </Text>
         ) : null}
       </View>
-    </CompactListCard>
+
+      {onDelete ? (
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          hitSlop={6}
+          style={{
+            width: 34,
+            height: 34,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Trash2 color={palette.inkMuted} size={18} />
+        </Pressable>
+      ) : null}
+
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation();
+          onToggleComplete?.();
+        }}
+        hitSlop={6}
+        style={{
+          width: 34,
+          height: 34,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {task.completed ? (
+          <CheckCircle2 color={palette.leaf} size={22} />
+        ) : (
+          <Circle color={palette.inkMuted} size={22} />
+        )}
+      </Pressable>
+    </View>
+  );
+
+  if (!onPress) {
+    return content;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.97 : 1,
+        transform: [{ scale: pressed ? 0.996 : 1 }],
+      })}
+    >
+      {content}
+    </Pressable>
   );
 }

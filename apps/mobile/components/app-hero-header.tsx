@@ -11,6 +11,7 @@ export function AppHeroHeader({
   hero,
   action,
   tone = 'sunrise',
+  topPadding = spacing.xl,
 }: {
   eyebrow?: string;
   title: string;
@@ -18,6 +19,7 @@ export function AppHeroHeader({
   hero?: ReactNode;
   action?: ReactNode;
   tone?: 'sunrise' | 'weather' | 'market' | 'scheme' | 'assistant';
+  topPadding?: number;
 }) {
   const backgroundColor =
     tone === 'weather'
@@ -34,7 +36,7 @@ export function AppHeroHeader({
     <View
       style={{
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xl,
+        paddingTop: topPadding,
         paddingBottom: spacing.sm,
         backgroundColor,
       }}

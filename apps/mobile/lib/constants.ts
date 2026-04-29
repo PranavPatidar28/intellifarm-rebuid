@@ -51,4 +51,5 @@ export const storageKeys = {
   selectedSeasonId: 'intellifarm.selected-season-id',
   pendingDiseaseReports: 'intellifarm.pending-disease-reports',
   expenseEntries: 'intellifarm.expense-entries',
+  homeTasks: 'intellifarm.home-tasks',
 } as const;

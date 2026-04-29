@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
-import { MapPinned, Sprout, UserRound } from 'lucide-react-native';
+import { MapPinned, Phone, Sprout } from 'lucide-react-native';
 
+import { FarmerAvatar } from '@/components/farmer-avatar';
 import { InsetCard } from '@/components/inset-card';
 import { StatChip } from '@/components/stat-chip';
 import type { AuthUser } from '@/lib/api-types';
@@ -17,53 +18,70 @@ export function ProfileHeroCard({
   farmCount: number;
   cropCount: number;
 }) {
+  const locationParts = [user?.village, user?.district, user?.state].filter(Boolean);
+
   return (
-    <InsetCard tone="neutral" padding={16}>
+    <InsetCard tone="soft" padding={16} borderColor="rgba(47, 125, 78, 0.12)">
       <View style={{ gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <View
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: radii.xl,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: palette.leafMist,
-            }}
-          >
-            <UserRound color={palette.leafDark} size={24} />
-          </View>
+          <FarmerAvatar
+            name={user?.name}
+            profilePhotoUrl={user?.profilePhotoUrl}
+            size={72}
+            borderColor="rgba(47, 125, 78, 0.16)"
+            backgroundColor={palette.white}
+          />
           <View style={{ flex: 1, gap: 4 }}>
             <Text
               style={{
                 color: palette.ink,
                 fontFamily: typography.bodyStrong,
-                fontSize: 19,
+                fontSize: 20,
               }}
             >
               {user?.name ?? 'Farmer profile'}
             </Text>
-            <Text
-              style={{
-                color: palette.inkSoft,
-                fontFamily: typography.bodyRegular,
-                fontSize: 12,
-              }}
-            >
-              {user ? `${user.village}, ${user.district}, ${user.state}` : 'Profile not loaded'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Phone color={palette.leafDark} size={14} />
+              <Text
+                selectable
+                style={{
+                  color: palette.inkSoft,
+                  fontFamily: typography.bodyRegular,
+                  fontSize: 12,
+                }}
+              >
+                {user?.phone ?? 'Phone not available'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <MapPinned color={palette.leafDark} size={14} />
+              <Text
+                style={{
+                  flex: 1,
+                  color: palette.inkSoft,
+                  fontFamily: typography.bodyRegular,
+                  fontSize: 12,
+                }}
+              >
+                {locationParts.length
+                  ? locationParts.join(', ')
+                  : 'Add your location to localize guidance'}
+              </Text>
+            </View>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           <StatChip
             label="Plots"
             value={String(farmCount)}
             icon={<MapPinned color={palette.sky} size={14} />}
           />
           <StatChip
-            label="Crops"
+            label="Active crops"
             value={String(cropCount)}
             icon={<Sprout color={palette.leafDark} size={14} />}
+            minWidth={120}
           />
         </View>
       </View>

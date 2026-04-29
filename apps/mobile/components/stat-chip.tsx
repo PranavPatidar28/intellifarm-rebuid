@@ -7,15 +7,17 @@ export function StatChip({
   label,
   value,
   icon,
+  minWidth = 92,
 }: {
   label: string;
   value: string;
   icon?: ReactNode;
+  minWidth?: number;
 }) {
   return (
     <View
       style={{
-        minWidth: 92,
+        minWidth,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         borderRadius: radii.lg,

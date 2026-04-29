@@ -27,11 +27,8 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
       <Tabs.Screen name="crop-plan" options={{ title: 'Plan' }} />
-      <Tabs.Screen name="diagnose" options={{ title: 'Diagnose' }} />
-      <Tabs.Screen
-        name="market"
-        options={{ title: 'Market', tabBarStyle: { display: 'none' } }}
-      />
+      <Tabs.Screen name="diagnose" options={{ title: 'Diagnose', href: null }} />
+      <Tabs.Screen name="market" options={{ title: 'Market' }} />
       <Tabs.Screen name="voice" options={{ title: 'Voice' }} />
     </Tabs>
   );

@@ -51,6 +51,15 @@ export function formatDistance(distanceKm?: number | null) {
   return `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km`;
 }
 
+export function getFirstName(value?: string | null) {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.split(/\s+/)[0] ?? null;
+}
+
 export function titleCase(value: string) {
   return value
     .toLowerCase()

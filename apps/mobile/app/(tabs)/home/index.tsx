@@ -1,36 +1,47 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useMemo } from 'react';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
 import { useRouter } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
-import { Bell, CloudOff, FileHeart, MapPinned, Sparkles, Wallet } from 'lucide-react-native';
+import {
+  ArrowRight,
+  Bell,
+  Camera,
+  Plus,
+  Sparkles,
+  Sprout,
+} from 'lucide-react-native';
 
 import { Button } from '@/components/button';
-import { HomeInsightCard } from '@/components/home-insight-card';
-import { HomeSeasonStrip } from '@/components/home-season-strip';
-import { HomeUtilityShortcut } from '@/components/home-utility-shortcut';
+import { HomeNewsCard } from '@/components/home-news-card';
+import { HomePrimaryToolCard } from '@/components/home-primary-tool-card';
+import { HomeSchemeCard } from '@/components/home-scheme-card';
+import { HomeSeasonContextRow } from '@/components/home-season-context-row';
+import { LoadingScreen } from '@/components/loading-screen';
 import { MetricBadge } from '@/components/metric-badge';
 import { OfflineBanner } from '@/components/offline-banner';
 import { PageShell } from '@/components/page-shell';
 import { RichEmptyState } from '@/components/rich-empty-state';
 import { SectionTitle } from '@/components/section-title';
-import { SegmentedChipRow } from '@/components/segmented-chip-row';
-import { SunriseCard } from '@/components/sunrise-card';
 import { TaskCard } from '@/components/task-card';
 import { WeatherHeroCard } from '@/components/weather-hero-card';
 import { useSession } from '@/features/session/session-provider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { apiGet, apiPatch } from '@/lib/api';
-import type { DashboardWeeklyResponse } from '@/lib/api-types';
+import { apiGet } from '@/lib/api';
+import type {
+  AlertsResponse,
+  DashboardWeeklyResponse,
+  SchemesResponse,
+} from '@/lib/api-types';
 import { storageKeys } from '@/lib/constants';
-import { getHomeInsight } from '@/lib/home-insight';
+import { getOrderedHomeTasks, readHomeTasks, toggleHomeTask } from '@/lib/home-tasks';
+import { getHomeNewsItems, getHomeSchemeHighlight } from '@/lib/home-news';
 import { useStoredValue } from '@/lib/storage';
 import { palette, radii, spacing, typography } from '@/theme/tokens';
 
 export default function HomeDashboardRoute() {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const { width } = useWindowDimensions();
   const network = useNetworkStatus();
   const { authUser, token } = useSession();
   const [selectedSeasonId, setSelectedSeasonId] = useStoredValue(
@@ -38,7 +49,7 @@ export default function HomeDashboardRoute() {
     '',
   );
   const [pendingUploads] = useStoredValue(storageKeys.pendingDiseaseReports, []);
-  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [homeTasks] = useStoredValue(storageKeys.homeTasks, readHomeTasks());
 
   const queryString = selectedSeasonId ? `?cropSeasonId=${selectedSeasonId}` : '';
   const dashboardQuery = useCachedQuery({
@@ -46,10 +57,43 @@ export default function HomeDashboardRoute() {
     queryKey: ['dashboard-weekly', token, selectedSeasonId],
     enabled: Boolean(token),
     queryFn: () => apiGet<DashboardWeeklyResponse>(`/dashboard/weekly${queryString}`, token),
+    placeholderData: (previous) => previous,
+  });
+  const alertsQuery = useCachedQuery({
+    cacheKey: 'alerts',
+    queryKey: ['alerts', token],
+    enabled: Boolean(token),
+    queryFn: () => apiGet<AlertsResponse>('/alerts', token),
   });
 
   const dashboard = dashboardQuery.data;
   const featuredSeason = dashboard?.featuredSeason ?? null;
+  const homeSchemeQueryString = useMemo(() => {
+    const scopedCropName = featuredSeason?.cropName?.trim();
+    const scopedState = authUser?.state?.trim() || featuredSeason?.state?.trim();
+    const params: string[] = [];
+
+    if (scopedCropName) {
+      params.push(`cropName=${encodeURIComponent(scopedCropName)}`);
+    }
+
+    if (scopedState) {
+      params.push(`state=${encodeURIComponent(scopedState)}`);
+    }
+
+    return params.join('&');
+  }, [authUser?.state, featuredSeason?.cropName, featuredSeason?.state]);
+  const schemesQuery = useCachedQuery({
+    cacheKey: `schemes:${homeSchemeQueryString || 'default'}`,
+    queryKey: ['schemes', token, homeSchemeQueryString],
+    enabled: Boolean(token && featuredSeason && !dashboard?.schemeSpotlight),
+    queryFn: () =>
+      apiGet<SchemesResponse>(
+        `/schemes${homeSchemeQueryString ? `?${homeSchemeQueryString}` : ''}`,
+        token,
+      ),
+    placeholderData: (previous) => previous,
+  });
 
   useEffect(() => {
     if (!selectedSeasonId && dashboard?.featuredSeason?.cropSeasonId) {
@@ -57,23 +101,46 @@ export default function HomeDashboardRoute() {
     }
   }, [dashboard?.featuredSeason?.cropSeasonId, selectedSeasonId, setSelectedSeasonId]);
 
-  const pendingTasks = useMemo(
+  const visibleHomeTasks = useMemo(
+    () => getOrderedHomeTasks(homeTasks).slice(0, 3),
+    [homeTasks],
+  );
+  const openTaskCount = useMemo(
+    () => homeTasks.filter((task) => !task.completed).length,
+    [homeTasks],
+  );
+  const fallbackScheme = useMemo(() => {
+    const schemes = schemesQuery.data?.schemes ?? [];
+    const recommendedSchemeId = schemesQuery.data?.recommendedSchemeId;
+
+    if (!schemes.length) {
+      return null;
+    }
+
+    return schemes.find((scheme) => scheme.id === recommendedSchemeId) ?? schemes[0];
+  }, [schemesQuery.data?.recommendedSchemeId, schemesQuery.data?.schemes]);
+  const homeNewsItems = useMemo(
     () =>
-      (dashboard?.taskFocus?.tasks ?? [])
-        .filter((task) => task.status !== 'COMPLETED')
-        .slice(0, 2),
-    [dashboard?.taskFocus?.tasks],
+      getHomeNewsItems({
+        alerts: alertsQuery.data?.alerts ?? [],
+        marketPulse: dashboard?.marketPulse ?? null,
+        weatherHero: dashboard?.weatherHero ?? null,
+        farmPlotId: featuredSeason?.farmPlotId,
+      }),
+    [alertsQuery.data?.alerts, dashboard?.marketPulse, dashboard?.weatherHero, featuredSeason?.farmPlotId],
+  );
+  const homeSchemeHighlight = useMemo(
+    () =>
+      getHomeSchemeHighlight({
+        schemeSpotlight: dashboard?.schemeSpotlight ?? null,
+        fallbackScheme,
+      }),
+    [dashboard?.schemeSpotlight, fallbackScheme],
   );
 
-  const homeInsight = useMemo(
-    () =>
-      getHomeInsight({
-        cropHealth: dashboard?.cropHealth ?? null,
-        marketPulse: dashboard?.marketPulse ?? null,
-        schemeSpotlight: dashboard?.schemeSpotlight ?? null,
-      }),
-    [dashboard?.cropHealth, dashboard?.marketPulse, dashboard?.schemeSpotlight],
-  );
+  if (dashboardQuery.isLoading && !dashboard) {
+    return <LoadingScreen label="Loading your farm dashboard" />;
+  }
 
   if (!featuredSeason) {
     return (
@@ -95,49 +162,8 @@ export default function HomeDashboardRoute() {
   const activeSeasonId = selectedSeasonId || featuredSeason.cropSeasonId;
   const cacheBannerNeeded =
     network.isOffline || Boolean(dashboardQuery.error && dashboardQuery.hasCachedData);
-  const pendingTaskCount = dashboard?.taskFocus?.pendingCount ?? pendingTasks.length;
-  const hasMultipleSeasons = (dashboard?.seasonSwitcher?.length ?? 0) > 1;
-
-  const handleQuickComplete = async (taskId: string) => {
-    if (!token || completingTaskId) {
-      return;
-    }
-
-    setCompletingTaskId(taskId);
-
-    const queryKey = ['dashboard-weekly', token, selectedSeasonId] as const;
-    const previousDashboard = queryClient.getQueryData<DashboardWeeklyResponse>(queryKey);
-
-    queryClient.setQueryData<DashboardWeeklyResponse>(queryKey, (current) => {
-      if (!current?.taskFocus) {
-        return current;
-      }
-
-      return {
-        ...current,
-        taskFocus: {
-          ...current.taskFocus,
-          pendingCount: Math.max(current.taskFocus.pendingCount - 1, 0),
-          completedCount: current.taskFocus.completedCount + 1,
-          tasks: current.taskFocus.tasks.map((task) =>
-            task.id === taskId ? { ...task, status: 'COMPLETED' } : task,
-          ),
-        },
-      };
-    });
-
-    try {
-      await apiPatch(`/tasks/${taskId}`, { status: 'COMPLETED' }, token);
-    } catch {
-      if (previousDashboard) {
-        queryClient.setQueryData(queryKey, previousDashboard);
-      }
-    } finally {
-      setCompletingTaskId(null);
-      void queryClient.invalidateQueries({ queryKey: ['dashboard-weekly', token] });
-      void queryClient.invalidateQueries({ queryKey: ['timeline', token, activeSeasonId] });
-    }
-  };
+  const featureToolsStacked = width < 386;
+  const newsAndSchemesStacked = width < 410;
 
   return (
     <PageShell
@@ -163,24 +189,15 @@ export default function HomeDashboardRoute() {
       }
       heroTone="sunrise"
       hero={
-        <View style={{ gap: spacing.sm }}>
-          <HomeSeasonStrip
-            cropName={featuredSeason.cropName}
-            currentStage={featuredSeason.currentStage}
-            daysSinceSowing={featuredSeason.daysSinceSowing}
-            farmPlotName={featuredSeason.farmPlotName}
-          />
-          {hasMultipleSeasons ? (
-            <SegmentedChipRow
-              value={featuredSeason.cropSeasonId}
-              options={dashboard?.seasonSwitcher.map((season) => ({
-                value: season.cropSeasonId,
-                label: season.cropName,
-              })) ?? []}
-              onChange={(value) => setSelectedSeasonId(value)}
-            />
-          ) : null}
-        </View>
+        <HomeSeasonContextRow
+          cropName={featuredSeason.cropName}
+          currentStage={featuredSeason.currentStage}
+          farmPlotName={featuredSeason.farmPlotName}
+          stageProgressPercent={featuredSeason.stageProgressPercent}
+          selectedSeasonId={activeSeasonId}
+          seasonOptions={dashboard?.seasonSwitcher ?? []}
+          onSeasonChange={(value) => setSelectedSeasonId(value)}
+        />
       }
     >
       {cacheBannerNeeded ? (
@@ -214,108 +231,185 @@ export default function HomeDashboardRoute() {
       />
 
       <View style={{ gap: spacing.sm }}>
-        <SectionTitle
-          eyebrow="This week"
-          title="Top actions"
-          action={
-            <MetricBadge
-              label={pendingTaskCount ? `${pendingTaskCount} open` : 'All clear'}
-              tone={pendingTaskCount ? 'warning' : 'success'}
-            />
-          }
-        />
-        <Text
+        <SectionTitle title="Quick tools" />
+        <View
           style={{
-            color: palette.inkSoft,
-            fontFamily: typography.bodyRegular,
-            fontSize: 13,
-            lineHeight: 19,
+            flexDirection: featureToolsStacked ? 'column' : 'row',
+            gap: spacing.sm,
           }}
         >
-          {dashboard?.taskFocus?.subtitle ?? 'Focus on the next safe field action.'}
-        </Text>
-        {pendingTasks.length ? (
-          <View style={{ gap: spacing.sm }}>
-            {pendingTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onPress={() =>
-                  router.push({
-                    pathname: '/task/[id]',
-                    params: { id: task.id, cropSeasonId: featuredSeason.cropSeasonId },
-                  })
-                }
-                onQuickComplete={() => {
-                  void handleQuickComplete(task.id);
-                }}
-                quickCompleting={completingTaskId === task.id}
-              />
-            ))}
-          </View>
-        ) : (
-          <SunriseCard accent="soft" title="No urgent tasks this week">
-            <Text
-              style={{
-                color: palette.inkSoft,
-                fontFamily: typography.bodyRegular,
-                fontSize: 13,
-                lineHeight: 19,
-              }}
-            >
-              Your current crop window looks stable. Use Crop Plan if you want to review the full journey.
-            </Text>
-          </SunriseCard>
-        )}
-        <View style={{ flexDirection: 'row' }}>
-          <Button
-            label="View full crop plan"
-            variant="ghost"
-            fullWidth={false}
-            onPress={() => router.push('/crop-plan')}
+          <HomePrimaryToolCard
+            title="Crop Prediction"
+            icon={<Sprout color={palette.leafDark} size={20} />}
+            tone="prediction"
+            onPress={() => router.push('/crop-prediction')}
+          />
+          <HomePrimaryToolCard
+            title="Disease Detection"
+            icon={<Camera color={palette.sky} size={20} />}
+            tone="diagnosis"
+            onPress={() => router.push('/diagnose')}
           />
         </View>
       </View>
 
-      {homeInsight ? (
-        <HomeInsightCard
-          insight={homeInsight}
-          onPress={() => router.push(homeInsight.route as never)}
+      <View style={{ gap: spacing.sm }}>
+        <SectionTitle
+          title="Your tasks"
+          action={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Pressable
+                onPress={() => router.push('/personal-tasks' as never)}
+                style={{
+                  minHeight: 34,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: spacing.sm,
+                  borderRadius: radii.pill,
+                  borderWidth: 1,
+                  borderColor: palette.outlineStrong,
+                  backgroundColor: palette.white,
+                }}
+              >
+                <Text
+                  style={{
+                    color: palette.inkSoft,
+                    fontFamily: typography.bodyStrong,
+                    fontSize: 12,
+                  }}
+                >
+                  View all
+                </Text>
+                <ArrowRight color={palette.inkSoft} size={14} />
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/personal-task/[id]',
+                    params: { id: 'new' },
+                  } as never)
+                }
+                style={{
+                  minHeight: 34,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: spacing.sm,
+                  borderRadius: radii.pill,
+                  borderWidth: 1,
+                  borderColor: palette.leaf,
+                  backgroundColor: palette.leafMist,
+                }}
+              >
+                <Plus color={palette.leafDark} size={15} />
+                <Text
+                  style={{
+                    color: palette.leafDark,
+                    fontFamily: typography.bodyStrong,
+                    fontSize: 12,
+                  }}
+                >
+                  Add
+                </Text>
+              </Pressable>
+            </View>
+          }
         />
-      ) : null}
+        {visibleHomeTasks.length ? (
+          <View style={{ gap: spacing.xs }}>
+            {visibleHomeTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onPress={() =>
+                  router.push(
+                    {
+                      pathname: '/personal-task/[id]',
+                      params: { id: task.id },
+                    } as never,
+                  )
+                }
+                onToggleComplete={() => {
+                  toggleHomeTask(task.id);
+                }}
+              />
+            ))}
+          </View>
+        ) : (
+          <View
+            style={{
+              gap: spacing.xs,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.md,
+              borderRadius: radii.xl,
+              borderCurve: 'continuous',
+              borderWidth: 1,
+              borderColor: palette.outline,
+              backgroundColor: palette.white,
+            }}
+          >
+            <Text
+              style={{
+                color: palette.ink,
+                fontFamily: typography.bodyStrong,
+                fontSize: 14,
+              }}
+            >
+              No tasks yet
+            </Text>
+            <Text
+              style={{
+                color: palette.inkSoft,
+                fontFamily: typography.bodyRegular,
+                fontSize: 12,
+                lineHeight: 18,
+              }}
+            >
+              Add a few farm reminders and the latest three will stay here.
+            </Text>
+          </View>
+        )}
+        {visibleHomeTasks.length ? (
+          <View style={{ flexDirection: 'row' }}>
+            <MetricBadge
+              label={openTaskCount ? `${openTaskCount} open` : 'All done'}
+              tone={openTaskCount ? 'warning' : 'success'}
+            />
+          </View>
+        ) : null}
+      </View>
 
       <View style={{ gap: spacing.sm }}>
-        <Text
+        <SectionTitle title="News & Schemes" />
+        <View
           style={{
-            color: palette.inkMuted,
-            fontFamily: typography.bodyStrong,
-            fontSize: 11,
-            textTransform: 'uppercase',
+            flexDirection: newsAndSchemesStacked ? 'column' : 'row',
+            gap: spacing.sm,
           }}
         >
-          More tools
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          <HomeUtilityShortcut
-            label="Schemes"
-            icon={<FileHeart color={palette.lilac} size={16} />}
-            onPress={() => router.push('/schemes')}
-          />
-          <HomeUtilityShortcut
-            label="Expenses"
-            icon={<Wallet color={palette.leafDark} size={16} />}
-            onPress={() => router.push('/expenses' as never)}
-          />
-          <HomeUtilityShortcut
-            label="Nearby support"
-            icon={<MapPinned color={palette.sky} size={16} />}
-            onPress={() => router.push('/facilities')}
-          />
-          <HomeUtilityShortcut
-            label="Offline"
-            icon={<CloudOff color={palette.mustard} size={16} />}
-            onPress={() => router.push('/offline')}
-          />
+          <View style={newsAndSchemesStacked ? undefined : { flex: 1 }}>
+            <HomeNewsCard
+              items={homeNewsItems}
+              onOpenItem={(item) => router.push(item.route as never)}
+              onViewAllAlerts={() => router.push('/alerts')}
+            />
+          </View>
+          <View style={newsAndSchemesStacked ? undefined : { flex: 1 }}>
+            <HomeSchemeCard
+              scheme={homeSchemeHighlight}
+              loading={schemesQuery.isFetching && !homeSchemeHighlight}
+              onOpenScheme={() => {
+                if (!homeSchemeHighlight) {
+                  router.push('/schemes');
+                  return;
+                }
+
+                router.push(homeSchemeHighlight.route as never);
+              }}
+              onViewAllSchemes={() => router.push('/schemes')}
+            />
+          </View>
         </View>
       </View>
     </PageShell>

@@ -254,9 +254,6 @@ export default function MarketRoute() {
       onDetailsPress={(card) => router.push(card.detailsRoute)}
       onFilterModeChange={setFilterMode}
       onOpenAi={() => router.push('/voice')}
-      onOpenChat={() => router.push('/voice')}
-      onOpenExpenses={() => router.push('/expenses')}
-      onOpenHome={() => router.push('/home')}
       onSearchTextChange={setSearchText}
       onTradeModeChange={setTradeMode}
       onViewAllPinned={() => router.push('/crop-plan')}

@@ -5,9 +5,7 @@ import {
   Bell,
   ChartColumnBig,
   ChevronLeft,
-  House,
   MapPin,
-  MessageCircle,
   Mic,
   Pin,
   Search,
@@ -15,8 +13,6 @@ import {
   Sprout,
   TrendingDown,
   TrendingUp,
-  WalletCards,
-  Warehouse,
   Wheat,
 } from 'lucide-react-native';
 import { memo, useMemo } from 'react';
@@ -79,9 +75,6 @@ type Props = {
   onFilterModeChange: (value: FilterMode) => void;
   onViewAllPinned: () => void;
   onOpenAi: () => void;
-  onOpenChat: () => void;
-  onOpenExpenses: () => void;
-  onOpenHome: () => void;
   onDetailsPress: (card: NearbyMarketCard) => void;
 };
 
@@ -112,9 +105,6 @@ export const MandiMarketScreen = memo(function MandiMarketScreen({
   onFilterModeChange,
   onViewAllPinned,
   onOpenAi,
-  onOpenChat,
-  onOpenExpenses,
-  onOpenHome,
   onDetailsPress,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -562,69 +552,6 @@ export const MandiMarketScreen = memo(function MandiMarketScreen({
           </Pressable>
         </View>
       </View>
-
-      <View
-        pointerEvents="box-none"
-        style={{
-          alignSelf: 'center',
-          bottom: 0,
-          left: 0,
-          maxWidth: 420,
-          position: 'absolute',
-          right: 0,
-          width: '100%',
-        }}
-      >
-        <View style={{ alignItems: 'center' }}>
-          <View
-            style={{
-              backgroundColor: '#065F46',
-              borderRadius: 5,
-              height: 3,
-              marginBottom: -3,
-              width: 56,
-            }}
-          />
-        </View>
-        <View
-          style={{
-            alignItems: 'flex-end',
-            backgroundColor: palette.white,
-            flexDirection: 'row',
-            height: 70 + insets.bottom,
-            justifyContent: 'space-between',
-            paddingBottom: Math.max(insets.bottom, 8),
-            paddingHorizontal: 12,
-            paddingTop: 8,
-          }}
-        >
-          <BottomNavItem icon={House} label="Home" onPress={onOpenHome} />
-          <BottomNavItem active icon={ChartColumnBig} label="mandi" onPress={() => undefined} />
-          <Pressable
-            hitSlop={10}
-            onPress={onOpenAi}
-            style={{ alignItems: 'center', justifyContent: 'center', marginTop: -8, width: 77 }}
-          >
-            <View
-              style={{
-                alignItems: 'center',
-                backgroundColor: 'rgba(78, 78, 78, 0.07)',
-                borderColor: palette.white,
-                borderRadius: 999,
-                borderCurve: 'continuous',
-                borderWidth: 4,
-                boxShadow: '0 2px 10px rgba(6, 95, 70, 0.30)',
-                justifyContent: 'center',
-                padding: 12,
-              }}
-            >
-              <Sparkles color={palette.leafDark} size={30} strokeWidth={1.8} />
-            </View>
-          </Pressable>
-          <BottomNavItem icon={MessageCircle} label="Chat" onPress={onOpenChat} />
-          <BottomNavItem icon={WalletCards} label="expense" onPress={onOpenExpenses} />
-        </View>
-      </View>
     </View>
   );
 });
@@ -773,42 +700,6 @@ function PinnedCropCard({ crop, width }: { crop: PinnedCrop; width: number }) {
         </Text>
       </View>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon: Icon,
-  label,
-  onPress,
-}: {
-  active?: boolean;
-  icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      hitSlop={8}
-      onPress={onPress}
-      style={{ alignItems: 'center', gap: 4, height: 46, justifyContent: 'center', width: 72 }}
-    >
-      <Icon
-        color={active ? palette.leafDark : '#4B4E54'}
-        size={23}
-        strokeWidth={active ? 2.4 : 2.1}
-      />
-      <Text
-        style={{
-          color: active ? palette.leafDark : '#4B4E54',
-          fontFamily: active ? typography.body : typography.bodyRegular,
-          fontSize: 12,
-          lineHeight: 16,
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 

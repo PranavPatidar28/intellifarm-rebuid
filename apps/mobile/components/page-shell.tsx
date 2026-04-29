@@ -30,7 +30,7 @@ export function PageShell({
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
-        paddingBottom: 124,
+        paddingBottom: 138,
         backgroundColor: palette.canvas,
       }}
       {...scrollProps}

@@ -2,13 +2,17 @@ import { z } from 'zod';
 
 import {
   alertTypes,
+  assistantSafetyLevels,
   assistantMessageRoles,
   cropSeasonStatuses,
+  diseaseConfidenceBands,
   diseaseAnalysisSources,
   diseaseCaptureModes,
   diseaseReportStatuses,
+  fieldWindowStatuses,
   facilityTypes,
   irrigationTypes,
+  marketTrendDirections,
   predictionInputConfidenceLevels,
   predictionStatuses,
   predictionTypes,
@@ -16,13 +20,17 @@ import {
   seasonClimateMethods,
   seasonKeys,
   severityLevels,
+  schemeEligibilityTones,
+  schemePriorityLevels,
   soilProfileSources,
   soilTypes,
   taskPriorities,
   taskStatuses,
   taskTypes,
   userRoles,
+  weatherConditionCodes,
   weatherLocationSources,
+  weatherRiskLevels,
 } from './enums';
 
 const queryBooleanSchema = z.preprocess((value) => {
@@ -148,11 +156,26 @@ export const weatherLocationQuerySchema = z
     }
   });
 
-export const createDiseaseReportSchema = z.object({
-  cropSeasonId: z.string().uuid(),
-  userNote: z.string().trim().max(500).optional(),
-  captureMode: z.enum(diseaseCaptureModes).default('CAMERA_DUAL_ANGLE'),
+export const dashboardQuerySchema = weatherLocationQuerySchema.extend({
+  cropSeasonId: z.string().uuid().optional(),
 });
+
+export const createDiseaseReportSchema = z
+  .object({
+    cropSeasonId: z.string().uuid().optional(),
+    placeLabel: z.string().trim().min(2).max(80).optional(),
+    userNote: z.string().trim().max(500).optional(),
+    captureMode: z.enum(diseaseCaptureModes).default('CAMERA_DUAL_ANGLE'),
+  })
+  .superRefine((value, context) => {
+    if (!value.cropSeasonId && !value.placeLabel) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Choose a saved crop season or enter a new place label',
+        path: ['cropSeasonId'],
+      });
+    }
+  });
 
 export const soilMetricsSchema = z
   .object({
@@ -321,73 +344,233 @@ export const dashboardAlertSchema = z.object({
   isRead: z.boolean(),
 });
 
-export const weatherSummarySchema = z.object({
-  currentTemperatureC: z.number(),
-  forecastSummary: z.string(),
-  rainfallExpectedMm: z.number(),
-  advisories: z.array(z.string()),
-  forecastDays: z.array(
-    z.object({
-      date: z.string(),
-      maxTemperatureC: z.number(),
-      minTemperatureC: z.number(),
-      rainfallMm: z.number(),
-    }),
-  ),
-  source: z.string(),
-  locationSource: z.enum(weatherLocationSources),
-  locationLabel: z.string(),
+export const weatherFreshnessSchema = z.object({
+  capturedAt: z.string(),
+  isCached: z.boolean(),
+  cacheAgeMinutes: z.number().int().min(0),
+  stale: z.boolean(),
 });
 
-export const seasonSummarySchema = z.object({
+export const weatherCurrentSchema = z.object({
+  temperatureC: z.number(),
+  humidityPercent: z.number().min(0).max(100),
+  rainfallExpectedMm: z.number(),
+  rainProbabilityPercent: z.number().min(0).max(100),
+  conditionCode: z.enum(weatherConditionCodes),
+  conditionLabel: z.string(),
+  feelsLikeC: z.number(),
+  windSpeedKph: z.number(),
+  updatedAt: z.string(),
+});
+
+export const weatherHourlyPointSchema = z.object({
+  time: z.string(),
+  temperatureC: z.number(),
+  rainMm: z.number(),
+  rainProbabilityPercent: z.number().min(0).max(100),
+  conditionCode: z.enum(weatherConditionCodes),
+});
+
+export const weatherDailyPointSchema = z.object({
+  date: z.string(),
+  maxTemperatureC: z.number(),
+  minTemperatureC: z.number(),
+  rainfallMm: z.number(),
+  conditionCode: z.enum(weatherConditionCodes),
+  conditionLabel: z.string(),
+});
+
+export const weatherAdvisorySchema = z.object({
+  title: z.string(),
+  message: z.string(),
+  severity: z.enum(severityLevels),
+  recommendedAction: z.string(),
+  audioSummary: z.string(),
+});
+
+export const weatherRiskSignalSchema = z.object({
+  level: z.enum(weatherRiskLevels),
+  reason: z.string(),
+});
+
+export const weatherFieldWindowSchema = z.object({
+  status: z.enum(fieldWindowStatuses),
+  summary: z.string(),
+});
+
+export const weatherSummarySchema = z.object({
+  current: weatherCurrentSchema,
+  hourly: z.array(weatherHourlyPointSchema),
+  daily: z.array(weatherDailyPointSchema),
+  advisories: z.array(weatherAdvisorySchema),
+  riskSignals: z.object({
+    sprayRisk: weatherRiskSignalSchema,
+    irrigationNeed: weatherRiskSignalSchema,
+    heatStressRisk: weatherRiskSignalSchema,
+    floodRisk: weatherRiskSignalSchema,
+  }),
+  fieldWindows: z.object({
+    sprayWindow: weatherFieldWindowSchema,
+    irrigationWindow: weatherFieldWindowSchema,
+    harvestWindow: weatherFieldWindowSchema,
+  }),
+  sourceMeta: z.object({
+    provider: z.string(),
+    locationSource: z.enum(weatherLocationSources),
+    locationLabel: z.string(),
+    accuracyLabel: z.string(),
+    isFallback: z.boolean(),
+  }),
+  freshness: weatherFreshnessSchema,
+});
+
+export const seasonSwitcherItemSchema = z.object({
+  cropSeasonId: z.string().uuid(),
+  cropName: z.string(),
+  currentStage: z.string(),
+  farmPlotName: z.string(),
+  locationLabel: z.string(),
+  stageProgressPercent: z.number().min(0).max(100),
+  pendingTaskCount: z.number().int().min(0),
+  hasWeather: z.boolean(),
+});
+
+export const featuredSeasonSchema = z.object({
   cropSeasonId: z.string().uuid(),
   cropName: z.string(),
   sowingDate: z.string(),
   currentStage: z.string(),
+  farmPlotId: z.string().uuid(),
   farmPlotName: z.string(),
+  village: z.string(),
+  district: z.string(),
+  state: z.string(),
+  irrigationType: z.enum(irrigationTypes),
+  stageProgressPercent: z.number().min(0).max(100),
+  daysSinceSowing: z.number().int().min(0),
+});
+
+export const taskFocusSchema = z.object({
+  title: z.string(),
+  subtitle: z.string(),
+  progressLabel: z.string(),
+  pendingCount: z.number().int().min(0),
+  completedCount: z.number().int().min(0),
   tasks: z.array(dashboardTaskSchema),
-  alerts: z.array(dashboardAlertSchema),
-  weather: weatherSummarySchema.nullable(),
+});
+
+export const cropHealthSummarySchema = z.object({
+  riskLevel: z.enum(severityLevels),
+  headline: z.string(),
+  detail: z.string(),
+  confidenceBand: z.enum(diseaseConfidenceBands).nullable(),
+  latestReportId: z.string().uuid().nullable(),
+  ctaLabel: z.string(),
+});
+
+export const marketResponseRecordSchema = z.object({
+  id: z.string().uuid(),
+  facilityId: z.string().uuid().nullable().optional(),
+  cropName: z.string(),
+  mandiName: z.string(),
+  district: z.string(),
+  state: z.string(),
+  priceMin: z.number(),
+  priceMax: z.number(),
+  priceModal: z.number(),
+  recordDate: z.string(),
+  source: z.string(),
+  distanceKm: z.number().nullable(),
+  trendDirection: z.enum(marketTrendDirections),
+  trendLabel: z.string(),
+  deltaFromPrevious: z.number().nullable(),
+  freshnessLabel: z.string(),
+});
+
+export const marketPulseSchema = z.object({
+  cropName: z.string(),
+  modalPrice: z.number(),
+  mandiName: z.string(),
+  distanceKm: z.number().nullable(),
+  trendDirection: z.enum(marketTrendDirections),
+  trendLabel: z.string(),
+  freshnessLabel: z.string(),
+  summary: z.string(),
+  ctaLabel: z.string(),
+});
+
+export const schemeSummarySchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  titleHi: z.string().nullable().optional(),
+  description: z.string(),
+  descriptionHi: z.string().nullable().optional(),
+  category: z.string(),
+  applicableState: z.string(),
+  officialLink: z.string(),
+  benefitSummary: z.string(),
+  eligibilityTone: z.enum(schemeEligibilityTones),
+  priority: z.enum(schemePriorityLevels),
+  whyRelevant: z.string(),
+  documentsPreview: z.array(z.string()),
+  deadlineLabel: z.string(),
+});
+
+export const schemeSpotlightSchema = z.object({
+  schemeId: z.string().uuid(),
+  title: z.string(),
+  benefitSummary: z.string(),
+  priority: z.enum(schemePriorityLevels),
+  whyRelevant: z.string(),
+  officialLink: z.string(),
+  ctaLabel: z.string(),
+});
+
+export const resourcePulseSchema = z.object({
+  weeklyWaterMm: z.number(),
+  fertilizerNeed: z.string(),
+  pesticideNeedLevel: z.enum(['LOW', 'WATCH', 'HIGH']),
+  recommendations: z.array(z.string()),
+  safetyNote: z.string(),
+});
+
+export const dashboardOfflineStateSchema = z.object({
+  weatherCacheReady: z.boolean(),
+  latestWeatherAt: z.string().nullable(),
+  latestAlertAt: z.string().nullable(),
+  message: z.string(),
 });
 
 export const dashboardResponseSchema = z.object({
   user: userSummarySchema,
-  seasons: z.array(seasonSummarySchema),
+  generatedAt: z.string(),
+  featuredSeason: featuredSeasonSchema.nullable(),
+  seasonSwitcher: z.array(seasonSwitcherItemSchema),
+  weatherHero: weatherSummarySchema.nullable(),
+  taskFocus: taskFocusSchema.nullable(),
+  cropHealth: cropHealthSummarySchema.nullable(),
+  marketPulse: marketPulseSchema.nullable(),
+  schemeSpotlight: schemeSpotlightSchema.nullable(),
+  resourcePulse: resourcePulseSchema.nullable(),
+  offlineState: dashboardOfflineStateSchema,
 });
 
 export const diseaseResultSchema = z.object({
   predictedIssue: z.string().nullable(),
   confidenceScore: z.number(),
+  confidenceBand: z.enum(diseaseConfidenceBands),
   recommendation: z.string(),
   escalationRequired: z.boolean(),
   status: z.enum(diseaseReportStatuses),
   provider: z.string(),
   captureMode: z.enum(diseaseCaptureModes),
   analysisSource: z.enum(diseaseAnalysisSources),
-});
-
-export const facilitySummarySchema = z.object({
-  id: z.string().uuid(),
-  type: z.enum(facilityTypes),
-  name: z.string(),
-  district: z.string(),
-  state: z.string(),
-  village: z.string().nullable().optional(),
-  latitude: z.number(),
-  longitude: z.number(),
-  distanceKm: z.number(),
-  services: z.array(z.string()),
-  latestMarket: z
-    .object({
-      cropName: z.string(),
-      mandiName: z.string(),
-      priceMin: z.number(),
-      priceMax: z.number(),
-      priceModal: z.number(),
-      recordDate: z.string(),
-      source: z.string(),
-    })
-    .nullable(),
+  symptomsDetected: z.array(z.string()),
+  possibleCause: z.string(),
+  safeFirstAction: z.string(),
+  whatNotToDo: z.array(z.string()),
+  nextActions: z.array(z.string()),
+  escalationReason: z.string().nullable(),
 });
 
 export const predictionSummarySchema = z.object({
@@ -433,17 +616,165 @@ export const cropSuggestionPredictionResponseSchema = z.object({
   }),
 });
 
+export const facilityMarketContextSchema = z.object({
+  cropName: z.string(),
+  mandiName: z.string(),
+  priceMin: z.number(),
+  priceMax: z.number(),
+  priceModal: z.number(),
+  recordDate: z.string(),
+  source: z.string(),
+  trendDirection: z.enum(marketTrendDirections),
+  trendLabel: z.string(),
+  freshnessLabel: z.string(),
+});
+
+export const facilitySummarySchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(facilityTypes),
+  name: z.string(),
+  district: z.string(),
+  state: z.string(),
+  village: z.string().nullable().optional(),
+  latitude: z.number(),
+  longitude: z.number(),
+  distanceKm: z.number(),
+  distanceBucket: z.string(),
+  travelHint: z.string(),
+  primaryServiceLabel: z.string(),
+  services: z.array(z.string()),
+  marketContext: facilityMarketContextSchema.nullable(),
+  recommendedUse: z.string(),
+  latestMarket: facilityMarketContextSchema.nullable(),
+});
+
+export const marketsResponseSchema = z.object({
+  generatedAt: z.string(),
+  cropName: z.string().nullable(),
+  records: z.array(marketResponseRecordSchema),
+  bestRecord: marketResponseRecordSchema.nullable(),
+  recommendedRecord: marketResponseRecordSchema.nullable(),
+  topNearby: z.array(marketResponseRecordSchema),
+});
+
+export const facilitiesResponseSchema = z.object({
+  facilities: z.array(facilitySummarySchema),
+});
+
+export const schemesResponseSchema = z.object({
+  generatedAt: z.string(),
+  schemes: z.array(schemeSummarySchema),
+  recommendedSchemeId: z.string().uuid().nullable(),
+});
+
 export const assistantSourceSchema = z.object({
   type: z.string(),
   label: z.string(),
   referenceId: z.string().optional(),
 });
 
+export const assistantActionCardSchema = z.object({
+  title: z.string(),
+  body: z.string(),
+  ctaLabel: z.string(),
+  ctaRoute: z.string(),
+  tone: z.enum(['weather', 'diagnose', 'market', 'scheme', 'expert', 'task']),
+});
+
+export const assistantSuggestedNextStepSchema = z.object({
+  label: z.string(),
+  ctaLabel: z.string(),
+  ctaRoute: z.string(),
+});
+
 export const assistantMessageSchema = z.object({
   id: z.string().uuid(),
   role: z.enum(assistantMessageRoles),
   content: z.string(),
+  answer: z.string(),
+  spokenSummary: z.string(),
   sources: z.array(assistantSourceSchema),
+  safetyLevel: z.enum(assistantSafetyLevels),
   safetyFlags: z.array(z.string()),
+  actionCards: z.array(assistantActionCardSchema),
+  suggestedNextStep: assistantSuggestedNextStepSchema.nullable(),
   createdAt: z.string(),
+});
+
+export const assistantThreadSummarySchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  updatedAt: z.string(),
+  messageCount: z.number().int().min(0),
+});
+
+export const assistantThreadSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().nullable(),
+  updatedAt: z.string(),
+  messages: z.array(assistantMessageSchema),
+});
+
+export const assistantThreadsResponseSchema = z.object({
+  threads: z.array(assistantThreadSummarySchema),
+});
+
+export const assistantThreadResponseSchema = z.object({
+  thread: assistantThreadSchema,
+});
+
+export const assistantMessageResponseSchema = z.object({
+  message: assistantMessageSchema,
+});
+
+export const alertSummarySchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  message: z.string(),
+  alertType: z.enum(alertTypes),
+  severity: z.enum(severityLevels),
+  isRead: z.boolean(),
+  createdAt: z.string(),
+  categoryLabel: z.string(),
+  iconKey: z.string(),
+  ctaLabel: z.string(),
+  ctaRoute: z.string(),
+  freshnessLabel: z.string(),
+});
+
+export const alertsResponseSchema = z.object({
+  alerts: z.array(alertSummarySchema),
+});
+
+export const diseaseReportSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid().optional(),
+  cropSeasonId: z.string().uuid().nullable().optional(),
+  placeLabel: z.string().nullable().optional(),
+  image1Url: z.string().nullable().optional(),
+  image2Url: z.string().nullable().optional(),
+  voiceNoteUrl: z.string().nullable().optional(),
+  userNote: z.string().nullable().optional(),
+  cropSeason: z
+    .object({
+      id: z.string().uuid(),
+      cropName: z.string(),
+      currentStage: z.string(),
+      sowingDate: z.string(),
+      farmPlotId: z.string().uuid(),
+      status: z.enum(cropSeasonStatuses),
+    })
+    .nullable()
+    .optional(),
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+  providerRef: z.string().nullable().optional(),
+}).extend(diseaseResultSchema.shape);
+
+export const diseaseReportsResponseSchema = z.object({
+  reports: z.array(diseaseReportSchema),
+});
+
+export const diseaseReportResponseSchema = z.object({
+  report: diseaseReportSchema,
 });

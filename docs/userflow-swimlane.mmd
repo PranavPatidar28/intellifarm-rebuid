@@ -1,0 +1,108 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Manrope, sans-serif",
+    "background": "#ffffff",
+    "primaryTextColor": "#143423",
+    "lineColor": "#3d6a52",
+    "tertiaryColor": "#f7fbf8"
+  },
+  "flowchart": {
+    "curve": "linear",
+    "nodeSpacing": 34,
+    "rankSpacing": 70,
+    "htmlLabels": true
+  }
+}}%%
+flowchart LR
+    subgraph L1["1. Access and trust"]
+        direction TB
+        A["Open app"]
+        B["Phone login"]
+        C["Request OTP"]
+        D["Verify OTP"]
+        E{"Profile complete?"}
+        A --> B --> C --> D --> E
+    end
+
+    subgraph L2["2. First-time setup"]
+        direction TB
+        F["Create farmer profile"]
+        G["Add first plot"]
+        H["Create first crop season"]
+        F --> G --> H
+    end
+
+    subgraph L3["3. Daily farm workspace"]
+        direction TB
+        I["Dashboard briefing"]
+        J{"Season exists?"}
+        K["Empty state<br/>start setup"]
+        L["Fields and plot detail"]
+        M["Season timeline"]
+        N["Update weekly tasks"]
+        I --> J
+        J -- "No" --> K
+        J -- "Yes" --> L
+        L --> M --> N
+    end
+
+    subgraph L4["4. Intelligence and support tools"]
+        direction TB
+        O["Run crop planning"]
+        P["Use selected crop"]
+        Q["Review markets"]
+        R["Ask grounded assistant"]
+        S["Submit disease photos"]
+        T["Browse schemes"]
+        U["Act with confidence"]
+        O --> P --> U
+        Q --> U
+        R --> U
+        S --> U
+        T --> U
+    end
+
+    subgraph L5["5. Admin operations"]
+        direction TB
+        V["Manage crop definitions"]
+        W["Manage stage rules"]
+        X["Manage task templates"]
+        Y["Manage schemes"]
+        Z["Review disease reports"]
+        V --> W --> X --> Y --> Z
+    end
+
+    E -- "No" --> F
+    E -- "Yes" --> I
+    H --> I
+    K --> G
+    I --> O
+    I --> Q
+    I --> R
+    I --> S
+    I --> T
+    U --> I
+    I --> AA{"Admin role?"}
+    AA -- "Yes" --> V
+
+    classDef access fill:#dff4fb,stroke:#4d98b5,stroke-width:2px,color:#184456;
+    classDef setup fill:#fff2c7,stroke:#d9a02e,stroke-width:2px,color:#6f4a0d;
+    classDef workspace fill:#e7f6ea,stroke:#57a871,stroke-width:2px,color:#19492e;
+    classDef tools fill:#fde9df,stroke:#d78d66,stroke-width:2px,color:#69341d;
+    classDef admin fill:#edf1f2,stroke:#8fa0a6,stroke-width:2px,color:#304149;
+    classDef decision fill:#ffffff,stroke:#5f7667,stroke-width:2.5px,color:#173122;
+
+    class A,B,C,D access;
+    class F,G,H setup;
+    class I,K,L,M,N workspace;
+    class O,P,Q,R,S,T,U tools;
+    class V,W,X,Y,Z admin;
+    class E,J,AA decision;
+
+    style L1 fill:#f8fcff,stroke:#bedbe7,stroke-width:1.5px
+    style L2 fill:#fff9e9,stroke:#ecd38e,stroke-width:1.5px
+    style L3 fill:#f6fcf7,stroke:#cae6d1,stroke-width:1.5px
+    style L4 fill:#fff5ef,stroke:#f1c8b3,stroke-width:1.5px
+    style L5 fill:#f5f7f8,stroke:#d0d9dc,stroke-width:1.5px
+

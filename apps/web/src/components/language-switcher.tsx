@@ -25,7 +25,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
         "inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium transition",
         compact
           ? "border border-white/18 bg-white/12 text-white hover:bg-white/18"
-          : "border border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--surface-muted)]",
+          : "border border-[var(--border)] bg-card text-[var(--foreground)] hover:bg-[var(--surface-muted)]",
       )}
       title="Sets the preferred language for audio and future language support."
     >

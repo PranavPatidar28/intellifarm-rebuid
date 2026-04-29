@@ -8,9 +8,20 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WeatherService } from '../weather/weather.service';
 
 type WeatherSummary = {
-  currentTemperatureC: number;
-  rainfallExpectedMm: number;
-  forecastSummary: string;
+  current: {
+    temperatureC: number;
+    rainfallExpectedMm: number;
+    conditionLabel: string;
+  };
+  fieldWindows?: {
+    sprayWindow?: {
+      summary: string;
+    };
+  };
+  advisories?: Array<{
+    title: string;
+    message: string;
+  }>;
 };
 
 @Injectable()
@@ -141,15 +152,15 @@ export class RulesEngineService {
   }) {
     const advisories: string[] = [];
 
-    if (params.weather.rainfallExpectedMm >= 20) {
+    if (params.weather.current.rainfallExpectedMm >= 20) {
       advisories.push(
         `Rain expected soon for ${params.cropName}. Avoid spraying right now.`,
       );
     }
 
     if (
-      params.weather.rainfallExpectedMm < 3 &&
-      params.weather.currentTemperatureC >= 33
+      params.weather.current.rainfallExpectedMm < 3 &&
+      params.weather.current.temperatureC >= 33
     ) {
       advisories.push(
         `Hot and dry conditions may stress the crop at ${params.currentStage.toLowerCase()} stage. Review irrigation timing.`,
@@ -158,20 +169,25 @@ export class RulesEngineService {
 
     if (
       params.irrigationType === 'RAIN_FED' &&
-      params.weather.rainfallExpectedMm < 5
+      params.weather.current.rainfallExpectedMm < 5
     ) {
       advisories.push(
         'Low expected rainfall this week. Monitor soil moisture closely.',
       );
     }
 
+    if (params.weather.fieldWindows?.sprayWindow?.summary) {
+      advisories.push(params.weather.fieldWindows.sprayWindow.summary);
+    }
+
     if (advisories.length === 0) {
       advisories.push(
-        'Weather looks stable this week. Continue regular field scouting.',
+        params.weather.advisories?.[0]?.message ??
+          `Weather looks stable this week. ${params.weather.current.conditionLabel}. Continue regular field scouting.`,
       );
     }
 
-    return advisories;
+    return Array.from(new Set(advisories)).slice(0, 3);
   }
 
   async applyWeatherAlerts(params: {
@@ -188,7 +204,7 @@ export class RulesEngineService {
       severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
     }> = [];
 
-    if (params.weather.rainfallExpectedMm >= 30) {
+    if (params.weather.current.rainfallExpectedMm >= 30) {
       alerts.push({
         title: 'Heavy rain likely this week',
         message: `Expected rain may affect ${params.cropName} at ${params.currentStage.toLowerCase()} stage. Check drainage and avoid unnecessary spray activity.`,
@@ -197,8 +213,8 @@ export class RulesEngineService {
     }
 
     if (
-      params.weather.currentTemperatureC >= 35 &&
-      params.weather.rainfallExpectedMm < 2
+      params.weather.current.temperatureC >= 35 &&
+      params.weather.current.rainfallExpectedMm < 2
     ) {
       alerts.push({
         title: 'Heat and moisture stress watch',

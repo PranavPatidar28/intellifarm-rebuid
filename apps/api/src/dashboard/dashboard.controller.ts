@@ -1,7 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
-import { weatherLocationQuerySchema } from '@intellifarm/contracts';
+import { dashboardQuerySchema } from '@intellifarm/contracts';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthGuard } from '../common/guards/auth.guard';
@@ -20,7 +20,7 @@ export class DashboardController {
     @CurrentUser() user: AuthUser,
     @Query() query: Record<string, unknown>,
   ) {
-    const location = parseWithSchema(weatherLocationQuerySchema, query);
+    const location = parseWithSchema(dashboardQuerySchema, query);
     const locationOverride =
       typeof location.latitude === 'number' &&
       typeof location.longitude === 'number'
@@ -30,6 +30,10 @@ export class DashboardController {
           }
         : undefined;
 
-    return this.dashboardService.getWeeklyDashboard(user.sub, locationOverride);
+    return this.dashboardService.getWeeklyDashboard(
+      user.sub,
+      locationOverride,
+      location.cropSeasonId,
+    );
   }
 }

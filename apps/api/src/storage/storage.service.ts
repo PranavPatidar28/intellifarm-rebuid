@@ -90,11 +90,7 @@ export class StorageService {
 
     const report = await this.prisma.diseaseReport.findFirst({
       where: {
-        cropSeason: {
-          farmPlot: {
-            userId,
-          },
-        },
+        userId,
         OR: [
           { image1Url: mediaUrl },
           { image1Url: { endsWith: mediaSuffix } },

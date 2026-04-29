@@ -236,6 +236,7 @@ export class AdminService {
     const diseaseReports = await this.prisma.diseaseReport.findMany({
       include: {
         cropSeason: true,
+        user: true,
       },
       orderBy: { createdAt: 'desc' },
       take: 50,

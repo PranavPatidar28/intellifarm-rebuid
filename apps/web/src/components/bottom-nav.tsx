@@ -9,8 +9,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-6 z-50 px-4 xl:hidden pointer-events-none flex justify-center">
-      <div className="pointer-events-auto flex w-full max-w-sm justify-between rounded-full border border-border bg-background/90 px-4 py-2 shadow-lg backdrop-blur-xl">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4 xl:hidden">
+      <div className="pointer-events-auto flex w-full max-w-sm justify-between rounded-[var(--radius-panel)] border border-[var(--border)] bg-card/94 px-3 py-2 shadow-[var(--shadow-2)] backdrop-blur-xl">
         {mobileNavItems.map((item) => {
           const Icon = item.icon;
           const active =
@@ -21,11 +21,12 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center gap-1 rounded-full p-2 transition-all ${
+              className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] p-2 transition-all ${
                 active
-                  ? "bg-primary text-primary-foreground scale-110 shadow-md"
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "text-muted-foreground hover:text-foreground"
               }`}
+              aria-label={item.label}
             >
               <Icon className="h-5 w-5" />
               <span className="sr-only">{item.label}</span>

@@ -28,7 +28,7 @@ export async function serverApiGet<T>(path: string): Promise<T | null> {
     const text = await response.text();
     return text ? (JSON.parse(text) as T) : null;
   } catch (error) {
-    if ((error as any).message === "NEXT_REDIRECT") {
+    if (isNextRedirectError(error)) {
       throw error;
     }
     console.error("Server API Get Error:", error);
@@ -36,7 +36,7 @@ export async function serverApiGet<T>(path: string): Promise<T | null> {
   }
 }
 
-export async function serverApiPost<T>(path: string, body: any): Promise<T | null> {
+export async function serverApiPost<T>(path: string, body: unknown): Promise<T | null> {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()
@@ -64,10 +64,14 @@ export async function serverApiPost<T>(path: string, body: any): Promise<T | nul
     const text = await response.text();
     return text ? (JSON.parse(text) as T) : null;
   } catch (error) {
-    if ((error as any).message === "NEXT_REDIRECT") {
+    if (isNextRedirectError(error)) {
       throw error;
     }
     console.error("Server API Post Error:", error);
     return null;
   }
+}
+
+function isNextRedirectError(error: unknown) {
+  return error instanceof Error && error.message === "NEXT_REDIRECT";
 }

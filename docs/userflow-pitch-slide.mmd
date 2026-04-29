@@ -1,0 +1,57 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Manrope, sans-serif",
+    "background": "#ffffff",
+    "primaryTextColor": "#143423",
+    "lineColor": "#3d6a52",
+    "tertiaryColor": "#f7fbf8"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 36,
+    "rankSpacing": 76,
+    "htmlLabels": true
+  }
+}}%%
+flowchart LR
+    A["Open Intellifarm"] --> B["Phone + OTP login"]
+    B --> C{"New farmer?"}
+    C -- "Yes" --> D["3-step onboarding<br/>Profile • Plot • Season"]
+    C -- "No" --> E["Daily dashboard<br/>Weather • Tasks • Alerts"]
+    D --> E
+
+    E --> F["Track fields<br/>and timelines"]
+    E --> G["Plan next crop<br/>with predictions"]
+    E --> H["Compare mandis<br/>and warehouses"]
+    E --> I["Ask assistant<br/>scan disease<br/>find schemes"]
+
+    F --> J["Take field action"]
+    G --> J
+    H --> J
+    I --> J
+
+    J --> K["Better weekly decisions"]
+    K --> E
+
+    E --> L{"Admin role?"}
+    L -- "Yes" --> M["Configure crop rules<br/>tasks • schemes • reviews"]
+
+    classDef start fill:#e1f4ea,stroke:#2e8458,stroke-width:2px,color:#123a27;
+    classDef login fill:#dff4fb,stroke:#4d98b5,stroke-width:2px,color:#184456;
+    classDef setup fill:#fff2c7,stroke:#d9a02e,stroke-width:2px,color:#6f4a0d;
+    classDef hub fill:#e7f6ea,stroke:#57a871,stroke-width:2px,color:#19492e;
+    classDef action fill:#fde9df,stroke:#d78d66,stroke-width:2px,color:#69341d;
+    classDef outcome fill:#eef5ff,stroke:#7b9ed8,stroke-width:2px,color:#223e68;
+    classDef admin fill:#edf1f2,stroke:#8fa0a6,stroke-width:2px,color:#304149;
+    classDef decision fill:#ffffff,stroke:#5f7667,stroke-width:2.5px,color:#173122;
+
+    class A start;
+    class B login;
+    class D setup;
+    class E,F,G,H,I hub;
+    class J action;
+    class K outcome;
+    class M admin;
+    class C,L decision;
+

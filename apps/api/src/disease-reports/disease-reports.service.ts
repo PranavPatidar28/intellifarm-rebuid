@@ -20,31 +20,21 @@ export class DiseaseReportsService {
 
   async listReports(userId: string) {
     const reports = await this.prisma.diseaseReport.findMany({
-      where: {
-        cropSeason: {
-          farmPlot: {
-            userId,
-          },
-        },
-      },
+      where: { userId },
       include: {
         cropSeason: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return { reports };
+    return { reports: reports.map((report) => presentDiseaseReport(report)) };
   }
 
   async getReport(userId: string, reportId: string) {
     const report = await this.prisma.diseaseReport.findFirst({
       where: {
         id: reportId,
-        cropSeason: {
-          farmPlot: {
-            userId,
-          },
-        },
+        userId,
       },
       include: {
         cropSeason: true,
@@ -55,13 +45,14 @@ export class DiseaseReportsService {
       throw new NotFoundException('Disease report not found');
     }
 
-    return { report };
+    return { report: presentDiseaseReport(report) };
   }
 
   async createReport(
     userId: string,
     payload: {
-      cropSeasonId: string;
+      cropSeasonId?: string;
+      placeLabel?: string;
       userNote?: string;
       captureMode: 'STANDARD' | 'CAMERA_DUAL_ANGLE';
     },
@@ -72,17 +63,26 @@ export class DiseaseReportsService {
       voiceNote?: Express.Multer.File[];
     },
   ) {
-    const season = await this.prisma.cropSeason.findFirst({
-      where: {
-        id: payload.cropSeasonId,
-        farmPlot: {
-          userId,
-        },
-      },
-    });
+    const season = payload.cropSeasonId
+      ? await this.prisma.cropSeason.findFirst({
+          where: {
+            id: payload.cropSeasonId,
+            farmPlot: {
+              userId,
+            },
+          },
+        })
+      : null;
 
-    if (!season) {
+    if (payload.cropSeasonId && !season) {
       throw new NotFoundException('Crop season not found');
+    }
+
+    const placeLabel = payload.placeLabel?.trim();
+    if (!season && !placeLabel) {
+      throw new BadRequestException(
+        'Choose a saved crop season or enter a new place label.',
+      );
     }
 
     if (payload.captureMode !== 'CAMERA_DUAL_ANGLE') {
@@ -91,7 +91,8 @@ export class DiseaseReportsService {
       );
     }
 
-    const { diseasedImage, cropImage, images } = this.resolveDiseaseImages(files);
+    const { diseasedImage, cropImage, images } =
+      this.resolveDiseaseImages(files);
     if (!diseasedImage || !cropImage) {
       throw new BadRequestException(
         'Dual-angle capture requires both a diseased photo and a healthy/reference crop photo.',
@@ -110,7 +111,7 @@ export class DiseaseReportsService {
     let analysis;
     try {
       analysis = await this.diseaseProvider.analyzeDualAngleImages({
-        cropName: season.cropName,
+        cropName: season?.cropName ?? 'Unknown crop',
         userNote: payload.userNote,
         captureMode: payload.captureMode,
         images,
@@ -133,7 +134,9 @@ export class DiseaseReportsService {
 
     const report = await this.prisma.diseaseReport.create({
       data: {
-        cropSeasonId: payload.cropSeasonId,
+        userId,
+        cropSeasonId: season?.id,
+        placeLabel: season ? undefined : placeLabel,
         image1Url,
         image2Url,
         voiceNoteUrl,
@@ -148,9 +151,12 @@ export class DiseaseReportsService {
         captureMode: payload.captureMode,
         analysisSource: analysis.analysisSource,
       },
+      include: {
+        cropSeason: true,
+      },
     });
 
-    return { report };
+    return { report: presentDiseaseReport(report) };
   }
 
   private resolveDiseaseImages(files: {
@@ -167,4 +173,161 @@ export class DiseaseReportsService {
 
     return { diseasedImage, cropImage, images };
   }
+}
+
+function presentDiseaseReport(
+  report: {
+    id: string;
+    userId: string;
+    cropSeasonId: string | null;
+    placeLabel: string | null;
+    image1Url: string | null;
+    image2Url: string | null;
+    voiceNoteUrl: string | null;
+    userNote: string | null;
+    predictedIssue: string | null;
+    confidenceScore: number;
+    recommendation: string;
+    escalationRequired: boolean;
+    status: 'PENDING' | 'ANALYZED' | 'ESCALATED';
+    provider: string;
+    providerRef: string | null;
+    captureMode: 'STANDARD' | 'CAMERA_DUAL_ANGLE';
+    analysisSource: 'MOCK_PROVIDER' | 'LIVE_PROVIDER';
+    cropSeason?:
+      | {
+          id: string;
+          cropName: string;
+          currentStage: string;
+          sowingDate: Date;
+          farmPlotId: string;
+          status: 'PLANNED' | 'ACTIVE' | 'HARVESTED' | 'ARCHIVED';
+        }
+      | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+) {
+  const confidenceBand =
+    report.confidenceScore >= 0.75
+      ? 'HIGH'
+      : report.confidenceScore >= 0.45
+        ? 'MEDIUM'
+        : 'LOW';
+  const predictedIssue = report.predictedIssue ?? 'Unclear issue';
+  const possibleCause = derivePossibleCause(predictedIssue, report.userNote);
+  const safeFirstAction = deriveSafeFirstAction(report.recommendation);
+  const nextActions = deriveNextActions(report);
+
+  return {
+    id: report.id,
+    userId: report.userId,
+    cropSeasonId: report.cropSeasonId,
+    placeLabel: report.placeLabel,
+    image1Url: report.image1Url,
+    image2Url: report.image2Url,
+    voiceNoteUrl: report.voiceNoteUrl,
+    userNote: report.userNote,
+    predictedIssue: report.predictedIssue,
+    confidenceScore: report.confidenceScore,
+    confidenceBand,
+    recommendation: report.recommendation,
+    escalationRequired: report.escalationRequired,
+    status: report.status,
+    provider: report.provider,
+    providerRef: report.providerRef,
+    captureMode: report.captureMode,
+    analysisSource: report.analysisSource,
+    symptomsDetected: deriveSymptomsDetected(report.userNote, predictedIssue),
+    possibleCause,
+    safeFirstAction,
+    whatNotToDo: [
+      'Do not treat this as a confirmed diagnosis without field verification.',
+      'Do not rush into chemical mixing without checking local expert guidance.',
+    ],
+    nextActions,
+    escalationReason: report.escalationRequired
+      ? confidenceBand === 'LOW'
+        ? 'AI confidence is still low, so expert review is strongly recommended.'
+        : 'The issue may need expert review before you act.'
+      : null,
+    cropSeason: report.cropSeason
+      ? {
+          id: report.cropSeason.id,
+          cropName: report.cropSeason.cropName,
+          currentStage: report.cropSeason.currentStage,
+          sowingDate: report.cropSeason.sowingDate.toISOString(),
+          farmPlotId: report.cropSeason.farmPlotId,
+          status: report.cropSeason.status,
+        }
+      : null,
+    createdAt: report.createdAt.toISOString(),
+    updatedAt: report.updatedAt.toISOString(),
+  };
+}
+
+function derivePossibleCause(predictedIssue: string, userNote?: string | null) {
+  const haystack = `${predictedIssue} ${userNote ?? ''}`.toLowerCase();
+
+  if (/fung|leaf|spot|rust|powder/.test(haystack)) {
+    return 'A fungal or leaf-surface issue may be affecting the crop.';
+  }
+
+  if (/whitefly|aphid|sucking|sticky|honeydew|curl/.test(haystack)) {
+    return 'A sucking pest pattern may be contributing to the symptoms.';
+  }
+
+  if (/wilt|droop|dry|water|stress/.test(haystack)) {
+    return 'Moisture stress or root-zone stress may be contributing to the crop decline.';
+  }
+
+  return 'The current evidence is not strong enough to confirm one exact cause.';
+}
+
+function deriveSafeFirstAction(recommendation: string) {
+  const firstSentence = recommendation.split(/[.!?]/)[0]?.trim();
+
+  return firstSentence?.length
+    ? firstSentence
+    : 'Inspect more plants before making any treatment decision.';
+}
+
+function deriveSymptomsDetected(
+  userNote: string | null,
+  predictedIssue: string,
+) {
+  const note = userNote?.trim();
+
+  if (!note) {
+    return predictedIssue === 'Unclear issue'
+      ? ['Symptoms were not strong enough for a clear match']
+      : [predictedIssue];
+  }
+
+  return note
+    .split(/[.,;]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function deriveNextActions(report: {
+  escalationRequired: boolean;
+  confidenceScore: number;
+  captureMode: 'STANDARD' | 'CAMERA_DUAL_ANGLE';
+}) {
+  const nextActions = [
+    'Compare symptoms across several plants before deciding treatment.',
+    'Keep clear photos ready in case you need expert help.',
+  ];
+
+  if (report.captureMode === 'CAMERA_DUAL_ANGLE') {
+    nextActions.unshift('Retake photos in daylight if symptoms are spreading quickly.');
+  }
+
+  if (report.escalationRequired || report.confidenceScore < 0.45) {
+    nextActions.push('Escalate this case to an expert or KVK before chemical action.');
+  }
+
+  return nextActions.slice(0, 3);
 }

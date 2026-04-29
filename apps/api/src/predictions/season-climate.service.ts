@@ -104,9 +104,9 @@ export class SeasonClimateService {
       });
       const fallback: SeasonClimateResult = {
         method: 'CURRENT_FALLBACK',
-        averageTempC: roundMetric(forecast.currentTemperatureC),
-        averageHumidityPercent: roundMetric(forecast.humidityPercent),
-        totalRainfallMm: roundMetric(forecast.rainfallExpectedMm),
+        averageTempC: roundMetric(forecast.current.temperatureC),
+        averageHumidityPercent: roundMetric(forecast.current.humidityPercent),
+        totalRainfallMm: roundMetric(forecast.current.rainfallExpectedMm),
         label: `Current weather fallback near ${resolvedLocation.locationLabel}`,
         locationLabel: resolvedLocation.locationLabel,
         assumptions: [

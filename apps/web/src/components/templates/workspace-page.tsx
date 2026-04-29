@@ -30,38 +30,32 @@ export function WorkspacePage({
   const showNav = mode === "default" || mode === "admin";
 
   return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+    <div className="page-shell">
       <div
         className={cn(
-          "mx-auto max-w-[1500px]",
-          showNav && "xl:grid xl:grid-cols-[280px_minmax(0,1fr)] xl:gap-8",
+          "app-frame",
+          showNav && "xl:grid xl:grid-cols-[272px_minmax(0,1fr)] xl:gap-6",
         )}
       >
         {showNav ? <AppNavigation mode={mode} /> : null}
         <div className="min-w-0">
           <header
             className={cn(
-              "mb-6 md:mb-8 overflow-hidden rounded-3xl border border-border/50",
-              mode === "default" 
-                 ? "bg-gradient-to-tr from-primary to-primary/80 text-primary-foreground p-6 md:p-10 shadow-lg" 
-                 : "bg-card text-card-foreground p-6 md:p-8 shadow-sm",
+              "mb-5 rounded-[var(--radius-panel)] border border-[var(--border)] bg-card/92 p-4 shadow-[var(--shadow-1)] backdrop-blur md:mb-6 md:p-5",
+              mode === "admin" && "bg-[var(--surface-muted)]",
+              mode === "focus" && "mx-auto max-w-5xl",
               className,
             )}
           >
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="max-w-3xl">
-                  <p className={cn("text-xs font-bold uppercase tracking-widest", mode === "default" ? "text-primary-foreground/70" : "text-muted-foreground")}>{eyebrow}</p>
-                  <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-5xl">
+                  <p className="eyebrow">{eyebrow}</p>
+                  <h1 className="mt-1 text-2xl font-semibold md:text-3xl">
                     {title}
                   </h1>
                   {description ? (
-                    <p
-                      className={cn(
-                        "mt-4 max-w-2xl text-base leading-relaxed",
-                        mode === "default" ? "text-primary-foreground/90" : "text-muted-foreground",
-                      )}
-                    >
+                    <p className="mt-2 max-w-2xl text-sm leading-6 muted md:text-base">
                       {description}
                     </p>
                   ) : null}
@@ -69,17 +63,18 @@ export function WorkspacePage({
                 <div className="flex flex-wrap items-center gap-3 self-start">
                   <Link
                     href="/profile"
-                    className={cn("inline-flex h-10 w-10 items-center justify-center rounded-full transition xl:hidden", mode === "default" ? "bg-white/10 hover:bg-white/20 text-white" : "bg-secondary hover:bg-secondary/80")}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)] transition hover:bg-[var(--brand-soft)] xl:hidden"
+                    aria-label="Open profile"
                   >
                     <CircleUserRound className="h-5 w-5" />
                   </Link>
-                  <LanguageSwitcher compact={mode === "default"} />
+                  <LanguageSwitcher />
                 </div>
               </div>
-              {actions ? <div className="flex flex-wrap gap-3 mt-2">{actions}</div> : null}
+              {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
             </div>
           </header>
-          <main className="pb-28 xl:pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">{children}</main>
+          <main className="pb-28 xl:pb-8">{children}</main>
         </div>
       </div>
       {showNav ? <BottomNav /> : null}

@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "IntelliFarm",
+    "slug": "intellifarm-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "intellifarm",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f6eedf"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.intellifarm.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "IntelliFarm uses your location to improve weather advice, nearby mandi discovery, and farm setup.",
+        "NSPhotoLibraryUsageDescription": "IntelliFarm lets you choose crop photos for disease diagnosis and profile updates.",
+        "NSCameraUsageDescription": "IntelliFarm lets you capture crop photos for disease diagnosis."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#f6eedf"
+      },
+      "package": "com.intellifarm.mobile",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "IntelliFarm uses your location to improve weather advice and nearby mandi suggestions."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "IntelliFarm lets you choose crop photos for diagnosis and profile updates.",
+          "cameraPermission": "IntelliFarm lets you capture crop photos for diagnosis."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "tagline": "From Sowing to Selling, Smarter Decisions"
+    }
+  }
+}

@@ -38,9 +38,11 @@ describe('RulesEngineService', () => {
   it('builds dry-weather advisories for heat stress', () => {
     const advisories = service.buildWeatherAdvisories({
       weather: {
-        currentTemperatureC: 36,
-        rainfallExpectedMm: 1,
-        forecastSummary: 'Hot and dry',
+        current: {
+          temperatureC: 36,
+          rainfallExpectedMm: 1,
+          conditionLabel: 'Hot and dry',
+        },
       },
       cropName: 'Cotton',
       currentStage: 'Flowering',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const LOCATION_STORAGE_KEY = "intellifarm:last-device-location";
 
@@ -48,7 +48,11 @@ export function useCurrentLocation(): CurrentLocationState {
   const [status, setStatus] = useState<
     "idle" | "locating" | "ready" | "denied" | "unsupported" | "error"
   >(location ? "ready" : "idle");
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(
+    location
+      ? "Using the last approved GPS location saved on this device."
+      : null,
+  );
 
   const refreshLocation = () => {
     if (typeof window === "undefined" || !navigator.geolocation) {
@@ -96,12 +100,6 @@ export function useCurrentLocation(): CurrentLocationState {
       },
     );
   };
-
-  useEffect(() => {
-    if (location) {
-      setMessage("Using the last approved GPS location saved on this device.");
-    }
-  }, [location]);
 
   return {
     location,

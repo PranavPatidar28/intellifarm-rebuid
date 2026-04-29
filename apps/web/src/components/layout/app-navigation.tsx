@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { Leaf, LogOut, ShieldCheck } from "lucide-react";
 
 import { useSession } from "@/lib/session";
 
@@ -19,27 +19,30 @@ export function AppNavigation({
   const items = getDesktopNavItems(user?.role ?? null);
 
   return (
-    <aside className="surface-card-strong sticky top-6 hidden min-h-[calc(100vh-3rem)] flex-col justify-between p-5 xl:flex">
+    <aside className="surface-card-strong sticky top-6 hidden min-h-[calc(100vh-3rem)] flex-col justify-between p-4 xl:flex">
       <div className="space-y-6">
-        <div className={mode === "admin" ? "surface-card p-4" : "hero-panel p-5"}>
-          <p className={mode === "admin" ? "eyebrow" : "eyebrow"}>Intellifarm</p>
-          <h2
-            className={
-              mode === "admin"
-                ? "mt-3 font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--foreground)]"
-                : "mt-3 font-[family-name:var(--font-display)] text-2xl font-semibold text-white"
-            }
-          >
-            {mode === "admin" ? "Admin console" : "Field decision system"}
-          </h2>
-          <p className={mode === "admin" ? "mt-3 text-sm leading-6 muted" : "mt-3 text-sm leading-6 text-white/78"}>
+        <div className="flex items-center gap-3 px-2 pt-1">
+          <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-control)] bg-[var(--brand-soft)] text-[var(--brand)]">
+            <Leaf className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-xl font-semibold text-[var(--brand)]">Intellifarm</p>
+            <p className="text-xs font-medium muted">
+              {mode === "admin" ? "Admin console" : "Field console"}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-[var(--radius-panel)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+          <p className="eyebrow">Today focus</p>
+          <p className="mt-2 text-sm leading-6 muted">
             {mode === "admin"
-              ? "Maintain crop logic, scheme content, and report operations."
-              : "Prioritize what matters today across fields, risk, markets, and support."}
+              ? "Review crop rules, schemes, and report operations."
+              : "Weather, tasks, markets, and support in one calm place."}
           </p>
         </div>
 
-        <nav className="space-y-1" aria-label="Primary">
+        <nav className="space-y-1" aria-label="Primary navigation">
           {items.map((item) => {
             const Icon = item.icon;
             const active =
@@ -50,15 +53,15 @@ export function AppNavigation({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-[var(--radius-card)] px-3 py-3 text-sm font-medium transition ${
+                className={`flex items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-sm font-medium transition ${
                   active
-                    ? "bg-[var(--brand-soft)] text-[var(--brand)]"
+                    ? "bg-[var(--brand-soft)] text-[var(--brand)] shadow-sm"
                     : "text-[var(--foreground-soft)] hover:bg-[var(--surface-muted)]"
                 }`}
               >
                 <span
-                  className={`flex h-10 w-10 items-center justify-center rounded-[0.85rem] ${
-                    active ? "bg-[rgba(30,90,60,0.12)]" : "bg-[var(--surface-muted)]"
+                  className={`flex h-9 w-9 items-center justify-center rounded-[var(--radius-control)] ${
+                    active ? "bg-white/70 dark:bg-white/10" : "bg-[var(--surface-muted)]"
                   }`}
                 >
                   <Icon className="h-4 w-4" />

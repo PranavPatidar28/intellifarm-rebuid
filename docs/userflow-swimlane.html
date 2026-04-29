@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Intellifarm Judge Swimlane User Flow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #173223;
+        --muted: #607567;
+        --line: rgba(30, 76, 49, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Manrope", sans-serif;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, #f5fbf5, #ecf5ef);
+      }
+
+      .page {
+        width: min(1540px, calc(100vw - 40px));
+        margin: 24px auto;
+      }
+
+      .topbar {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+        padding: 26px 28px;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        background:
+          radial-gradient(circle at top right, rgba(252, 232, 192, 0.9), transparent 30%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 251, 248, 0.9));
+        box-shadow: 0 24px 64px rgba(28, 67, 41, 0.1);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: #edf6ef;
+        color: #226844;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 14px 0 0;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: clamp(2.2rem, 3.6vw, 3.8rem);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.72;
+      }
+
+      .legend {
+        display: grid;
+        gap: 10px;
+      }
+
+      .legend span {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.82);
+        color: #375846;
+        font-size: 0.84rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .board {
+        margin-top: 18px;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: 0 24px 64px rgba(28, 67, 41, 0.1);
+      }
+
+      .scroll {
+        overflow: auto;
+      }
+
+      .mermaid {
+        min-width: 1600px;
+      }
+
+      @media (max-width: 1100px) {
+        .topbar {
+          grid-template-columns: 1fr;
+        }
+
+        .legend {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="topbar">
+        <div>
+          <div class="eyebrow">Judge-Friendly Swimlane Version</div>
+          <h1>How the product works, lane by lane</h1>
+          <p>
+            This version is optimized for clarity during Q and A. It separates
+            access, setup, daily farm work, intelligence tools, and admin
+            operations so judges can understand both the farmer journey and the
+            system architecture at a glance.
+          </p>
+        </div>
+        <div class="legend">
+          <span>Access and trust</span>
+          <span>First-time setup</span>
+          <span>Daily workspace</span>
+          <span>Decision tools</span>
+          <span>Admin operations</span>
+        </div>
+      </section>
+
+      <section class="board scroll">
+        <pre class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Manrope, sans-serif",
+    "background": "#ffffff",
+    "primaryTextColor": "#143423",
+    "lineColor": "#3d6a52",
+    "tertiaryColor": "#f7fbf8"
+  },
+  "flowchart": {
+    "curve": "linear",
+    "nodeSpacing": 34,
+    "rankSpacing": 70,
+    "htmlLabels": true
+  }
+}}%%
+flowchart LR
+    subgraph L1["1. Access and trust"]
+        direction TB
+        A["Open app"]
+        B["Phone login"]
+        C["Request OTP"]
+        D["Verify OTP"]
+        E{"Profile complete?"}
+        A --> B --> C --> D --> E
+    end
+    subgraph L2["2. First-time setup"]
+        direction TB
+        F["Create farmer profile"]
+        G["Add first plot"]
+        H["Create first crop season"]
+        F --> G --> H
+    end
+    subgraph L3["3. Daily farm workspace"]
+        direction TB
+        I["Dashboard briefing"]
+        J{"Season exists?"}
+        K["Empty state<br/>start setup"]
+        L["Fields and plot detail"]
+        M["Season timeline"]
+        N["Update weekly tasks"]
+        I --> J
+        J -- "No" --> K
+        J -- "Yes" --> L
+        L --> M --> N
+    end
+    subgraph L4["4. Intelligence and support tools"]
+        direction TB
+        O["Run crop planning"]
+        P["Use selected crop"]
+        Q["Review markets"]
+        R["Ask grounded assistant"]
+        S["Submit disease photos"]
+        T["Browse schemes"]
+        U["Act with confidence"]
+        O --> P --> U
+        Q --> U
+        R --> U
+        S --> U
+        T --> U
+    end
+    subgraph L5["5. Admin operations"]
+        direction TB
+        V["Manage crop definitions"]
+        W["Manage stage rules"]
+        X["Manage task templates"]
+        Y["Manage schemes"]
+        Z["Review disease reports"]
+        V --> W --> X --> Y --> Z
+    end
+    E -- "No" --> F
+    E -- "Yes" --> I
+    H --> I
+    K --> G
+    I --> O
+    I --> Q
+    I --> R
+    I --> S
+    I --> T
+    U --> I
+    I --> AA{"Admin role?"}
+    AA -- "Yes" --> V
+
+    classDef access fill:#dff4fb,stroke:#4d98b5,stroke-width:2px,color:#184456;
+    classDef setup fill:#fff2c7,stroke:#d9a02e,stroke-width:2px,color:#6f4a0d;
+    classDef workspace fill:#e7f6ea,stroke:#57a871,stroke-width:2px,color:#19492e;
+    classDef tools fill:#fde9df,stroke:#d78d66,stroke-width:2px,color:#69341d;
+    classDef admin fill:#edf1f2,stroke:#8fa0a6,stroke-width:2px,color:#304149;
+    classDef decision fill:#ffffff,stroke:#5f7667,stroke-width:2.5px,color:#173122;
+    class A,B,C,D access;
+    class F,G,H setup;
+    class I,K,L,M,N workspace;
+    class O,P,Q,R,S,T,U tools;
+    class V,W,X,Y,Z admin;
+    class E,J,AA decision;
+    style L1 fill:#f8fcff,stroke:#bedbe7,stroke-width:1.5px
+    style L2 fill:#fff9e9,stroke:#ecd38e,stroke-width:1.5px
+    style L3 fill:#f6fcf7,stroke:#cae6d1,stroke-width:1.5px
+    style L4 fill:#fff5ef,stroke:#f1c8b3,stroke-width:1.5px
+    style L5 fill:#f5f7f8,stroke:#d0d9dc,stroke-width:1.5px
+        </pre>
+      </section>
+    </main>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, securityLevel: "loose" });
+    </script>
+  </body>
+</html>

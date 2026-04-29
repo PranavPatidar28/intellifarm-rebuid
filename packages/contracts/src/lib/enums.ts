@@ -88,3 +88,43 @@ export const weatherLocationSources = [
   'SAFE_FALLBACK',
 ] as const;
 export type WeatherLocationSource = (typeof weatherLocationSources)[number];
+
+export const weatherConditionCodes = [
+  'CLEAR',
+  'PARTLY_CLOUDY',
+  'CLOUDY',
+  'FOG',
+  'LIGHT_RAIN',
+  'RAIN',
+  'HEAVY_RAIN',
+  'STORM',
+  'HEAT',
+  'UNKNOWN',
+] as const;
+export type WeatherConditionCode = (typeof weatherConditionCodes)[number];
+
+export const weatherRiskLevels = ['LOW', 'MEDIUM', 'HIGH'] as const;
+export type WeatherRiskLevel = (typeof weatherRiskLevels)[number];
+
+export const fieldWindowStatuses = ['GOOD', 'CAUTION', 'AVOID'] as const;
+export type FieldWindowStatus = (typeof fieldWindowStatuses)[number];
+
+export const marketTrendDirections = ['UP', 'DOWN', 'STABLE'] as const;
+export type MarketTrendDirection = (typeof marketTrendDirections)[number];
+
+export const schemeEligibilityTones = [
+  'LIKELY_ELIGIBLE',
+  'CHECK_DETAILS',
+  'NOT_ELIGIBLE',
+] as const;
+export type SchemeEligibilityTone =
+  (typeof schemeEligibilityTones)[number];
+
+export const schemePriorityLevels = ['LOW', 'MEDIUM', 'HIGH'] as const;
+export type SchemePriorityLevel = (typeof schemePriorityLevels)[number];
+
+export const diseaseConfidenceBands = ['LOW', 'MEDIUM', 'HIGH'] as const;
+export type DiseaseConfidenceBand = (typeof diseaseConfidenceBands)[number];
+
+export const assistantSafetyLevels = ['INFO', 'CAUTION', 'ESCALATE'] as const;
+export type AssistantSafetyLevel = (typeof assistantSafetyLevels)[number];

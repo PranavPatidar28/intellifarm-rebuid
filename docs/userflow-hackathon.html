@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Intellifarm Hackathon User Flow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-1: #f7fbf4;
+        --bg-2: #eef6ed;
+        --surface: rgba(255, 255, 255, 0.82);
+        --surface-strong: rgba(255, 255, 255, 0.94);
+        --line: rgba(30, 71, 46, 0.12);
+        --ink: #163221;
+        --muted: #5e7466;
+        --brand: #1c6b43;
+        --brand-soft: #e5f4ea;
+        --sky: #dff4fb;
+        --amber: #fff1c7;
+        --coral: #fde8df;
+        --shadow-lg: 0 30px 80px rgba(28, 63, 39, 0.12);
+        --shadow-md: 0 16px 32px rgba(18, 48, 30, 0.08);
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Manrope", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(253, 227, 147, 0.35), transparent 26%),
+          radial-gradient(circle at top right, rgba(143, 214, 189, 0.32), transparent 24%),
+          linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      }
+
+      .page {
+        width: min(1440px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 32px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background:
+          linear-gradient(135deg, rgba(27, 89, 56, 0.96), rgba(46, 118, 79, 0.9)),
+          linear-gradient(180deg, #1f6a45, #275f46);
+        color: #f6fff8;
+        box-shadow: var(--shadow-lg);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -80px -100px auto;
+        width: 280px;
+        height: 280px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 245, 208, 0.34), transparent 70%);
+        pointer-events: none;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.88);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 18px 0 0;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: clamp(2.3rem, 4vw, 4.2rem);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+      }
+
+      .hero p {
+        max-width: 860px;
+        margin: 16px 0 0;
+        color: rgba(246, 255, 248, 0.8);
+        font-size: 1rem;
+        line-height: 1.8;
+      }
+
+      .hero-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-top: 28px;
+      }
+
+      .hero-card,
+      .panel,
+      .legend,
+      .flow-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        backdrop-filter: blur(12px);
+      }
+
+      .hero-card {
+        padding: 18px 18px 16px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .hero-card strong {
+        display: block;
+        font-size: 1.3rem;
+        font-weight: 800;
+      }
+
+      .hero-card span {
+        display: block;
+        margin-top: 6px;
+        color: rgba(246, 255, 248, 0.74);
+        font-size: 0.93rem;
+        line-height: 1.6;
+      }
+
+      .content {
+        display: grid;
+        gap: 22px;
+        grid-template-columns: 320px minmax(0, 1fr);
+        margin-top: 22px;
+      }
+
+      .panel,
+      .flow-card {
+        background: var(--surface);
+        box-shadow: var(--shadow-md);
+      }
+
+      .panel {
+        padding: 22px;
+      }
+
+      .panel h2,
+      .flow-card h2 {
+        margin: 0;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.2rem;
+        letter-spacing: -0.03em;
+      }
+
+      .panel p,
+      .flow-card p,
+      .legend li {
+        color: var(--muted);
+        font-size: 0.96rem;
+        line-height: 1.7;
+      }
+
+      .stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .legend {
+        padding: 18px;
+        background: var(--surface-strong);
+      }
+
+      .legend ul {
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .legend li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        margin-top: 12px;
+      }
+
+      .swatch {
+        flex: none;
+        width: 14px;
+        height: 14px;
+        margin-top: 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+      }
+
+      .swatch-auth { background: #dff3fb; }
+      .swatch-onboard { background: #fff1c8; }
+      .swatch-hub { background: #e4f5e9; }
+      .swatch-support { background: #fde8df; }
+      .swatch-admin { background: #ebeff1; }
+      .swatch-decision { background: #fff; }
+
+      .flow-card {
+        padding: 22px;
+      }
+
+      .flow-header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .flow-header p {
+        max-width: 520px;
+        margin: 8px 0 0;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .pill {
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: #f5faf6;
+        border: 1px solid var(--line);
+        color: #315542;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .mermaid-wrap {
+        overflow: auto;
+        padding: 14px;
+        border-radius: var(--radius-lg);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 246, 0.98));
+        border: 1px solid rgba(30, 71, 46, 0.08);
+      }
+
+      .mermaid {
+        min-width: 1240px;
+      }
+
+      footer {
+        margin-top: 18px;
+        padding: 0 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 1080px) {
+        .content {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .pill-row {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="eyebrow">Intellifarm MVP · Hackathon Story</div>
+        <h1>Farmer-first user flow</h1>
+        <p>
+          This version is designed for demos and judging: the journey reads left
+          to right, the major product moments are color-coded, and the support
+          and admin branches stay visible without overwhelming the main farmer
+          story.
+        </p>
+
+        <div class="hero-grid">
+          <div class="hero-card">
+            <strong>OTP access</strong>
+            <span>Fast sign-in for farmers with a simple phone-first entry point.</span>
+          </div>
+          <div class="hero-card">
+            <strong>3-step onboarding</strong>
+            <span>Profile, plot, and season setup turn an empty account into a working farm workspace.</span>
+          </div>
+          <div class="hero-card">
+            <strong>Decision support loop</strong>
+            <span>Dashboard, planning, market insight, disease help, and grounded assistant all connect back to action.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content">
+        <div class="stack">
+          <aside class="panel">
+            <h2>Presentation Notes</h2>
+            <p>
+              Lead with the main farmer path first: login, onboarding, dashboard,
+              then the action loops. After that, point out the support lane and
+              the admin lane as differentiators.
+            </p>
+          </aside>
+
+          <aside class="legend">
+            <h2>Legend</h2>
+            <ul>
+              <li><span class="swatch swatch-auth"></span><span><strong>Access and trust</strong><br />Phone OTP and session creation.</span></li>
+              <li><span class="swatch swatch-onboard"></span><span><strong>Onboarding</strong><br />Profile, farm plot, and first crop season setup.</span></li>
+              <li><span class="swatch swatch-hub"></span><span><strong>Daily workspace</strong><br />Dashboard, fields, tasks, and recurring farm decisions.</span></li>
+              <li><span class="swatch swatch-support"></span><span><strong>Advisory tools</strong><br />Planning, support, markets, schemes, and disease help.</span></li>
+              <li><span class="swatch swatch-admin"></span><span><strong>Admin operations</strong><br />Rules, templates, schemes, and report review.</span></li>
+              <li><span class="swatch swatch-decision"></span><span><strong>Decision points</strong><br />Branching moments like auth, onboarding, and role checks.</span></li>
+            </ul>
+          </aside>
+        </div>
+
+        <section class="flow-card">
+          <div class="flow-header">
+            <div>
+              <h2>Hackathon user flow diagram</h2>
+              <p>
+                The primary story is a farmer journey that starts with low-friction
+                sign-in and ends in an action-oriented workspace, with planning
+                and support available exactly when the user needs them.
+              </p>
+            </div>
+            <div class="pill-row">
+              <span class="pill">Farmer flow</span>
+              <span class="pill">Support loop</span>
+              <span class="pill">Admin branch</span>
+            </div>
+          </div>
+
+          <div class="mermaid-wrap">
+            <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Manrope, sans-serif",
+    "background": "#ffffff",
+    "primaryTextColor": "#163221",
+    "lineColor": "#3b6451",
+    "tertiaryColor": "#f8fcf8"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 38,
+    "rankSpacing": 74,
+    "htmlLabels": true
+  }
+}}%%
+flowchart LR
+    launch["Open app"] --> home["/ redirects to /login"]
+    home --> login["Phone login"]
+    login --> otp["Request OTP"]
+    otp --> verify["Verify OTP"]
+    verify --> authCheck{"Authenticated?"}
+    authCheck -- No --> login
+    authCheck -- Yes --> profileCheck{"Profile complete?"}
+
+    subgraph ACCESS["Access and trust layer"]
+      launch
+      home
+      login
+      otp
+      verify
+      authCheck
+      profileCheck
+    end
+
+    profileCheck -- No --> profile["Onboarding 1<br/>Farmer profile"]
+    profile --> plot["Onboarding 2<br/>Add first plot"]
+    plot --> season["Onboarding 3<br/>Create crop season"]
+    season --> dashboard["Dashboard / Today"]
+    profileCheck -- Yes --> dashboard
+
+    subgraph SETUP["First-time setup"]
+      profile
+      plot
+      season
+    end
+
+    dashboard --> seasonExists{"Season exists?"}
+    seasonExists -- No --> emptyState["Empty dashboard state"]
+    emptyState --> plot
+    emptyState --> fields["Fields"]
+    seasonExists -- Yes --> briefing["Weather, alerts,<br/>tasks, markets, schemes"]
+
+    briefing --> fields["Fields"]
+    briefing --> planner["Plan crop"]
+    briefing --> support["Support hub"]
+    briefing --> markets["Market"]
+    briefing --> account["Profile"]
+
+    subgraph WORKSPACE["Farmer workspace"]
+      dashboard
+      seasonExists
+      emptyState
+      briefing
+      fields
+      planner
+      support
+      markets
+      account
+    end
+
+    fields --> fieldList["Field list"]
+    fieldList --> fieldDetail["Field detail"]
+    fieldDetail --> fieldSeason{"Plot has season?"}
+    fieldSeason -- Yes --> timeline["Season timeline"]
+    fieldSeason -- No --> createSeason["Create season"]
+    fieldSeason -- No --> planner
+    createSeason --> season
+    timeline --> taskUpdate["Update tasks"]
+    timeline --> estimate["Run weekly estimate"]
+    timeline --> schemeView["View related schemes"]
+
+    planner --> planMode{"Saved plot or explore?"}
+    planMode -- Saved plot --> planSaved["Use saved plot context"]
+    planMode -- Explore --> planExplore["Enter new location,<br/>irrigation, optional GPS"]
+    planSaved --> planSetup["Set season and soil inputs"]
+    planExplore --> planSetup
+    planSetup --> runPrediction["Run crop prediction"]
+    runPrediction --> topMatches["Review fit, confidence,<br/>and top crop matches"]
+    topMatches --> useCrop["Use selected crop"]
+    topMatches --> saveSoil["Optional: save soil type"]
+    useCrop --> season
+
+    support --> assistant["Grounded assistant"]
+    support --> disease["Disease help"]
+    support --> schemes["Schemes"]
+    assistant --> ask["Ask by text or voice"]
+    ask --> groundedReply["Grounded reply with<br/>sources and safety flags"]
+    disease --> context["Saved season or new place"]
+    context --> photos["Upload 2 photos"]
+    photos --> diagnosis["Diagnosis result and history"]
+    schemes --> filters["Filter by crop,<br/>category, search"]
+    filters --> official["Open official link"]
+
+    markets --> location["Refresh GPS or use<br/>saved coordinates"]
+    location --> compare["Compare mandis,<br/>warehouses, prices"]
+
+    account --> profileEdit["Update profile and photo"]
+    account --> logout["Log out"]
+    logout --> login
+
+    briefing --> roleCheck{"Admin role?"}
+    roleCheck -- Yes --> admin["Admin console"]
+    roleCheck -- No --> briefing
+
+    subgraph SUPPORT["Advisory and decision tools"]
+      fieldList
+      fieldDetail
+      fieldSeason
+      timeline
+      taskUpdate
+      estimate
+      schemeView
+      planMode
+      planSaved
+      planExplore
+      planSetup
+      runPrediction
+      topMatches
+      useCrop
+      saveSoil
+      assistant
+      ask
+      groundedReply
+      disease
+      context
+      photos
+      diagnosis
+      schemes
+      filters
+      official
+      location
+      compare
+      profileEdit
+      logout
+    end
+
+    admin --> cropDefs["Manage crops"]
+    admin --> stageRules["Manage stage rules"]
+    admin --> templates["Manage task templates"]
+    admin --> adminSchemes["Manage schemes"]
+    admin --> reportReview["Review disease reports"]
+
+    subgraph ADMIN["Admin branch"]
+      admin
+      cropDefs
+      stageRules
+      templates
+      adminSchemes
+      reportReview
+    end
+
+    classDef accessNode fill:#dff3fb,stroke:#4b9cb8,stroke-width:2px,color:#15455a;
+    classDef setupNode fill:#fff1c8,stroke:#e2a535,stroke-width:2px,color:#6d4c13;
+    classDef hubNode fill:#e4f5e9,stroke:#46a36d,stroke-width:2px,color:#15482d;
+    classDef toolNode fill:#fde8df,stroke:#dd8e6d,stroke-width:2px,color:#6f3a22;
+    classDef adminNode fill:#ebeff1,stroke:#8898a2,stroke-width:2px,color:#31424d;
+    classDef decisionNode fill:#ffffff,stroke:#587264,stroke-width:2.5px,color:#173122;
+
+    class launch,home,login,otp,verify accessNode;
+    class profile,plot,season setupNode;
+    class dashboard,emptyState,briefing,fields,planner,support,markets,account hubNode;
+    class fieldList,fieldDetail,timeline,taskUpdate,estimate,schemeView,planSaved,planExplore,planSetup,runPrediction,topMatches,useCrop,saveSoil,assistant,ask,groundedReply,disease,context,photos,diagnosis,schemes,filters,official,location,compare,profileEdit,logout,createSeason toolNode;
+    class admin,cropDefs,stageRules,templates,adminSchemes,reportReview adminNode;
+    class authCheck,profileCheck,seasonExists,fieldSeason,planMode,roleCheck decisionNode;
+
+    style ACCESS fill:#f7fcff,stroke:#b2d9e8,stroke-width:1.5px,color:#173122
+    style SETUP fill:#fff8e5,stroke:#efd28b,stroke-width:1.5px,color:#173122
+    style WORKSPACE fill:#f5fcf6,stroke:#bfe2c8,stroke-width:1.5px,color:#173122
+    style SUPPORT fill:#fff4ee,stroke:#f1c1ab,stroke-width:1.5px,color:#173122
+    style ADMIN fill:#f4f7f8,stroke:#c8d3d8,stroke-width:1.5px,color:#173122
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <footer>
+        Open this file directly in a browser for the cleanest presentation view.
+        The diagram is based on the current app routes, auth logic, onboarding
+        flow, support tools, and admin branch in the repo.
+      </footer>
+    </main>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+      mermaid.initialize({
+        startOnLoad: true,
+        securityLevel: "loose",
+      });
+    </script>
+  </body>
+</html>

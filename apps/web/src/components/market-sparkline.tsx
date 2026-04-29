@@ -1,12 +1,44 @@
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { ChartColumnBig } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { Badge } from "./ui/badge";
 
-export function MarketSparkline({ marketData }: { marketData: any }) {
+type MarketSparklineRecord = {
+  id?: string;
+  mandiName: string;
+  priceModal: number;
+  priceMin?: number;
+  priceMax?: number;
+  distanceKm?: number | null;
+};
+
+type MarketSparklineData = {
+  records?: MarketSparklineRecord[];
+  bestRecord?: MarketSparklineRecord | null;
+};
+
+export function MarketSparkline({
+  marketData,
+}: {
+  marketData: MarketSparklineData | null;
+}) {
   if (!marketData?.bestRecord) return null;
 
-  // Simulate sparkline trend visualization
-  const trend = Math.random() > 0.5 ? "up" : "down";
+  const records = Array.isArray(marketData.records)
+    ? marketData.records.slice(0, 12)
+    : [];
+  const prices = records
+    .map((record) => Number(record.priceModal))
+    .filter((price: number) => Number.isFinite(price));
+  const minPrice = prices.length
+    ? Math.min(...prices)
+    : (marketData.bestRecord.priceMin ?? marketData.bestRecord.priceModal);
+  const maxPrice = prices.length
+    ? Math.max(...prices)
+    : (marketData.bestRecord.priceMax ?? marketData.bestRecord.priceModal);
+  const rangeLabel =
+    minPrice !== maxPrice
+      ? `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`
+      : formatCurrency(marketData.bestRecord.priceModal);
   
   return (
     <div className="flex h-full flex-col justify-between rounded-2xl bg-gradient-to-br from-card to-card/50 p-5 shadow-sm border border-border">
@@ -15,9 +47,9 @@ export function MarketSparkline({ marketData }: { marketData: any }) {
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Live Mandi Price</p>
           <div className="flex items-center gap-2">
             <h3 className="text-2xl font-bold font-mono tracking-tight">{formatCurrency(marketData.bestRecord.priceModal)}</h3>
-            <Badge tone={trend === "up" ? "success" : "danger"} className="h-6">
-                {trend === "up" ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                1.4%
+            <Badge tone="accent" className="h-6">
+                <ChartColumnBig className="w-3 h-3 mr-1" />
+                Best
             </Badge>
           </div>
           <p className="text-sm text-foreground/80 mt-1">{marketData.bestRecord.mandiName}</p>
@@ -29,20 +61,27 @@ export function MarketSparkline({ marketData }: { marketData: any }) {
       </div>
 
       <div className="h-16 w-full flex items-end gap-1 opacity-70 hover:opacity-100 transition-opacity">
-        {/* Fake sparkline bars */}
-        {[30, 40, 35, 55, 60, 50, 75, 80, 85, 70, 90, 85].map((val, i) => (
+        {(prices.length ? prices : [marketData.bestRecord.priceModal]).map((price: number, i: number) => {
+          const height =
+            maxPrice === minPrice
+              ? 72
+              : 28 + ((price - minPrice) / (maxPrice - minPrice)) * 62;
+
+          return (
           <div 
             key={i} 
             className="flex-1 rounded-t-sm"
             style={{ 
-                height: `${val}%`, 
-                backgroundColor: trend === "up" ? "var(--success)" : "var(--danger)" 
+                height: `${height}%`, 
+                backgroundColor: "var(--accent)" 
             }}
           />
-        ))}
+        )})}
       </div>
       
-      <p className="text-xs text-muted-foreground mt-3 text-right">Last updated 10 mins ago</p>
+      <p className="text-xs text-muted-foreground mt-3 text-right">
+        Current result range: {rangeLabel}
+      </p>
     </div>
   );
 }

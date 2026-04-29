@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ReactNode,
 } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -14,11 +15,13 @@ import {
   ArrowLeft,
   Camera,
   CheckCircle2,
+  ChevronDown,
   FileImage,
   History,
   ImagePlus,
   Leaf,
   Loader2,
+  MapPin,
   Mic,
   RefreshCw,
   Upload,
@@ -30,6 +33,8 @@ import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
+
+const NEW_PLACE_VALUE = "__new_place__";
 
 type CropSeasonOption = {
   id: string;
@@ -51,7 +56,9 @@ type MeResponse = {
 
 type DiseaseReport = {
   id: string;
-  cropSeasonId: string;
+  userId?: string;
+  cropSeasonId: string | null;
+  placeLabel?: string | null;
   image1Url?: string | null;
   image2Url?: string | null;
   userNote?: string | null;
@@ -80,7 +87,8 @@ type CreateReportResponse = {
 };
 
 type FieldErrors = {
-  cropSeasonId?: string;
+  context?: string;
+  placeLabel?: string;
   cropImage?: string;
   diseasedImage?: string;
 };
@@ -94,17 +102,18 @@ export default function DiseaseHelpPage() {
 }
 
 function DiseaseDiagnosisWorkspace() {
-  const [cropSeasonId, setCropSeasonId] = useState("");
+  const [contextValue, setContextValue] = useState("");
+  const [placeLabel, setPlaceLabel] = useState("");
   const [cropImage, setCropImage] = useState<File | null>(null);
   const [diseasedImage, setDiseasedImage] = useState<File | null>(null);
   const [userNote, setUserNote] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [submitState, setSubmitState] = useState<{
-    tone: "success" | "error";
-    message: string;
-  } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [latestReport, setLatestReport] = useState<DiseaseReport | null>(null);
+  const resultCardRef = useRef<HTMLDivElement | null>(null);
+  const shouldScrollToResultRef = useRef(false);
   const speechRecognition = useSpeechRecognition();
 
   const {
@@ -139,9 +148,10 @@ function DiseaseDiagnosisWorkspace() {
     [seasons],
   );
 
+  const isNewPlace = contextValue === NEW_PLACE_VALUE;
   const selectedSeason = useMemo(
-    () => seasons.find((season) => season.id === cropSeasonId) ?? null,
-    [cropSeasonId, seasons],
+    () => seasons.find((season) => season.id === contextValue) ?? null,
+    [contextValue, seasons],
   );
 
   const reports = useMemo(() => {
@@ -160,10 +170,10 @@ function DiseaseDiagnosisWorkspace() {
   const featuredReport = latestReport ?? reports[0] ?? null;
 
   useEffect(() => {
-    if (!cropSeasonId && seasons[0]) {
-      setCropSeasonId(seasons[0].id);
+    if (!contextValue && !isLoadingMe) {
+      setContextValue(seasons[0]?.id ?? NEW_PLACE_VALUE);
     }
-  }, [cropSeasonId, seasons]);
+  }, [contextValue, isLoadingMe, seasons]);
 
   useEffect(() => {
     if (speechRecognition.transcript) {
@@ -176,11 +186,35 @@ function DiseaseDiagnosisWorkspace() {
     }
   }, [speechRecognition, speechRecognition.transcript]);
 
+  useEffect(() => {
+    if (!latestReport || isSubmitting || !shouldScrollToResultRef.current) {
+      return;
+    }
+
+    shouldScrollToResultRef.current = false;
+
+    window.requestAnimationFrame(() => {
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      resultCardRef.current?.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+  }, [isSubmitting, latestReport]);
+
   const submit = async () => {
+    const trimmedPlaceLabel = placeLabel.trim();
     const nextErrors: FieldErrors = {};
 
-    if (!selectedSeason) {
-      nextErrors.cropSeasonId = "Choose the crop season affected by this issue.";
+    if (!contextValue) {
+      nextErrors.context = "Choose where these photos were taken.";
+    } else if (isNewPlace && !trimmedPlaceLabel) {
+      nextErrors.placeLabel = "Enter a simple place label.";
+    } else if (!isNewPlace && !selectedSeason) {
+      nextErrors.context = "Choose a saved crop season or new place.";
     }
 
     if (!cropImage) {
@@ -192,17 +226,27 @@ function DiseaseDiagnosisWorkspace() {
     }
 
     setFieldErrors(nextErrors);
-    setSubmitState(null);
+    setSubmitError(null);
 
-    if (Object.keys(nextErrors).length > 0 || !selectedSeason || !cropImage || !diseasedImage) {
+    if (
+      Object.keys(nextErrors).length > 0 ||
+      !cropImage ||
+      !diseasedImage ||
+      (!isNewPlace && !selectedSeason)
+    ) {
       return;
     }
 
     const formData = new FormData();
-    formData.append("cropSeasonId", selectedSeason.id);
     formData.append("captureMode", "CAMERA_DUAL_ANGLE");
     formData.append("cropImage", cropImage);
     formData.append("diseasedImage", diseasedImage);
+
+    if (isNewPlace) {
+      formData.append("placeLabel", trimmedPlaceLabel);
+    } else if (selectedSeason) {
+      formData.append("cropSeasonId", selectedSeason.id);
+    }
 
     if (userNote.trim()) {
       formData.append("userNote", userNote.trim());
@@ -217,20 +261,16 @@ function DiseaseDiagnosisWorkspace() {
       );
       const enrichedReport = {
         ...response.report,
-        cropSeason: response.report.cropSeason ?? {
-          id: selectedSeason.id,
-          cropName: selectedSeason.cropName,
-        },
+        cropSeason: response.report.cropSeason ?? selectedSeason ?? null,
+        placeLabel: response.report.placeLabel ?? (isNewPlace ? trimmedPlaceLabel : null),
       };
 
+      shouldScrollToResultRef.current = true;
       setLatestReport(enrichedReport);
       setCropImage(null);
       setDiseasedImage(null);
       setUserNote("");
-      setSubmitState({
-        tone: "success",
-        message: "Diagnosis created. Review the result before taking action.",
-      });
+      setNotesOpen(false);
 
       void mutateReports(
         (current) => ({
@@ -244,10 +284,9 @@ function DiseaseDiagnosisWorkspace() {
         { revalidate: true },
       );
     } catch {
-      setSubmitState({
-        tone: "error",
-        message: "We could not submit these photos. Check the images and try again.",
-      });
+      setSubmitError(
+        "We could not submit these photos. Check the images and try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -266,38 +305,35 @@ function DiseaseDiagnosisWorkspace() {
             title="Farm details could not load"
             message="Refresh the page or sign in again before creating a diagnosis."
           />
-        ) : seasons.length === 0 ? (
-          <NoSeasonsPanel />
         ) : (
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="mx-auto w-full max-w-4xl space-y-4">
             <section className="space-y-4">
               <div className="rounded-lg border border-[#d9d0c1] bg-white p-5 shadow-sm sm:p-6">
-                <div className="flex flex-col gap-2">
-                  <div className="max-w-2xl">
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      Diagnosis details
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-[#5f6f63]">
-                      Choose the affected crop, then upload one normal-distance
-                      photo and one close-up symptom photo.
-                    </p>
-                  </div>
+                <div className="max-w-2xl">
+                  <h2 className="text-xl font-semibold tracking-tight">
+                    Diagnosis details
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#5f6f63]">
+                    Choose a saved crop season or use a new place that is not in
+                    your records.
+                  </p>
                 </div>
 
                 <label
-                  htmlFor="crop-season"
+                  htmlFor="diagnosis-context"
                   className="mt-6 block text-sm font-semibold text-[#17231a]"
                 >
-                  Crop season
+                  Place for diagnosis
                 </label>
                 <select
-                  id="crop-season"
-                  value={cropSeasonId}
+                  id="diagnosis-context"
+                  value={contextValue}
                   onChange={(event) => {
-                    setCropSeasonId(event.target.value);
+                    setContextValue(event.target.value);
                     setFieldErrors((current) => ({
                       ...current,
-                      cropSeasonId: undefined,
+                      context: undefined,
+                      placeLabel: undefined,
                     }));
                   }}
                   className="mt-2 h-12 w-full rounded-lg border border-[#cfc5b4] bg-white px-4 text-sm font-medium text-[#17231a] outline-none transition focus:border-[#1f6b45] focus:ring-4 focus:ring-[#1f6b45]/15"
@@ -307,16 +343,51 @@ function DiseaseDiagnosisWorkspace() {
                       {season.cropName} - {season.farmPlot.name}
                     </option>
                   ))}
+                  <option value={NEW_PLACE_VALUE}>New place / not saved</option>
                 </select>
-                {fieldErrors.cropSeasonId ? (
+                {fieldErrors.context ? (
                   <p className="mt-2 text-sm font-medium text-[#a23a31]">
-                    {fieldErrors.cropSeasonId}
+                    {fieldErrors.context}
                   </p>
                 ) : null}
-                <p className="mt-3 text-xs leading-5 text-[#6f7a70]">
-                  Use daylight, keep photos sharp, and confirm serious cases
-                  locally before spraying.
-                </p>
+
+                {isNewPlace ? (
+                  <div className="mt-4 rounded-lg border border-[#d9d0c1] bg-[#fbf8f0] p-4">
+                    <label
+                      htmlFor="place-label"
+                      className="block text-sm font-semibold text-[#17231a]"
+                    >
+                      Place label
+                    </label>
+                    <div className="mt-2 flex items-center gap-3">
+                      <MapPin className="h-5 w-5 shrink-0 text-[#1f6b45]" />
+                      <input
+                        id="place-label"
+                        value={placeLabel}
+                        onChange={(event) => {
+                          setPlaceLabel(event.target.value);
+                          setFieldErrors((current) => ({
+                            ...current,
+                            placeLabel: undefined,
+                          }));
+                        }}
+                        maxLength={80}
+                        placeholder="Example: back field near well"
+                        className="h-11 min-w-0 flex-1 rounded-lg border border-[#cfc5b4] bg-white px-3 text-sm font-medium text-[#17231a] outline-none transition placeholder:text-[#9b8f7c] focus:border-[#1f6b45] focus:ring-4 focus:ring-[#1f6b45]/15"
+                      />
+                    </div>
+                    {fieldErrors.placeLabel ? (
+                      <p className="mt-2 text-sm font-medium text-[#a23a31]">
+                        {fieldErrors.placeLabel}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs leading-5 text-[#6f7a70]">
+                        This creates a one-off diagnosis only. It will not save a
+                        new plot.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -354,58 +425,19 @@ function DiseaseDiagnosisWorkspace() {
                 />
               </div>
 
-              <section className="rounded-lg border border-[#d9d0c1] bg-white p-5 shadow-sm sm:p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="max-w-2xl">
-                    <h2 className="text-xl font-semibold">Field notes</h2>
-                    <p className="mt-2 text-sm leading-6 text-[#5f6f63]">
-                      Optional details can improve triage, especially recent rain,
-                      spraying, irrigation, or fast symptom spread.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      speechRecognition.isListening
-                        ? speechRecognition.stopListening()
-                        : speechRecognition.startListening()
-                    }
-                    className={cn(
-                      "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition",
-                      speechRecognition.isListening
-                        ? "border-[#1f6b45] bg-[#1f6b45] text-white"
-                        : "border-[#cfc5b4] bg-white text-[#17231a] hover:bg-[#f4efe6]",
-                    )}
-                  >
-                    <Mic className="h-4 w-4" />
-                    {speechRecognition.isListening ? "Stop voice typing" : "Voice typing"}
-                  </button>
-                </div>
+              <FieldNotesPanel
+                open={notesOpen}
+                onOpenChange={setNotesOpen}
+                userNote={userNote}
+                onUserNoteChange={setUserNote}
+                speechRecognition={speechRecognition}
+              />
 
-                <textarea
-                  value={userNote}
-                  onChange={(event) => setUserNote(event.target.value)}
-                  rows={5}
-                  maxLength={500}
-                  placeholder="Example: yellow spots started on lower leaves after two rainy days. No spray was used this week."
-                  className="mt-5 min-h-36 w-full resize-y rounded-lg border border-[#cfc5b4] bg-white px-4 py-3 text-sm leading-6 text-[#17231a] outline-none transition placeholder:text-[#9b8f7c] focus:border-[#1f6b45] focus:ring-4 focus:ring-[#1f6b45]/15"
-                />
-                <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-[#6f7a70]">
-                  <span>{userNote.length}/500 characters</span>
-                  <span>Optional, but useful for safer triage.</span>
-                </div>
-                {speechRecognition.error ? (
-                  <p className="mt-3 text-sm font-medium text-[#a23a31]">
-                    {speechRecognition.error}
-                  </p>
-                ) : null}
-              </section>
-
-              {submitState ? (
+              {submitError ? (
                 <MessagePanel
-                  tone={submitState.tone}
-                  title={submitState.tone === "success" ? "Submitted" : "Upload failed"}
-                  message={submitState.message}
+                  tone="error"
+                  title="Upload failed"
+                  message={submitError}
                 />
               ) : null}
 
@@ -421,18 +453,19 @@ function DiseaseDiagnosisWorkspace() {
                   ) : (
                     <Upload className="h-5 w-5" />
                   )}
-                  {isSubmitting ? "Creating diagnosis..." : "Submit for diagnosis"}
+                  {isSubmitting ? "Analyzing photos..." : "Submit for diagnosis"}
                 </button>
               </div>
             </section>
 
-            <aside className="space-y-5 xl:sticky xl:top-6 xl:self-start">
+            <div ref={resultCardRef} className="scroll-mt-6">
               <ResultPanel
                 report={featuredReport}
                 seasonLookup={seasonLookup}
                 isLoading={isLoadingReports}
+                isAnalyzing={isSubmitting}
               />
-            </aside>
+            </div>
           </div>
         )}
 
@@ -462,11 +495,11 @@ function PageHeader() {
           Crop disease detection
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#17231a] sm:text-4xl">
-          Upload two crop photos for diagnosis
+          Upload two photos for diagnosis
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[#5f6f63]">
-          Add a normal-distance crop photo and a close-up symptom photo. The
-          latest diagnosis appears beside the form as soon as it is ready.
+          Use a saved crop season or diagnose a new place without setting up a
+          plot. Results appear as soon as analysis is complete.
         </p>
       </div>
     </header>
@@ -483,7 +516,7 @@ function PhotoUploadCard({
   onChange,
   error,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   title: string;
   description: string;
@@ -520,26 +553,40 @@ function PhotoUploadCard({
         </div>
       </div>
 
-      <div className="mt-5 aspect-[4/3] overflow-hidden rounded-lg border border-dashed border-[#cfc5b4] bg-[#fbf8f0]">
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt={`${title} preview`}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center px-5 text-center">
-            <ImagePlus className="h-10 w-10 text-[#8b9a8f]" />
-            <p className="mt-3 text-sm font-semibold text-[#17231a]">
-              Add an image
-            </p>
-            <p className="mt-2 max-w-xs text-xs leading-5 text-[#6f7a70]">
-              JPG, PNG, or a camera photo from your device.
-            </p>
-          </div>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        aria-label={file ? `Replace ${title}` : `Add ${title}`}
+        className={cn(
+          "mt-5 block aspect-[4/3] w-full overflow-hidden rounded-lg border border-dashed bg-[#fbf8f0] text-left transition hover:border-[#1f6b45] hover:bg-[#f4fbf5] focus:outline-none focus:ring-4 focus:ring-[#1f6b45]/15",
+          error ? "border-[#c85b4f]" : "border-[#cfc5b4]",
         )}
-      </div>
+      >
+        {previewUrl ? (
+          <span className="relative block h-full w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt={`${title} preview`}
+              className="h-full w-full object-cover"
+            />
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#17231a] shadow-sm">
+              <RefreshCw className="h-3.5 w-3.5" />
+              Replace
+            </span>
+          </span>
+        ) : (
+          <span className="flex h-full flex-col items-center justify-center px-5 text-center">
+            <ImagePlus className="h-10 w-10 text-[#8b9a8f]" />
+            <span className="mt-3 text-sm font-semibold text-[#17231a]">
+              Add an image
+            </span>
+            <span className="mt-2 max-w-xs text-xs leading-5 text-[#6f7a70]">
+              Tap here to choose a JPG, PNG, or camera photo.
+            </span>
+          </span>
+        )}
+      </button>
 
       <p className="mt-4 text-sm leading-6 text-[#5f6f63]">{guidance}</p>
 
@@ -547,24 +594,19 @@ function PhotoUploadCard({
         ref={inputRef}
         type="file"
         accept="image/*"
-        className="sr-only"
+        className="hidden"
         onChange={handleChange}
       />
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-[#cfc5b4] bg-white px-4 text-sm font-semibold text-[#17231a] transition hover:bg-[#f4efe6]"
-        >
-          <RefreshCw className="h-4 w-4" />
-          {file ? "Replace photo" : "Choose photo"}
-        </button>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-sm text-[#6f7a70]">
+          {file ? file.name : "No photo selected yet."}
+        </p>
         {file ? (
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#f0c8c3] bg-[#fff5f3] px-4 text-sm font-semibold text-[#a23a31] transition hover:bg-[#ffe7e3]"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#f0c8c3] bg-[#fff5f3] px-3 text-sm font-semibold text-[#a23a31] transition hover:bg-[#ffe7e3]"
           >
             <X className="h-4 w-4" />
             Remove
@@ -572,10 +614,96 @@ function PhotoUploadCard({
         ) : null}
       </div>
 
-      <p className="mt-3 truncate text-sm text-[#6f7a70]">
-        {file ? file.name : "No photo selected yet."}
-      </p>
       {error ? <p className="mt-2 text-sm font-medium text-[#a23a31]">{error}</p> : null}
+    </section>
+  );
+}
+
+function FieldNotesPanel({
+  open,
+  onOpenChange,
+  userNote,
+  onUserNoteChange,
+  speechRecognition,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  userNote: string;
+  onUserNoteChange: (value: string) => void;
+  speechRecognition: ReturnType<typeof useSpeechRecognition>;
+}) {
+  const notePreview = userNote.trim();
+
+  return (
+    <section className="rounded-lg border border-[#d9d0c1] bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6"
+      >
+        <span className="min-w-0">
+          <span className="block text-xl font-semibold text-[#17231a]">
+            Field notes{" "}
+            <span className="text-base font-medium text-[#6f7a70]">
+              (optional)
+            </span>
+          </span>
+          <span className="mt-1 block truncate text-sm text-[#5f6f63]">
+            {notePreview
+              ? `${userNote.length}/500 - ${notePreview}`
+              : "Add rain, spray, irrigation, or spread details if useful."}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-5 w-5 shrink-0 text-[#6f7a70] transition",
+            open ? "rotate-180" : "",
+          )}
+        />
+      </button>
+
+      {open ? (
+        <div className="border-t border-[#eee5d8] px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() =>
+                speechRecognition.isListening
+                  ? speechRecognition.stopListening()
+                  : speechRecognition.startListening()
+              }
+              className={cn(
+                "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition",
+                speechRecognition.isListening
+                  ? "border-[#1f6b45] bg-[#1f6b45] text-white"
+                  : "border-[#cfc5b4] bg-white text-[#17231a] hover:bg-[#f4efe6]",
+              )}
+            >
+              <Mic className="h-4 w-4" />
+              {speechRecognition.isListening ? "Stop voice typing" : "Voice typing"}
+            </button>
+          </div>
+
+          <textarea
+            value={userNote}
+            onChange={(event) => onUserNoteChange(event.target.value)}
+            rows={4}
+            maxLength={500}
+            placeholder="Example: yellow spots started after two rainy days. No spray was used this week."
+            className="mt-4 min-h-28 w-full resize-y rounded-lg border border-[#cfc5b4] bg-white px-4 py-3 text-sm leading-6 text-[#17231a] outline-none transition placeholder:text-[#9b8f7c] focus:border-[#1f6b45] focus:ring-4 focus:ring-[#1f6b45]/15"
+          />
+          <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-[#6f7a70]">
+            <span>{userNote.length}/500 characters</span>
+            <span>Optional, but useful for safer triage.</span>
+          </div>
+          {speechRecognition.error ? (
+            <p className="mt-3 text-sm font-medium text-[#a23a31]">
+              {speechRecognition.error}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -584,11 +712,38 @@ function ResultPanel({
   report,
   seasonLookup,
   isLoading,
+  isAnalyzing,
 }: {
   report: DiseaseReport | null;
   seasonLookup: Map<string, CropSeasonOption>;
   isLoading: boolean;
+  isAnalyzing: boolean;
 }) {
+  if (isAnalyzing) {
+    return (
+      <section className="rounded-lg border border-[#bfd9c4] bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#e7f1e8] text-[#1f6b45]">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a2f]">
+              Latest diagnosis
+            </p>
+            <h2 className="text-lg font-semibold">Analyzing photos...</h2>
+          </div>
+        </div>
+        <p className="mt-4 text-sm leading-6 text-[#5f6f63]">
+          The result card will appear here as soon as the live disease service
+          finishes.
+        </p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#e7f1e8]">
+          <div className="h-full w-2/3 animate-pulse rounded-full bg-[#1f6b45]" />
+        </div>
+      </section>
+    );
+  }
+
   if (isLoading && !report) {
     return (
       <section className="rounded-lg border border-[#d9d0c1] bg-white p-5 shadow-sm">
@@ -615,14 +770,13 @@ function ResultPanel({
         </div>
         <p className="mt-4 text-sm leading-6 text-[#5f6f63]">
           Your newest result will appear here with the issue name,
-          recommendation, confidence, and the images used for analysis.
+          recommendation, date, and the images used for analysis.
         </p>
       </section>
     );
   }
 
-  const season = getReportSeason(report, seasonLookup);
-  const confidence = getConfidence(report.confidenceScore);
+  const contextLabel = getReportContext(report, seasonLookup);
   const isEscalated = report.escalationRequired || report.status === "ESCALATED";
 
   return (
@@ -632,16 +786,17 @@ function ResultPanel({
         isEscalated ? "border-[#f0c8c3]" : "border-[#bfd9c4]",
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6a2f]">
             Latest diagnosis
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#17231a]">
             {report.predictedIssue || "Unclear issue"}
           </h2>
-          <p className="mt-2 text-sm text-[#5f6f63]">
-            {season.cropName} {season.farmPlotName ? `- ${season.farmPlotName}` : ""}
+          <p className="mt-2 text-sm text-[#5f6f63]">{contextLabel}</p>
+          <p className="mt-1 text-xs text-[#6f7a70]">
+            {formatDate(report.createdAt)}
           </p>
         </div>
         <span
@@ -661,15 +816,9 @@ function ResultPanel({
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <ReportImage label="Normal distance" src={report.image2Url} />
         <ReportImage label="Close-up" src={report.image1Url} />
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <ResultStat label="Confidence" value={`${confidence.percent}%`} hint={confidence.label} />
-        <ResultStat label="Source" value={formatProvider(report.provider)} hint={report.analysisSource.replace(/_/g, " ")} />
-        <ResultStat label="Created" value={formatDate(report.createdAt)} hint={shortenRef(report.providerRef)} />
       </div>
 
       <div
@@ -693,26 +842,6 @@ function ResultPanel({
         </p>
       ) : null}
     </section>
-  );
-}
-
-function ResultStat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-[#eee5d8] bg-[#fbf8f0] p-3">
-      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[#6f7a70]">
-        {label}
-      </p>
-      <p className="mt-2 truncate text-sm font-semibold text-[#17231a]">{value}</p>
-      {hint ? <p className="mt-1 truncate text-xs text-[#6f7a70]">{hint}</p> : null}
-    </div>
   );
 }
 
@@ -770,8 +899,7 @@ function HistorySection({
           />
         ) : reports.length === 0 ? (
           <div className="rounded-lg border border-dashed border-[#cfc5b4] bg-[#fbf8f0] p-5 text-sm leading-6 text-[#5f6f63]">
-            Submit two photos and a short note to create the first crop health
-            record for this season.
+            Submit two photos to create the first crop health record.
           </div>
         ) : (
           <>
@@ -780,7 +908,7 @@ function HistorySection({
                 <ReportCard
                   key={report.id}
                   report={report}
-                  season={getReportSeason(report, seasonLookup)}
+                  contextLabel={getReportContext(report, seasonLookup)}
                 />
               ))}
             </div>
@@ -798,15 +926,11 @@ function HistorySection({
 
 function ReportCard({
   report,
-  season,
+  contextLabel,
 }: {
   report: DiseaseReport;
-  season: {
-    cropName: string;
-    farmPlotName: string;
-  };
+  contextLabel: string;
 }) {
-  const confidence = getConfidence(report.confidenceScore);
   const isEscalated = report.escalationRequired || report.status === "ESCALATED";
 
   return (
@@ -826,19 +950,13 @@ function ReportCard({
               {report.status.replace(/_/g, " ")}
             </span>
             <span className="inline-flex items-center rounded-full bg-[#fbf8f0] px-2.5 py-1 text-xs font-semibold text-[#5f6f63]">
-              {confidence.label}
+              {formatDate(report.createdAt)}
             </span>
           </div>
           <h3 className="mt-3 truncate text-lg font-semibold text-[#17231a]">
             {report.predictedIssue || "Unclear issue"}
           </h3>
-          <p className="mt-1 text-sm text-[#5f6f63]">
-            {season.cropName}
-            {season.farmPlotName ? ` - ${season.farmPlotName}` : ""}
-          </p>
-          <p className="mt-1 text-sm text-[#6f7a70]">
-            {formatDate(report.createdAt)} - {confidence.percent}% confidence
-          </p>
+          <p className="mt-1 truncate text-sm text-[#5f6f63]">{contextLabel}</p>
           <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#4f5f54]">
             {stripRecommendationMarkup(report.recommendation)}
           </p>
@@ -849,20 +967,65 @@ function ReportCard({
 }
 
 function FormattedRecommendation({ text }: { text: string }) {
-  const paragraphs = text
-    .split(/\r?\n+/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
+  const blocks = toMarkdownBlocks(text);
 
   return (
     <>
-      {(paragraphs.length ? paragraphs : [text]).map((paragraph, paragraphIndex) => (
-        <p key={`${paragraph}-${paragraphIndex}`}>
-          {renderRecommendationInline(paragraph)}
-        </p>
-      ))}
+      {blocks.map((block, blockIndex) =>
+        block.type === "list" ? (
+          <ul
+            key={`list-${blockIndex}`}
+            className="list-disc space-y-1 pl-5"
+          >
+            {block.items.map((item, itemIndex) => (
+              <li key={`${item}-${itemIndex}`}>
+                {renderRecommendationInline(item)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p key={`${block.text}-${blockIndex}`}>
+            {renderRecommendationInline(block.text)}
+          </p>
+        ),
+      )}
     </>
   );
+}
+
+function toMarkdownBlocks(text: string) {
+  const lines = text
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const blocks: Array<
+    | {
+        type: "paragraph";
+        text: string;
+      }
+    | {
+        type: "list";
+        items: string[];
+      }
+  > = [];
+
+  for (const line of lines.length ? lines : [text]) {
+    const bullet = line.match(/^[-*]\s+(.+)$/);
+    const lastBlock = blocks.at(-1);
+
+    if (bullet) {
+      if (lastBlock?.type === "list") {
+        lastBlock.items.push(bullet[1]);
+      } else {
+        blocks.push({ type: "list", items: [bullet[1]] });
+      }
+    } else {
+      blocks.push({ type: "paragraph", text: line });
+    }
+  }
+
+  return blocks;
 }
 
 function renderRecommendationInline(text: string) {
@@ -880,7 +1043,9 @@ function renderRecommendationInline(text: string) {
 }
 
 function stripRecommendationMarkup(text: string) {
-  return text.replace(/\*\*([^*]+)\*\*/g, "$1");
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/^\s*[-*]\s+/gm, "");
 }
 
 function ReportImage({
@@ -947,35 +1112,6 @@ function MessagePanel({
   );
 }
 
-function NoSeasonsPanel() {
-  return (
-    <section className="rounded-lg border border-[#d9d0c1] bg-white p-8 text-center shadow-sm">
-      <Leaf className="mx-auto h-12 w-12 text-[#1f6b45]" />
-      <h2 className="mt-5 text-2xl font-semibold text-[#17231a]">
-        Add a crop season before diagnosis
-      </h2>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#5f6f63]">
-        Disease reports need to be linked to the crop and field they belong to.
-        Create a crop season first, then return here to upload photos.
-      </p>
-      <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-        <Link
-          href="/onboarding/season"
-          className="inline-flex h-11 items-center justify-center rounded-lg bg-[#1f6b45] px-5 text-sm font-semibold text-white hover:bg-[#185638]"
-        >
-          Create crop season
-        </Link>
-        <Link
-          href="/farms"
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-[#cfc5b4] bg-white px-5 text-sm font-semibold text-[#17231a] hover:bg-[#f4efe6]"
-        >
-          View farms
-        </Link>
-      </div>
-    </section>
-  );
-}
-
 function LoadingWorkspace() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
@@ -1004,42 +1140,19 @@ function useObjectUrl(file: File | null) {
   return url;
 }
 
-function getReportSeason(
+function getReportContext(
   report: DiseaseReport,
   seasonLookup: Map<string, CropSeasonOption>,
 ) {
-  const season = seasonLookup.get(report.cropSeasonId);
+  const season = report.cropSeasonId
+    ? seasonLookup.get(report.cropSeasonId)
+    : null;
+  const cropName = report.cropSeason?.cropName ?? season?.cropName;
+  const place = report.placeLabel ?? season?.farmPlot.name;
 
-  return {
-    cropName: report.cropSeason?.cropName ?? season?.cropName ?? "Crop",
-    farmPlotName: season?.farmPlot.name ?? "",
-  };
-}
-
-function getConfidence(score: number) {
-  const percent = Math.round(Math.max(0, Math.min(score, 1)) * 100);
-  const label =
-    score >= 0.8
-      ? "High confidence"
-      : score >= 0.55
-        ? "Medium confidence"
-        : "Low confidence";
-
-  return { percent, label };
-}
-
-function formatProvider(provider: string) {
-  return provider
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function shortenRef(value?: string | null) {
-  if (!value) {
-    return "No provider ref";
+  if (cropName && place) {
+    return `${cropName} - ${place}`;
   }
 
-  return value.length > 12 ? `Ref ${value.slice(0, 12)}...` : `Ref ${value}`;
+  return place ?? cropName ?? "New place";
 }

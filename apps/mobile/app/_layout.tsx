@@ -1,0 +1,113 @@
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import 'react-native-reanimated';
+import { StatusBar } from 'expo-status-bar';
+import {
+  NotoSans_400Regular,
+  NotoSans_500Medium,
+  NotoSans_700Bold,
+} from '@expo-google-fonts/noto-sans';
+import {
+  NotoSansDevanagari_400Regular,
+  NotoSansDevanagari_500Medium,
+} from '@expo-google-fonts/noto-sans-devanagari';
+import { Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
+
+import { LoadingScreen } from '@/components/loading-screen';
+import { PendingUploadSync } from '@/components/pending-upload-sync';
+import { AppProviders, useSession } from '@/features/session/session-provider';
+import { palette } from '@/theme/tokens';
+
+export {
+  // Catch any errors thrown by the Layout component.
+  ErrorBoundary,
+} from 'expo-router';
+
+export const unstable_settings = {
+  initialRouteName: '(auth)',
+};
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    NotoSans_400Regular,
+    NotoSans_500Medium,
+    NotoSans_700Bold,
+    NotoSansDevanagari_400Regular,
+    NotoSansDevanagari_500Medium,
+    Sora_600SemiBold,
+    Sora_700Bold,
+  });
+
+  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  useEffect(() => {
+    if (error) throw error;
+  }, [error]);
+
+  useEffect(() => {
+    if (loaded) {
+      void SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return <LoadingScreen label="Loading IntelliFarm" />;
+  }
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.parchment }}>
+      <AppProviders>
+        <StatusBar style="dark" />
+        <PendingUploadSync />
+        <RootLayoutNav />
+      </AppProviders>
+    </GestureHandlerRootView>
+  );
+}
+
+function RootLayoutNav() {
+  const { bootstrapped } = useSession();
+
+  if (!bootstrapped) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: palette.parchment },
+      }}
+    >
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="alerts" options={{ presentation: 'card' }} />
+      <Stack.Screen name="schemes" options={{ presentation: 'card' }} />
+      <Stack.Screen name="scheme/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="profile-settings" options={{ presentation: 'card' }} />
+      <Stack.Screen name="expenses" options={{ presentation: 'card' }} />
+      <Stack.Screen
+        name="expenses/add"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.78, 1.0],
+        }}
+      />
+      <Stack.Screen name="facilities" options={{ presentation: 'card' }} />
+      <Stack.Screen name="sell-store" options={{ presentation: 'card' }} />
+      <Stack.Screen name="expert-help" options={{ presentation: 'card' }} />
+      <Stack.Screen name="offline" options={{ presentation: 'card' }} />
+      <Stack.Screen name="season/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="task/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="weather/[farmPlotId]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="disease-report/[id]" options={{ presentation: 'card' }} />
+    </Stack>
+  );
+}

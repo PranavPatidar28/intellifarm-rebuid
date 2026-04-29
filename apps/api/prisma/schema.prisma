@@ -129,6 +129,7 @@ model User {
   alerts            Alert[]
   sessions          AuthSession[]
   farmPlots         FarmPlot[]
+  diseaseReports    DiseaseReport[]
   assistantThreads  AssistantThread[]
   predictionRuns    PredictionRun[]
 }
@@ -286,7 +287,9 @@ model WeatherSnapshot {
 
 model DiseaseReport {
   id                 String              @id @default(uuid())
-  cropSeasonId       String
+  userId             String
+  cropSeasonId       String?
+  placeLabel         String?
   image1Url          String?
   image2Url          String?
   voiceNoteUrl       String?
@@ -302,8 +305,10 @@ model DiseaseReport {
   analysisSource     DiseaseAnalysisSource @default(MOCK_PROVIDER)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
-  cropSeason         CropSeason          @relation(fields: [cropSeasonId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cropSeason         CropSeason?         @relation(fields: [cropSeasonId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt(sort: Desc)])
   @@index([cropSeasonId, createdAt(sort: Desc)])
 }
 

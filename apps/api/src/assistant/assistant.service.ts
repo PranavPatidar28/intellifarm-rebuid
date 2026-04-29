@@ -124,7 +124,7 @@ export class AssistantService {
     } catch {
       reply = {
         content:
-          'I could not reach the live assistant provider, so I am falling back to a safe grounded response. Review your latest tasks, weather advisories, schemes, and disease history before taking action.',
+          'I could not reach the live assistant provider, so I am falling back to a safe grounded response. Review your latest tasks, weather actions, schemes, and crop health notes before taking action.',
         sources: contextBundle.sources,
         safetyFlags: [...safetyFlags, 'LIVE_PROVIDER_UNAVAILABLE'],
       };
@@ -196,11 +196,7 @@ export class AssistantService {
       take: 3,
     });
     const diseaseReports = await this.prisma.diseaseReport.findMany({
-      where: {
-        cropSeason: {
-          farmPlot: { userId },
-        },
-      },
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 3,
       include: {
@@ -229,7 +225,7 @@ export class AssistantService {
         const weather = await this.weatherService.getWeatherForFarmPlot(
           effectiveSeason.farmPlot,
         );
-        return `Weather for ${effectiveSeason.cropName} in ${effectiveSeason.farmPlot.name}: ${weather.forecastSummary}`;
+        return `Weather for ${effectiveSeason.cropName} in ${effectiveSeason.farmPlot.name}: ${weather.current.conditionLabel}. ${weather.advisories[0]?.message ?? 'Review the latest field advisory.'}`;
       }),
     );
 
@@ -278,7 +274,7 @@ export class AssistantService {
       ),
       ...diseaseReports.map(
         (report) =>
-          `Disease report for ${report.cropSeason.cropName}: ${report.predictedIssue ?? 'unclear issue'} with recommendation ${report.recommendation}`,
+          `Disease report for ${report.cropSeason?.cropName ?? report.placeLabel ?? 'new place'}: ${report.predictedIssue ?? 'unclear issue'} with recommendation ${report.recommendation}`,
       ),
     ].join('\n');
 
@@ -303,6 +299,10 @@ function deriveSafetyFlags(content: string) {
     flags.push('PROMISE_GUARD');
   }
 
+  if (/(expert|doctor|serious|dying|severe)/.test(normalized)) {
+    flags.push('EXPERT_TRIAGE');
+  }
+
   return flags;
 }
 
@@ -314,24 +314,172 @@ function presentAssistantMessage(message: {
   safetyFlags: unknown;
   createdAt: Date;
 }) {
+  const sources = Array.isArray(message.sources)
+    ? message.sources.filter(
+        (source): source is AssistantSource =>
+          !!source &&
+          typeof source === 'object' &&
+          'type' in source &&
+          'label' in source,
+      )
+    : [];
+  const safetyFlags = Array.isArray(message.safetyFlags)
+    ? message.safetyFlags.filter(
+        (flag): flag is string => typeof flag === 'string',
+      )
+    : [];
+  const safetyLevel = deriveSafetyLevel(safetyFlags, message.content);
+  const actionCards =
+    message.role === 'ASSISTANT'
+      ? buildActionCards(message.content, safetyFlags, sources)
+      : [];
+
   return {
     id: message.id,
     role: message.role,
     content: message.content,
-    sources: Array.isArray(message.sources)
-      ? message.sources.filter(
-          (source): source is AssistantSource =>
-            !!source &&
-            typeof source === 'object' &&
-            'type' in source &&
-            'label' in source,
-        )
-      : [],
-    safetyFlags: Array.isArray(message.safetyFlags)
-      ? message.safetyFlags.filter(
-          (flag): flag is string => typeof flag === 'string',
-        )
-      : [],
+    answer: message.content,
+    spokenSummary: summarizeForSpeech(message.content),
+    sources,
+    safetyLevel,
+    safetyFlags,
+    actionCards,
+    suggestedNextStep:
+      message.role === 'ASSISTANT'
+        ? deriveSuggestedNextStep(safetyFlags, message.content)
+        : null,
     createdAt: message.createdAt.toISOString(),
   };
+}
+
+function deriveSafetyLevel(flags: string[], content: string) {
+  if (
+    flags.includes('CHEMICAL_GUARD') ||
+    flags.includes('EXPERT_TRIAGE') ||
+    /consult.*expert|local agronomist|kvk/i.test(content)
+  ) {
+    return 'ESCALATE' as const;
+  }
+
+  if (flags.includes('PROMISE_GUARD') || flags.includes('LIVE_PROVIDER_UNAVAILABLE')) {
+    return 'CAUTION' as const;
+  }
+
+  return 'INFO' as const;
+}
+
+function buildActionCards(
+  content: string,
+  flags: string[],
+  sources: AssistantSource[],
+) {
+  const cards: Array<{
+    title: string;
+    body: string;
+    ctaLabel: string;
+    ctaRoute: string;
+    tone: 'weather' | 'diagnose' | 'market' | 'scheme' | 'expert' | 'task';
+  }> = [];
+
+  if (flags.includes('CHEMICAL_GUARD')) {
+    cards.push({
+      title: 'Diagnose before spray',
+      body: 'Upload crop photos first so you can compare symptoms safely before any chemical step.',
+      ctaLabel: 'Open diagnose',
+      ctaRoute: '/(tabs)/diagnose',
+      tone: 'diagnose',
+    });
+  }
+
+  if (/market|mandi|price|sell|store/i.test(content)) {
+    cards.push({
+      title: 'Compare mandi prices',
+      body: 'Check price, distance, and freshness together before planning transport.',
+      ctaLabel: 'Open market',
+      ctaRoute: '/(tabs)/market',
+      tone: 'market',
+    });
+  }
+
+  if (/scheme|insurance|credit|pmfby|kisan/i.test(content)) {
+    cards.push({
+      title: 'Review schemes',
+      body: 'Open relevant schemes and keep documents ready if you plan to apply.',
+      ctaLabel: 'Open schemes',
+      ctaRoute: '/schemes',
+      tone: 'scheme',
+    });
+  }
+
+  if (
+    /weather|rain|irrigation|dry|heat/i.test(content) ||
+    sources.some((source) => source.type === 'crop-season')
+  ) {
+    cards.push({
+      title: 'Check field weather',
+      body: 'Open the weather detail to review rain timing, advisories, and field windows.',
+      ctaLabel: 'Open weather',
+      ctaRoute: '/(tabs)/home',
+      tone: 'weather',
+    });
+  }
+
+  if (flags.includes('EXPERT_TRIAGE') || /expert|serious|unclear/i.test(content)) {
+    cards.push({
+      title: 'Escalate for expert help',
+      body: 'Use expert help when the issue is spreading, severe, or still unclear.',
+      ctaLabel: 'Get expert help',
+      ctaRoute: '/expert-help',
+      tone: 'expert',
+    });
+  }
+
+  if (!cards.length) {
+    cards.push({
+      title: 'Open weekly tasks',
+      body: 'Start with the most urgent field actions for this week.',
+      ctaLabel: 'Open crop plan',
+      ctaRoute: '/(tabs)/crop-plan',
+      tone: 'task',
+    });
+  }
+
+  return cards.slice(0, 3);
+}
+
+function deriveSuggestedNextStep(flags: string[], content: string) {
+  if (flags.includes('CHEMICAL_GUARD')) {
+    return {
+      label: 'Get clearer symptom evidence first',
+      ctaLabel: 'Diagnose crop problem',
+      ctaRoute: '/(tabs)/diagnose',
+    };
+  }
+
+  if (/market|sell|price/i.test(content)) {
+    return {
+      label: 'Compare price and distance together',
+      ctaLabel: 'Check mandi prices',
+      ctaRoute: '/(tabs)/market',
+    };
+  }
+
+  if (/scheme|insurance|credit/i.test(content)) {
+    return {
+      label: 'Open relevant support schemes',
+      ctaLabel: 'View schemes',
+      ctaRoute: '/schemes',
+    };
+  }
+
+  return {
+    label: 'Review this week’s field actions',
+    ctaLabel: 'Open home feed',
+    ctaRoute: '/(tabs)/home',
+  };
+}
+
+function summarizeForSpeech(content: string) {
+  const cleaned = content.replace(/\s+/g, ' ').trim();
+  return cleaned.length > 220 ? `${cleaned.slice(0, 217).trim()}...` : cleaned;
 }

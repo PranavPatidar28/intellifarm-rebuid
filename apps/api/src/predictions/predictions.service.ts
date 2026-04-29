@@ -347,12 +347,13 @@ export class PredictionsService {
     return {
       currentTemperatureC:
         payload.weatherOverride?.currentTemperatureC ??
-        liveWeather.currentTemperatureC,
+        liveWeather.current.temperatureC,
       humidityPercent:
-        payload.weatherOverride?.humidityPercent ?? liveWeather.humidityPercent,
+        payload.weatherOverride?.humidityPercent ??
+        liveWeather.current.humidityPercent,
       rainfallExpectedMm:
         payload.weatherOverride?.rainfallExpectedMm ??
-        liveWeather.rainfallExpectedMm,
+        liveWeather.current.rainfallExpectedMm,
     };
   }
 }

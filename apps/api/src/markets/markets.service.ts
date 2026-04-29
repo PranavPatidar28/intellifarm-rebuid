@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { MarketRecord } from '@prisma/client';
 
+import { diffInDays } from '../common/utils/date.util';
 import { haversineDistanceKm } from '../common/utils/geo.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -110,6 +112,33 @@ export class MarketsService {
       ]),
     );
 
+    const historyKeys = Array.from(
+      new Set(records.map((record) => createHistoryKey(record))),
+    );
+    const historyRecords = historyKeys.length
+      ? await this.prisma.marketRecord.findMany({
+          where: {
+            OR: records.map((record) => ({
+              cropName: {
+                equals: record.cropName,
+                mode: 'insensitive',
+              },
+              mandiName: {
+                equals: record.mandiName,
+                mode: 'insensitive',
+              },
+              state: {
+                equals: record.state,
+                mode: 'insensitive',
+              },
+            })),
+          },
+          orderBy: [{ recordDate: 'desc' }],
+        })
+      : [];
+
+    const historyByKey = groupMarketHistory(historyRecords);
+
     const enrichedRecords = records
       .map((record) => {
         const facility =
@@ -134,9 +163,31 @@ export class MarketsService {
               )
             : null;
 
+        const history = historyByKey.get(createHistoryKey(record)) ?? [];
+        const previousRecord = resolvePreviousRecord(record, history);
+        const deltaFromPrevious =
+          previousRecord != null
+            ? Number((record.priceModal - previousRecord.priceModal).toFixed(0))
+            : null;
+        const trendDirection =
+          deltaFromPrevious == null || Math.abs(deltaFromPrevious) < 10
+            ? 'STABLE'
+            : deltaFromPrevious > 0
+              ? 'UP'
+              : 'DOWN';
+
         return {
           ...record,
           distanceKm: distanceKm != null ? Number(distanceKm.toFixed(1)) : null,
+          trendDirection,
+          trendLabel:
+            trendDirection === 'UP'
+              ? `Up by ₹${Math.abs(deltaFromPrevious ?? 0)}`
+              : trendDirection === 'DOWN'
+                ? `Down by ₹${Math.abs(deltaFromPrevious ?? 0)}`
+                : 'Stable',
+          deltaFromPrevious,
+          freshnessLabel: formatFreshnessLabel(new Date(record.recordDate)),
         };
       })
       .sort((left, right) => {
@@ -156,18 +207,71 @@ export class MarketsService {
           .slice()
           .sort((left, right) => right.priceModal - left.priceModal)[0]
       : null;
+    const topNearby = enrichedRecords
+      .filter((record) => record.distanceKm != null)
+      .slice(0, 3);
+    const recommendedRecord =
+      topNearby[0] && bestRecord
+        ? topNearby[0].priceModal + 75 >= bestRecord.priceModal
+          ? topNearby[0]
+          : bestRecord
+        : topNearby[0] ?? bestRecord;
 
     return {
+      generatedAt: new Date().toISOString(),
+      cropName: query.cropName ?? null,
       records: query.bestPriceOnly
         ? bestRecord
           ? [bestRecord]
           : []
         : enrichedRecords.slice(0, 20),
       bestRecord,
+      recommendedRecord,
+      topNearby,
     };
   }
 }
 
 function createFacilityKey(name: string, district: string, state: string) {
   return `${name}|${district}|${state}`.trim().toLowerCase();
+}
+
+function createHistoryKey(record: Pick<NormalizedMarketRecord, 'cropName' | 'mandiName' | 'state'>) {
+  return `${record.cropName}|${record.mandiName}|${record.state}`.trim().toLowerCase();
+}
+
+function groupMarketHistory(records: MarketRecord[]) {
+  const map = new Map<string, MarketRecord[]>();
+
+  for (const record of records) {
+    const key = createHistoryKey(record);
+    const group = map.get(key) ?? [];
+    group.push(record);
+    map.set(key, group);
+  }
+
+  return map;
+}
+
+function resolvePreviousRecord(
+  record: NormalizedMarketRecord,
+  history: MarketRecord[],
+) {
+  const recordDate = new Date(record.recordDate).getTime();
+
+  return history.find((item) => item.recordDate.getTime() < recordDate) ?? null;
+}
+
+function formatFreshnessLabel(recordDate: Date) {
+  const days = Math.max(0, diffInDays(recordDate, new Date()));
+
+  if (days === 0) {
+    return 'Updated today';
+  }
+
+  if (days === 1) {
+    return 'Updated yesterday';
+  }
+
+  return `Updated ${days} days ago`;
 }

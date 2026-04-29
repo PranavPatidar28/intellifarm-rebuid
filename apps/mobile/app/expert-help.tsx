@@ -88,7 +88,20 @@ export default function ExpertHelpRoute() {
 
         <View style={{ gap: spacing.sm }}>
           <Button label="Back to crop result" variant="soft" onPress={() => router.back()} />
-          <Button label="Ask IntelliFarm by voice" onPress={() => router.push('/voice')} />
+          <Button
+            label="Open Assistant"
+            onPress={() =>
+              router.push({
+                pathname: '/voice',
+                params: {
+                  prompt:
+                    'Help me prepare a concise summary for expert review and tell me what details I should mention first.',
+                  originRoute: 'expert-help',
+                  focusCropSeasonId: report?.cropSeasonId ?? undefined,
+                },
+              } as never)
+            }
+          />
         </View>
       </PageShell>
     </>

@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 
-import type { CropSeason, FarmPlot, SoilType } from '@prisma/client';
+import type { CropSeason, FarmPlot, SoilType } from '../generated/prisma';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { RulesEngineService } from '../rules-engine/rules-engine.service';

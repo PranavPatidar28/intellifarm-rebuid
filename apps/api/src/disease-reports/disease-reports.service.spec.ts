@@ -58,7 +58,24 @@ describe('DiseaseReportsService', () => {
         id: 'report-id',
         userId: 'user-id',
         cropSeasonId: 'season-id',
-        cropSeason: { id: 'season-id', cropName: 'Wheat' },
+        recommendation: 'Confirm locally before treatment.',
+        confidenceScore: 0.6,
+        escalationRequired: false,
+        status: 'ANALYZED',
+        provider: 'test-provider',
+        providerRef: 'provider-ref',
+        captureMode: 'CAMERA_DUAL_ANGLE',
+        analysisSource: 'LIVE_PROVIDER',
+        createdAt: new Date('2026-04-30T00:00:00.000Z'),
+        updatedAt: new Date('2026-04-30T00:00:00.000Z'),
+        cropSeason: {
+          id: 'season-id',
+          cropName: 'Wheat',
+          currentStage: 'Tillering',
+          sowingDate: new Date('2026-01-10T00:00:00.000Z'),
+          farmPlotId: 'plot-1',
+          status: 'ACTIVE',
+        },
       });
     const analyzeDualAngleImages = jest.fn().mockResolvedValue({
       predictedIssue: 'Leaf rust',
@@ -139,6 +156,16 @@ describe('DiseaseReportsService', () => {
         userId: 'user-id',
         cropSeasonId: null,
         placeLabel: 'Back field near well',
+        recommendation: 'Review locally.',
+        confidenceScore: 0.25,
+        escalationRequired: true,
+        status: 'ESCALATED',
+        provider: 'test-provider',
+        providerRef: 'provider-ref',
+        captureMode: 'CAMERA_DUAL_ANGLE',
+        analysisSource: 'LIVE_PROVIDER',
+        createdAt: new Date('2026-04-30T00:00:00.000Z'),
+        updatedAt: new Date('2026-04-30T00:00:00.000Z'),
         cropSeason: null,
       });
     const analyzeDualAngleImages = jest.fn().mockResolvedValue({
@@ -230,7 +257,28 @@ describe('DiseaseReportsService', () => {
 
   it('lists and gets reports through direct user ownership', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    const findFirst = jest.fn().mockResolvedValue({ id: 'report-id' });
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'report-id',
+      userId: 'user-id',
+      cropSeasonId: null,
+      placeLabel: 'North field',
+      image1Url: null,
+      image2Url: null,
+      voiceNoteUrl: null,
+      userNote: null,
+      predictedIssue: 'Unclear issue',
+      confidenceScore: 0.25,
+      recommendation: 'Review locally.',
+      escalationRequired: true,
+      status: 'ESCALATED',
+      provider: 'test-provider',
+      providerRef: 'provider-ref',
+      captureMode: 'CAMERA_DUAL_ANGLE',
+      analysisSource: 'LIVE_PROVIDER',
+      cropSeason: null,
+      createdAt: new Date('2026-04-30T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-30T00:00:00.000Z'),
+    });
     const service = new DiseaseReportsService(
       {
         diseaseReport: {

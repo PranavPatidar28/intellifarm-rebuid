@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import { Button } from '@/components/button';
+import { FarmerAvatar } from '@/components/farmer-avatar';
 import { HomeNewsCard } from '@/components/home-news-card';
 import { HomePrimaryToolCard } from '@/components/home-primary-tool-card';
 import { HomeSchemeCard } from '@/components/home-scheme-card';
@@ -34,6 +35,7 @@ import type {
   SchemesResponse,
 } from '@/lib/api-types';
 import { storageKeys } from '@/lib/constants';
+import { getFirstName } from '@/lib/format';
 import { getOrderedHomeTasks, readHomeTasks, toggleHomeTask } from '@/lib/home-tasks';
 import { getHomeNewsItems, getHomeSchemeHighlight } from '@/lib/home-news';
 import { useStoredValue } from '@/lib/storage';
@@ -137,6 +139,33 @@ export default function HomeDashboardRoute() {
       }),
     [dashboard?.schemeSpotlight, fallbackScheme],
   );
+  const farmerFirstName = getFirstName(authUser?.name) ?? 'farmer';
+  const homeHeaderAction = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      <Pressable
+        onPress={() => router.push('/alerts')}
+        style={{
+          width: 40,
+          height: 40,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: radii.pill,
+          backgroundColor: palette.white,
+          borderWidth: 1,
+          borderColor: palette.outline,
+        }}
+      >
+        <Bell color={palette.leafDark} size={20} />
+      </Pressable>
+      <Pressable onPress={() => router.push('/profile-settings')}>
+        <FarmerAvatar
+          name={authUser?.name}
+          profilePhotoUrl={authUser?.profilePhotoUrl}
+          size={40}
+        />
+      </Pressable>
+    </View>
+  );
 
   if (dashboardQuery.isLoading && !dashboard) {
     return <LoadingScreen label="Loading your farm dashboard" />;
@@ -146,8 +175,9 @@ export default function HomeDashboardRoute() {
     return (
       <PageShell
         eyebrow="My farm"
-        title={`Namaste, ${authUser?.name || 'farmer'}`}
+        title={`Namaste, ${farmerFirstName}`}
         subtitle="Set up a crop season to unlock weekly farm actions."
+        action={homeHeaderAction}
       >
         <RichEmptyState
           title="No active crop yet"
@@ -168,25 +198,9 @@ export default function HomeDashboardRoute() {
   return (
     <PageShell
       eyebrow="My farm"
-      title={`Namaste, ${authUser?.name || 'farmer'}`}
+      title={`Namaste, ${farmerFirstName}`}
       subtitle="Weekly farm actions"
-      action={
-        <Pressable
-          onPress={() => router.push('/alerts')}
-          style={{
-            width: 40,
-            height: 40,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: radii.pill,
-            backgroundColor: palette.white,
-            borderWidth: 1,
-            borderColor: palette.outline,
-          }}
-        >
-          <Bell color={palette.leafDark} size={20} />
-        </Pressable>
-      }
+      action={homeHeaderAction}
       heroTone="sunrise"
       hero={
         <HomeSeasonContextRow

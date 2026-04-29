@@ -1,7 +1,14 @@
 import { Text, View } from 'react-native';
 
 import { Stack, useRouter } from 'expo-router';
-import { Bell, CloudSun, FileHeart, ShieldAlert, Wallet } from 'lucide-react-native';
+import {
+  Bell,
+  CloudSun,
+  FileHeart,
+  MessageSquareMore,
+  ShieldAlert,
+  Wallet,
+} from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/button';
@@ -129,6 +136,9 @@ function getAlertIcon(iconKey: string, categoryLabel: string) {
   }
   if (key.includes('disease') || key.includes('crop')) {
     return <ShieldAlert color={palette.terracotta} size={18} />;
+  }
+  if (key.includes('community')) {
+    return <MessageSquareMore color={palette.leafDark} size={18} />;
   }
 
   return <Bell color={palette.leafDark} size={18} />;

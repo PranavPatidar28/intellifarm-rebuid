@@ -29,7 +29,7 @@ export class AlertsService {
         categoryLabel: describeCategoryLabel(alert.alertType),
         iconKey: resolveIconKey(alert.alertType, alert.severity),
         ctaLabel: resolveCtaLabel(alert.alertType),
-        ctaRoute: resolveCtaRoute(alert.alertType, alert.cropSeasonId),
+        ctaRoute: resolveCtaRoute(alert.alertType, alert.cropSeasonId, alert.ctaRoute),
         freshnessLabel: formatFreshnessLabel(alert.createdAt),
       })),
     };
@@ -67,7 +67,11 @@ export class AlertsService {
         categoryLabel: describeCategoryLabel(updatedAlert.alertType),
         iconKey: resolveIconKey(updatedAlert.alertType, updatedAlert.severity),
         ctaLabel: resolveCtaLabel(updatedAlert.alertType),
-        ctaRoute: resolveCtaRoute(updatedAlert.alertType, updatedAlert.cropSeasonId),
+        ctaRoute: resolveCtaRoute(
+          updatedAlert.alertType,
+          updatedAlert.cropSeasonId,
+          updatedAlert.ctaRoute,
+        ),
         freshnessLabel: formatFreshnessLabel(updatedAlert.createdAt),
       },
     };
@@ -75,7 +79,7 @@ export class AlertsService {
 }
 
 function describeCategoryLabel(
-  alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM',
+  alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM' | 'COMMUNITY',
 ) {
   switch (alertType) {
     case 'WEATHER':
@@ -84,13 +88,15 @@ function describeCategoryLabel(
       return 'Field task';
     case 'DISEASE':
       return 'Crop health';
+    case 'COMMUNITY':
+      return 'Community reply';
     default:
       return 'System update';
   }
 }
 
 function resolveIconKey(
-  alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM',
+  alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM' | 'COMMUNITY',
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
 ) {
   if (alertType === 'WEATHER') {
@@ -105,10 +111,16 @@ function resolveIconKey(
     return 'check-circle-2';
   }
 
+  if (alertType === 'COMMUNITY') {
+    return 'messages-square';
+  }
+
   return 'bell';
 }
 
-function resolveCtaLabel(alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM') {
+function resolveCtaLabel(
+  alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM' | 'COMMUNITY',
+) {
   switch (alertType) {
     case 'WEATHER':
       return 'Open weather actions';
@@ -116,15 +128,22 @@ function resolveCtaLabel(alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM') {
       return 'Open crop plan';
     case 'DISEASE':
       return 'Open diagnose flow';
+    case 'COMMUNITY':
+      return 'Open discussion';
     default:
       return 'Open app';
   }
 }
 
 function resolveCtaRoute(
-  alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM',
+  alertType: 'WEATHER' | 'TASK' | 'DISEASE' | 'SYSTEM' | 'COMMUNITY',
   cropSeasonId: string | null,
+  explicitRoute: string | null,
 ) {
+  if (explicitRoute) {
+    return explicitRoute;
+  }
+
   switch (alertType) {
     case 'WEATHER':
       return cropSeasonId ? `/season/${cropSeasonId}` : '/(tabs)/home';
@@ -132,6 +151,8 @@ function resolveCtaRoute(
       return '/(tabs)/crop-plan';
     case 'DISEASE':
       return '/(tabs)/diagnose';
+    case 'COMMUNITY':
+      return '/community';
     default:
       return '/(tabs)/home';
   }

@@ -296,6 +296,23 @@ export default function DiagnoseRoute() {
           void submit();
         }}
       />
+      <Button
+        label="Open Assistant"
+        variant="soft"
+        onPress={() =>
+          router.push({
+            pathname: '/voice',
+            params: {
+              prompt:
+                symptoms.trim().length > 0
+                  ? `Help me think through this crop-health issue before I act: ${symptoms.trim()}`
+                  : 'Help me think through a crop-health issue before I act.',
+              originRoute: 'diagnose',
+              focusCropSeasonId: cropSeasonId || undefined,
+            },
+          } as never)
+        }
+      />
 
       <SectionTitle eyebrow="Recent checks" title="Crop health history" />
       <View style={{ gap: spacing.sm }}>

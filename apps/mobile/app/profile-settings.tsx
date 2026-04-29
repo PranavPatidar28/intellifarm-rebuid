@@ -1,23 +1,35 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
-import { Bell, CloudOff, Wallet } from 'lucide-react-native';
+import {
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  Languages,
+  LifeBuoy,
+  MapPinned,
+  SquarePen,
+  Sprout,
+} from 'lucide-react-native';
 
 import { Button } from '@/components/button';
 import { CompactListCard } from '@/components/compact-list-card';
+import { GradientFeatureCard } from '@/components/gradient-feature-card';
+import { InsetCard } from '@/components/inset-card';
 import { PageShell } from '@/components/page-shell';
 import { ProfileHeroCard } from '@/components/profile-hero-card';
+import { ProfileStatusCard } from '@/components/profile-status-card';
+import { SectionTitle } from '@/components/section-title';
 import { SunriseCard } from '@/components/sunrise-card';
-import { TextField } from '@/components/text-field';
 import { useSession } from '@/features/session/session-provider';
-import { apiPatch, apiPost, ApiError } from '@/lib/api';
+import { apiPost, ApiError } from '@/lib/api';
 import type { AuthUser } from '@/lib/api-types';
-import { languages } from '@/lib/constants';
+import { languages, storageKeys } from '@/lib/constants';
 import { titleCase } from '@/lib/format';
-import { palette, radii, spacing, typography } from '@/theme/tokens';
+import { storage, useStoredValue } from '@/lib/storage';
+import { gradients, palette, radii, spacing, typography } from '@/theme/tokens';
 
 function buildImagePart(uri: string) {
   const extension = uri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
@@ -28,41 +40,111 @@ function buildImagePart(uri: string) {
   } as unknown as Blob;
 }
 
+type StatusMessage = {
+  tone: 'success' | 'warning';
+  text: string;
+} | null;
+
+type OperationalStatus = 'ACTIVE' | 'PLANNED';
+
+type FarmSnapshot = {
+  id: string;
+  name: string;
+  areaLabel: string;
+  locationLabel: string;
+  irrigationLabel: string;
+  seasons: Array<{
+    id: string;
+    cropName: string;
+    currentStage: string;
+    status: 'ACTIVE' | 'PLANNED';
+  }>;
+  primarySeason:
+    | {
+        id: string;
+        cropName: string;
+        currentStage: string;
+        status: 'ACTIVE' | 'PLANNED';
+      }
+    | null;
+};
+
 export default function ProfileSettingsRoute() {
   const router = useRouter();
-  const { authUser, profile, token, language, setLanguage, signOut, refreshSession } = useSession();
-  const [form, setForm] = useState({
-    name: '',
-    state: '',
-    district: '',
-    village: '',
-  });
-  const [selectedLanguage, setSelectedLanguage] = useState(language ?? 'en');
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { width } = useWindowDimensions();
+  const { authUser, profile, token, signOut, refreshSession } = useSession();
+  const [profileNotice] = useStoredValue<string | null>(
+    storageKeys.profileSettingsNotice,
+    null,
+  );
+  const [statusMessage, setStatusMessage] = useState<StatusMessage>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
 
   useEffect(() => {
-    if (!authUser) {
+    if (!profileNotice) {
       return;
     }
 
-    setForm({
-      name: authUser.name,
-      state: authUser.state,
-      district: authUser.district,
-      village: authUser.village,
-    });
-    setSelectedLanguage(authUser.preferredLanguage);
-  }, [authUser]);
+    setStatusMessage({ tone: 'success', text: profileNotice });
+    storage.remove(storageKeys.profileSettingsNotice);
+  }, [profileNotice]);
 
-  const currentCrops = useMemo(
+  const operationalSeasons = useMemo(
     () =>
       profile?.farms.flatMap((farm) =>
-        farm.cropSeasons.map((season) => `${season.cropName} - ${titleCase(season.status)}`),
+        farm.cropSeasons
+          .filter((season) => isOperationalStatus(season.status))
+          .map((season) => ({
+            id: season.id,
+            cropName: season.cropName,
+            currentStage: season.currentStage,
+            status: season.status as OperationalStatus,
+            farmPlotName: farm.name,
+          })),
       ) ?? [],
     [profile],
   );
+  const farmSnapshots = useMemo<FarmSnapshot[]>(
+    () =>
+      profile?.farms.map((farm) => {
+        const seasons = farm.cropSeasons
+          .filter((season) => isOperationalStatus(season.status))
+          .map((season) => ({
+            id: season.id,
+            cropName: season.cropName,
+            currentStage: season.currentStage,
+            status: season.status as OperationalStatus,
+          }));
+
+        return {
+          id: farm.id,
+          name: farm.name,
+          areaLabel: `${formatPlotArea(farm.area)} acre plot`,
+          locationLabel: [farm.village, farm.district, farm.state].filter(Boolean).join(', '),
+          irrigationLabel: titleCase(farm.irrigationType),
+          seasons,
+          primarySeason: seasons.find((season) => season.status === 'ACTIVE') ?? seasons[0] ?? null,
+        };
+      }) ?? [],
+    [profile],
+  );
+  const activeCropCount = useMemo(
+    () => operationalSeasons.filter((season) => season.status === 'ACTIVE').length,
+    [operationalSeasons],
+  );
+  const plannedCropCount = useMemo(
+    () => operationalSeasons.filter((season) => season.status === 'PLANNED').length,
+    [operationalSeasons],
+  );
+  const locationSummary = useMemo(() => {
+    const parts = [authUser?.village, authUser?.district, authUser?.state].filter(Boolean);
+    return parts.length ? parts.join(', ') : 'Location details still missing';
+  }, [authUser?.district, authUser?.state, authUser?.village]);
+  const languageLabel =
+    languages.find((item) => item.code === authUser?.preferredLanguage)?.label ?? 'English';
+  const stackedPlotDetails = width < 380;
+  const planTargetRoute =
+    activeCropCount || plannedCropCount ? ('/crop-plan' as const) : ('/season' as const);
 
   const uploadPhoto = async () => {
     if (!token) {
@@ -71,7 +153,10 @@ export default function ProfileSettingsRoute() {
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permission.status !== 'granted') {
-      setMessage('Photo access is needed to update the profile image.');
+      setStatusMessage({
+        tone: 'warning',
+        text: 'Photo access is needed to update the profile image.',
+      });
       return;
     }
 
@@ -86,50 +171,24 @@ export default function ProfileSettingsRoute() {
     }
 
     setPhotoBusy(true);
-    setMessage(null);
+    setStatusMessage(null);
 
     try {
       const formData = new FormData();
       formData.append('file', buildImagePart(result.assets[0].uri));
       await apiPost<{ user: AuthUser }>('/me/photo', formData, token);
       await refreshSession();
-      setMessage('Profile photo updated.');
+      setStatusMessage({ tone: 'success', text: 'Profile photo updated.' });
     } catch (error) {
-      setMessage(
-        error instanceof ApiError ? error.message : 'Could not upload the profile photo.',
-      );
+      setStatusMessage({
+        tone: 'warning',
+        text:
+          error instanceof ApiError
+            ? error.message
+            : 'Could not upload the profile photo.',
+      });
     } finally {
       setPhotoBusy(false);
-    }
-  };
-
-  const saveProfile = async () => {
-    if (!token) {
-      return;
-    }
-
-    setBusy(true);
-    setMessage(null);
-
-    try {
-      await apiPatch(
-        '/me',
-        {
-          name: form.name.trim(),
-          preferredLanguage: selectedLanguage,
-          state: form.state.trim(),
-          district: form.district.trim(),
-          village: form.village.trim(),
-        },
-        token,
-      );
-      setLanguage(selectedLanguage);
-      await refreshSession();
-      setMessage('Profile saved.');
-    } catch (error) {
-      setMessage(error instanceof ApiError ? error.message : 'Could not save the profile.');
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -138,163 +197,454 @@ export default function ProfileSettingsRoute() {
       <Stack.Screen options={{ title: 'Profile & settings' }} />
       <PageShell
         eyebrow="Farmer profile"
-        title="Profile and settings"
-        subtitle="Manage identity, language, offline tools, and quick access to the new expense tracker."
-        heroTone="scheme"
+        title="Profile & settings"
+        subtitle="Keep your farm identity, local context, and everyday tools easy to reach."
+        heroTone="assistant"
+        hero={
+          <ProfileHeroCard
+            user={authUser}
+            farmCount={profile?.farmCount ?? 0}
+            cropCount={activeCropCount}
+          />
+        }
       >
-        <ProfileHeroCard
-          user={authUser}
-          farmCount={profile?.farmCount ?? 0}
-          cropCount={currentCrops.length}
-        />
-
-        <SunriseCard accent="soft" title="Profile photo">
-          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <View
-              style={{
-                overflow: 'hidden',
-                width: 72,
-                height: 72,
-                borderRadius: radii.lg,
-                backgroundColor: palette.parchmentSoft,
-              }}
-            >
-              {authUser?.profilePhotoUrl ? (
-                <Image source={authUser.profilePhotoUrl} contentFit="cover" style={{ width: '100%', height: '100%' }} />
-              ) : (
-                <View
-                  style={{
-                    flex: 1,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: palette.leaf,
-                      fontFamily: typography.displayBold,
-                      fontSize: 24,
-                    }}
-                  >
-                    {authUser?.name?.slice(0, 1)?.toUpperCase() ?? 'F'}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View style={{ flex: 1, gap: spacing.sm }}>
-              <Text
-                style={{
-                  color: palette.ink,
-                  fontFamily: typography.bodyStrong,
-                  fontSize: 15,
-                }}
-              >
-                {authUser?.phone ?? 'Phone not available'}
-              </Text>
-              <Button
-                label={photoBusy ? 'Uploading photo...' : 'Change photo'}
-                variant="soft"
-                fullWidth={false}
-                loading={photoBusy}
-                onPress={() => {
-                  void uploadPhoto();
-                }}
-              />
-            </View>
-          </View>
-        </SunriseCard>
-
-        <SunriseCard accent="brand" title="Farmer details">
-          <View style={{ gap: spacing.md }}>
-            <TextField label="Farmer name" value={form.name} onChangeText={(value) => setForm((current) => ({ ...current, name: value }))} />
-            <TextField label="State" value={form.state} onChangeText={(value) => setForm((current) => ({ ...current, state: value }))} />
-            <TextField label="District" value={form.district} onChangeText={(value) => setForm((current) => ({ ...current, district: value }))} />
-            <TextField label="Village" value={form.village} onChangeText={(value) => setForm((current) => ({ ...current, village: value }))} />
-          </View>
-        </SunriseCard>
-
-        <SunriseCard accent="scheme" title="Language">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {languages
-              .filter((item) => item.enabled)
-              .map((item) => (
-                <Button
-                  key={item.code}
-                  label={item.label}
-                  fullWidth={false}
-                  variant={selectedLanguage === item.code ? 'primary' : 'soft'}
-                  onPress={() => setSelectedLanguage(item.code)}
-                />
-              ))}
-          </View>
-        </SunriseCard>
-
-        <SunriseCard accent="info" title="Current farm summary">
-          <View style={{ gap: spacing.xs }}>
-            <Text
-              style={{
-                color: palette.ink,
-                fontFamily: typography.bodyRegular,
-                fontSize: 13,
-                lineHeight: 19,
-              }}
-            >
-              Farm plots: {profile?.farmCount ?? 0}
-            </Text>
-            <Text
-              style={{
-                color: palette.ink,
-                fontFamily: typography.bodyRegular,
-                fontSize: 13,
-                lineHeight: 19,
-              }}
-            >
-              Current crops: {currentCrops.length ? currentCrops.join(', ') : 'None yet'}
-            </Text>
-          </View>
-        </SunriseCard>
+        {statusMessage ? (
+          <ProfileStatusCard
+            message={statusMessage.text}
+            tone={statusMessage.tone}
+          />
+        ) : null}
 
         <View style={{ gap: spacing.sm }}>
+          <SectionTitle title="Farmer tools" />
+          <Pressable onPress={() => router.push(planTargetRoute)}>
+            <GradientFeatureCard colors={gradients.assistantGlow} padding={14}>
+              <View style={{ gap: spacing.sm }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: spacing.sm,
+                  }}
+                >
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text
+                      style={{
+                        color: palette.inkMuted,
+                        fontFamily: typography.bodyStrong,
+                        fontSize: 11,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Featured
+                    </Text>
+                    <Text
+                      style={{
+                        color: palette.ink,
+                        fontFamily: typography.bodyStrong,
+                        fontSize: 17,
+                        lineHeight: 22,
+                      }}
+                    >
+                      Crop plan
+                    </Text>
+                    <Text
+                      style={{
+                        color: palette.inkSoft,
+                        fontFamily: typography.bodyRegular,
+                        fontSize: 12,
+                        lineHeight: 18,
+                      }}
+                    >
+                      {activeCropCount || plannedCropCount
+                        ? 'Open the stage-wise plan to review next actions, crop progress, and weekly advisories.'
+                        : 'Start a crop season to unlock stage-wise planning and field action guidance.'}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: radii.md,
+                      borderCurve: 'continuous',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: palette.white,
+                      borderWidth: 1,
+                      borderColor: 'rgba(30, 42, 34, 0.08)',
+                    }}
+                  >
+                    <CalendarDays color={palette.leafDark} size={18} />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+                  <ToolStatPill
+                    label="Active"
+                    value={String(activeCropCount)}
+                    tone="leaf"
+                  />
+                  <ToolStatPill
+                    label="Planned"
+                    value={String(plannedCropCount)}
+                    tone="sky"
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text
+                    style={{
+                      color: palette.leafDark,
+                      fontFamily: typography.bodyStrong,
+                      fontSize: 12,
+                    }}
+                  >
+                    {activeCropCount || plannedCropCount
+                      ? 'Open crop plan'
+                      : 'Set up crop season'}
+                  </Text>
+                  <ArrowRight color={palette.leafDark} size={16} />
+                </View>
+              </View>
+            </GradientFeatureCard>
+          </Pressable>
+
           <CompactListCard
-            title="Expense tracker"
-            subtitle="Track seed, labour, and transport spending."
-            prefix={<Wallet color={palette.leafDark} size={18} />}
-            onPress={() => router.push('/expenses' as never)}
-          />
-          <CompactListCard
-            title="Alerts and reminders"
-            subtitle="Open weather, crop-health, and market reminders."
+            title="Alerts & reminders"
+            subtitle="Open weather, crop-health, and market reminders in one place."
             prefix={<Bell color={palette.mustard} size={18} />}
             onPress={() => router.push('/alerts')}
           />
           <CompactListCard
-            title="Offline tools"
-            subtitle="View cached advice and pending sync items."
-            prefix={<CloudOff color={palette.sky} size={18} />}
-            onPress={() => router.push('/offline')}
+            title="Expert help"
+            subtitle="Reach the guided support flow when the crop issue needs more help."
+            prefix={<LifeBuoy color={palette.terracotta} size={18} />}
+            onPress={() => router.push('/expert-help')}
           />
         </View>
 
-        {message ? (
-          <SunriseCard accent="warning" title="Settings note">
-            <Text
+        <SunriseCard accent="brand" title="Preferences & account">
+          <View style={{ gap: spacing.md }}>
+            <View
               style={{
-                color: palette.inkSoft,
-                fontFamily: typography.bodyRegular,
-                fontSize: 13,
-                lineHeight: 19,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderRadius: 18,
+                borderCurve: 'continuous',
+                borderWidth: 1,
+                borderColor: palette.outline,
+                backgroundColor: palette.white,
+                gap: spacing.xs,
               }}
             >
-              {message}
-            </Text>
-          </SunriseCard>
-        ) : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Languages color={palette.leafDark} size={18} />
+                <Text
+                  style={{
+                    color: palette.ink,
+                    fontFamily: typography.bodyStrong,
+                    fontSize: 14,
+                  }}
+                >
+                  Current language
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: palette.inkSoft,
+                  fontFamily: typography.bodyRegular,
+                  fontSize: 12,
+                  lineHeight: 18,
+                }}
+              >
+                {languageLabel}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderRadius: 18,
+                borderCurve: 'continuous',
+                borderWidth: 1,
+                borderColor: palette.outline,
+                backgroundColor: palette.white,
+                gap: spacing.xs,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Sprout color={palette.leafDark} size={18} />
+                <Text
+                  style={{
+                    color: palette.ink,
+                    fontFamily: typography.bodyStrong,
+                    fontSize: 14,
+                  }}
+                >
+                  Farmer details
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: palette.inkSoft,
+                  fontFamily: typography.bodyRegular,
+                  fontSize: 12,
+                  lineHeight: 18,
+                }}
+              >
+                {authUser?.name?.trim() || 'Farmer name missing'}
+              </Text>
+              <Text
+                style={{
+                  color: palette.inkMuted,
+                  fontFamily: typography.bodyRegular,
+                  fontSize: 11,
+                }}
+              >
+                {locationSummary}
+              </Text>
+            </View>
+          </View>
+        </SunriseCard>
 
         <View style={{ gap: spacing.sm }}>
-          <Button label={busy ? 'Saving profile...' : 'Save profile'} loading={busy} onPress={() => { void saveProfile(); }} />
-          <Button label="Log out" variant="ghost" onPress={() => { void signOut().then(() => router.replace('/login')); }} />
+          <Button
+            label="Edit details"
+            icon={<SquarePen color={palette.white} size={16} />}
+            onPress={() => router.push('/profile-settings-edit')}
+          />
+          <Button
+            label={photoBusy ? 'Uploading photo...' : 'Change photo'}
+            variant="soft"
+            loading={photoBusy}
+            onPress={() => {
+              void uploadPhoto();
+            }}
+          />
+          <Button
+            label="Log out"
+            variant="ghost"
+            onPress={() => {
+              void signOut().then(() => router.replace('/login'));
+            }}
+          />
         </View>
       </PageShell>
     </>
+  );
+}
+
+function formatPlotArea(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function isOperationalStatus(status: string): status is OperationalStatus {
+  return status === 'ACTIVE' || status === 'PLANNED';
+}
+
+function ToolStatPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'leaf' | 'sky';
+}) {
+  const colors =
+    tone === 'leaf'
+      ? { backgroundColor: palette.leafMist, textColor: palette.leafDark }
+      : { backgroundColor: palette.skySoft, textColor: palette.sky };
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 7,
+        borderRadius: radii.pill,
+        backgroundColor: colors.backgroundColor,
+      }}
+    >
+      <Text
+        style={{
+          color: colors.textColor,
+          fontFamily: typography.bodyStrong,
+          fontSize: 11,
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{
+          color: colors.textColor,
+          fontFamily: typography.bodyStrong,
+          fontSize: 11,
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function ContextMetricChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'leaf' | 'sky' | 'sunrise';
+}) {
+  const colors =
+    tone === 'leaf'
+      ? { backgroundColor: palette.leafMist, textColor: palette.leafDark }
+      : tone === 'sky'
+        ? { backgroundColor: palette.skySoft, textColor: palette.sky }
+        : { backgroundColor: palette.mustardSoft, textColor: palette.mustard };
+
+  return (
+    <View
+      style={{
+        minWidth: 94,
+        gap: 4,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: radii.lg,
+        borderCurve: 'continuous',
+        backgroundColor: palette.white,
+        borderWidth: 1,
+        borderColor: 'rgba(30, 42, 34, 0.08)',
+      }}
+    >
+      <Text
+        style={{
+          color: palette.inkMuted,
+          fontFamily: typography.bodyStrong,
+          fontSize: 10,
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        style={{
+          alignSelf: 'flex-start',
+          paddingHorizontal: spacing.sm,
+          paddingVertical: 6,
+          borderRadius: radii.pill,
+          backgroundColor: colors.backgroundColor,
+        }}
+      >
+        <Text
+          style={{
+            color: colors.textColor,
+            fontFamily: typography.bodyStrong,
+            fontSize: 12,
+          }}
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function FarmDetailTile({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        gap: 4,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: radii.lg,
+        borderCurve: 'continuous',
+        borderWidth: 1,
+        borderColor: palette.outline,
+        backgroundColor: palette.parchmentSoft,
+      }}
+    >
+      <Text
+        style={{
+          color: palette.inkMuted,
+          fontFamily: typography.bodyStrong,
+          fontSize: 10,
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{
+          color: palette.ink,
+          fontFamily: typography.bodyStrong,
+          fontSize: 15,
+        }}
+      >
+        {value}
+      </Text>
+      <Text
+        style={{
+          color: palette.inkSoft,
+          fontFamily: typography.bodyRegular,
+          fontSize: 11,
+          lineHeight: 17,
+        }}
+      >
+        {helper}
+      </Text>
+    </View>
+  );
+}
+
+function SeasonStatusPill({
+  status,
+}: {
+  status: 'ACTIVE' | 'PLANNED' | 'EMPTY';
+}) {
+  const colors =
+    status === 'ACTIVE'
+      ? { backgroundColor: palette.leafMist, textColor: palette.leafDark, label: 'Active' }
+      : status === 'PLANNED'
+        ? { backgroundColor: palette.skySoft, textColor: palette.sky, label: 'Planned' }
+        : {
+            backgroundColor: palette.mustardSoft,
+            textColor: palette.mustard,
+            label: 'No season',
+          };
+
+  return (
+    <View
+      style={{
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 7,
+        borderRadius: radii.pill,
+        backgroundColor: colors.backgroundColor,
+      }}
+    >
+      <Text
+        style={{
+          color: colors.textColor,
+          fontFamily: typography.bodyStrong,
+          fontSize: 11,
+        }}
+      >
+        {colors.label}
+      </Text>
+    </View>
   );
 }

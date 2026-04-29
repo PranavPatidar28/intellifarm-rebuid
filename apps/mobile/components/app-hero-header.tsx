@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppTopBar } from '@/components/app-top-bar';
 import { palette, spacing } from '@/theme/tokens';
@@ -11,7 +12,6 @@ export function AppHeroHeader({
   hero,
   action,
   tone = 'sunrise',
-  topPadding = spacing.xl,
 }: {
   eyebrow?: string;
   title: string;
@@ -19,8 +19,8 @@ export function AppHeroHeader({
   hero?: ReactNode;
   action?: ReactNode;
   tone?: 'sunrise' | 'weather' | 'market' | 'scheme' | 'assistant';
-  topPadding?: number;
 }) {
+  const insets = useSafeAreaInsets();
   const backgroundColor =
     tone === 'weather'
       ? palette.skySoft
@@ -36,7 +36,7 @@ export function AppHeroHeader({
     <View
       style={{
         paddingHorizontal: spacing.lg,
-        paddingTop: topPadding,
+        paddingTop: insets.top + spacing.md,
         paddingBottom: spacing.sm,
         backgroundColor,
       }}

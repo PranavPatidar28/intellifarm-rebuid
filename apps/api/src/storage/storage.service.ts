@@ -43,6 +43,9 @@ export class StorageService {
       'disease-reports',
       'voice-notes',
       'profile-photos',
+      'community-posts',
+      'expense-receipts',
+      'assistant-attachments',
     ]);
 
     if (!allowedFolders.has(folder)) {
@@ -88,6 +91,67 @@ export class StorageService {
       return Boolean(user);
     }
 
+    if (folder === 'community-posts') {
+      const post = await this.prisma.communityPost.findFirst({
+        where: {
+          OR: [
+            {
+              imageUrl: mediaUrl,
+            },
+            {
+              imageUrl: {
+                endsWith: mediaSuffix,
+              },
+            },
+          ],
+        },
+        select: {
+          authorId: true,
+          hidden: true,
+        },
+      });
+
+      if (!post) {
+        return false;
+      }
+
+      return !post.hidden || post.authorId === userId;
+    }
+
+    if (folder === 'expense-receipts') {
+      const expense = await this.prisma.expenseEntry.findFirst({
+        where: {
+          userId,
+          OR: [
+            { receiptUrl: mediaUrl },
+            { receiptUrl: { endsWith: mediaSuffix } },
+          ],
+        },
+        select: { id: true },
+      });
+
+      return Boolean(expense);
+    }
+
+    if (folder === 'assistant-attachments') {
+      const assistantMessages = await this.prisma.assistantMessage.findMany({
+        where: {
+          thread: {
+            userId,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { attachments: true },
+      });
+
+      return assistantMessages.some((message) =>
+        parseAssistantMediaUrls(message.attachments).some(
+          (attachmentUrl) =>
+            attachmentUrl === mediaUrl || attachmentUrl.endsWith(mediaSuffix),
+        ),
+      );
+    }
+
     const report = await this.prisma.diseaseReport.findFirst({
       where: {
         userId,
@@ -124,4 +188,19 @@ export class StorageService {
   private getMediaUrl(folder: string, filename: string) {
     return `${this.getPublicBaseUrl()}/${folder}/${filename}`;
   }
+}
+
+function parseAssistantMediaUrls(value: unknown) {
+  return Array.isArray(value)
+    ? value
+        .map((item) =>
+          item &&
+          typeof item === 'object' &&
+          'url' in item &&
+          typeof item.url === 'string'
+            ? item.url
+            : null,
+        )
+        .filter((url): url is string => Boolean(url))
+    : [];
 }

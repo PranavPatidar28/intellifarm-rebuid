@@ -26,10 +26,12 @@ export default function TabsLayout() {
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
-      <Tabs.Screen name="crop-plan" options={{ title: 'Plan' }} />
-      <Tabs.Screen name="diagnose" options={{ title: 'Diagnose', href: null }} />
       <Tabs.Screen name="market" options={{ title: 'Market' }} />
-      <Tabs.Screen name="voice" options={{ title: 'Voice' }} />
+      <Tabs.Screen name="expenses" options={{ title: 'Expense' }} />
+      <Tabs.Screen name="diagnose" options={{ title: 'Diagnose', href: null }} />
+      <Tabs.Screen name="community" options={{ title: 'Community' }} />
+      <Tabs.Screen name="voice" options={{ title: 'Assistant' }} />
+      <Tabs.Screen name="crop-plan" options={{ title: 'Plan', href: null }} />
     </Tabs>
   );
 }

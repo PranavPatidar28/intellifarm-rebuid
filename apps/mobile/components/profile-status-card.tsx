@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 
-import { CircleAlert, CircleCheckBig } from 'lucide-react-native';
+import { CheckCircle2, CircleAlert } from 'lucide-react-native';
 
 import { InsetCard } from '@/components/inset-card';
 import { palette, spacing, typography } from '@/theme/tokens';
@@ -16,7 +16,7 @@ export function ProfileStatusCard({
     tone === 'success'
       ? {
           tone: 'feature' as const,
-          icon: <CircleCheckBig color={palette.leafDark} size={18} />,
+          icon: <CheckCircle2 color={palette.leafDark} size={18} />,
           title: 'Saved',
         }
       : {

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type SoilType } from '@prisma/client';
+import { type SoilType } from '../generated/prisma';
 
 type SoilMetrics = {
   n?: number;

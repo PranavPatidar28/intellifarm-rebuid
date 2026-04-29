@@ -1,17 +1,37 @@
 import { z } from 'zod';
 
-import type { PreferredLanguage } from '@intellifarm/contracts';
+import type {
+  CommunityCategory,
+  CommunityFeedScope,
+  CommunityReportReason,
+  ExpenseCategory,
+  ExpenseScope,
+  ExpenseStatus,
+  PreferredLanguage,
+} from '@intellifarm/contracts';
 import {
   alertsResponseSchema,
   assistantMessageResponseSchema,
   assistantThreadResponseSchema,
   assistantThreadsResponseSchema,
+  communityFeedResponseSchema,
+  communityPostResponseSchema,
+  communityPostSummaryResponseSchema,
   cropSuggestionPredictionResponseSchema,
   dashboardResponseSchema,
   diseaseReportResponseSchema,
   diseaseReportsResponseSchema,
   diseaseResultSchema,
+  expenseBudgetResponseSchema,
+  expenseDeleteResponseSchema,
+  expenseListResponseSchema,
+  expenseResponseSchema,
+  expenseSummaryResponseSchema,
   facilitiesResponseSchema,
+  marketCropDetailResponseSchema,
+  marketExplorerCropsResponseSchema,
+  marketExplorerMandisResponseSchema,
+  marketMandiDetailResponseSchema,
   marketsResponseSchema,
   schemesResponseSchema,
   weatherSummarySchema,
@@ -25,6 +45,18 @@ export type DiseaseAnalysisResult = z.infer<typeof diseaseResultSchema>;
 export type WeatherSummary = z.infer<typeof weatherSummarySchema>;
 export type MarketsResponse = z.infer<typeof marketsResponseSchema>;
 export type FacilitiesResponse = z.infer<typeof facilitiesResponseSchema>;
+export type MarketExplorerCropsResponse = z.infer<
+  typeof marketExplorerCropsResponseSchema
+>;
+export type MarketExplorerMandisResponse = z.infer<
+  typeof marketExplorerMandisResponseSchema
+>;
+export type MarketCropDetailResponse = z.infer<
+  typeof marketCropDetailResponseSchema
+>;
+export type MarketMandiDetailResponse = z.infer<
+  typeof marketMandiDetailResponseSchema
+>;
 export type SchemesResponse = z.infer<typeof schemesResponseSchema>;
 export type AlertsResponse = z.infer<typeof alertsResponseSchema>;
 export type DiseaseReportsResponse = z.infer<typeof diseaseReportsResponseSchema>;
@@ -32,6 +64,33 @@ export type DiseaseReportResponse = z.infer<typeof diseaseReportResponseSchema>;
 export type AssistantThreadsResponse = z.infer<typeof assistantThreadsResponseSchema>;
 export type AssistantThreadResponse = z.infer<typeof assistantThreadResponseSchema>;
 export type AssistantMessageResponse = z.infer<typeof assistantMessageResponseSchema>;
+export type CommunityFeedResponse = z.infer<typeof communityFeedResponseSchema>;
+export type CommunityPostResponse = z.infer<typeof communityPostResponseSchema>;
+export type CommunityPostSummaryResponse = z.infer<
+  typeof communityPostSummaryResponseSchema
+>;
+export type ExpenseListResponse = z.infer<typeof expenseListResponseSchema>;
+export type ExpenseResponse = z.infer<typeof expenseResponseSchema>;
+export type ExpenseSummaryResponse = z.infer<typeof expenseSummaryResponseSchema>;
+export type ExpenseBudgetResponse = z.infer<typeof expenseBudgetResponseSchema>;
+export type ExpenseDeleteResponse = z.infer<typeof expenseDeleteResponseSchema>;
+export type CommunityPost = CommunityFeedResponse['posts'][number];
+export type CommunityReply = CommunityPostResponse['post']['replies'][number];
+export type ExpenseEntry = ExpenseListResponse['expenses'][number];
+export type ExpenseSummary = ExpenseSummaryResponse['summary'];
+export type ExpenseBudget = ExpenseBudgetResponse['budget'];
+export type CommunityReplyResponse = {
+  reply: CommunityReply;
+};
+export type CommunityReportResponse = {
+  success: boolean;
+};
+export type CommunityCategoryType = CommunityCategory;
+export type CommunityFeedScopeType = CommunityFeedScope;
+export type CommunityReportReasonType = CommunityReportReason;
+export type ExpenseCategoryType = ExpenseCategory;
+export type ExpenseStatusType = ExpenseStatus;
+export type ExpenseScopeType = ExpenseScope;
 
 export type AuthUser = {
   id: string;

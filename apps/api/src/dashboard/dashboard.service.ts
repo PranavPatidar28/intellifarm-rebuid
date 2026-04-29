@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CropSeason, FarmPlot, Scheme } from '@prisma/client';
+import type { CropSeason, FarmPlot, Scheme } from '../generated/prisma';
 
 import { diffInDays, endOfWindow, startOfToday } from '../common/utils/date.util';
 import { haversineDistanceKm } from '../common/utils/geo.util';

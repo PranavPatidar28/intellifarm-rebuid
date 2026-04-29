@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -242,5 +242,179 @@ export class AdminService {
       take: 50,
     });
     return { diseaseReports };
+  }
+
+  async listCommunityReports() {
+    const reports = await this.prisma.communityReport.findMany({
+      include: {
+        reporter: true,
+      },
+      orderBy: [{ resolvedAt: 'asc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+
+    const postIds = reports
+      .filter((report) => report.targetType === 'POST')
+      .map((report) => report.targetId);
+    const replyIds = reports
+      .filter((report) => report.targetType === 'REPLY')
+      .map((report) => report.targetId);
+
+    const [posts, replies] = await Promise.all([
+      postIds.length
+        ? this.prisma.communityPost.findMany({
+            where: {
+              id: {
+                in: postIds,
+              },
+            },
+            select: {
+              id: true,
+              title: true,
+              body: true,
+              hidden: true,
+              locked: true,
+            },
+          })
+        : Promise.resolve([]),
+      replyIds.length
+        ? this.prisma.communityReply.findMany({
+            where: {
+              id: {
+                in: replyIds,
+              },
+            },
+            select: {
+              id: true,
+              body: true,
+              hidden: true,
+              postId: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const postMap = new Map(posts.map((post) => [post.id, post]));
+    const replyMap = new Map(replies.map((reply) => [reply.id, reply]));
+
+    return {
+      reports: reports.map((report) => ({
+        id: report.id,
+        targetType: report.targetType,
+        targetId: report.targetId,
+        reason: report.reason,
+        note: report.note,
+        createdAt: report.createdAt,
+        resolvedAt: report.resolvedAt,
+        reporter: {
+          id: report.reporter.id,
+          name: report.reporter.name,
+          phone: report.reporter.phone,
+        },
+        target:
+          report.targetType === 'POST'
+            ? postMap.get(report.targetId) ?? null
+            : replyMap.get(report.targetId) ?? null,
+      })),
+    };
+  }
+
+  async moderateCommunityPost(
+    id: string,
+    payload: Partial<{
+      hidden: boolean;
+      locked: boolean;
+    }>,
+  ) {
+    const existing = await this.prisma.communityPost.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Community post not found');
+    }
+
+    const post = await this.prisma.communityPost.update({
+      where: { id },
+      data: payload,
+    });
+
+    if (payload.hidden === true) {
+      await this.prisma.communityReport.updateMany({
+        where: {
+          targetType: 'POST',
+          targetId: id,
+          resolvedAt: null,
+        },
+        data: {
+          resolvedAt: new Date(),
+        },
+      });
+    }
+
+    return { post };
+  }
+
+  async moderateCommunityReply(id: string, payload: { hidden: boolean }) {
+    const existing = await this.prisma.communityReply.findUnique({
+      where: { id },
+      select: { id: true, hidden: true, postId: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Community reply not found');
+    }
+
+    const reply = await this.prisma.communityReply.update({
+      where: { id },
+      data: payload,
+    });
+
+    if (existing.hidden !== payload.hidden) {
+      await this.prisma.communityPost.update({
+        where: { id: existing.postId },
+        data: {
+          replyCount: {
+            increment: payload.hidden ? -1 : 1,
+          },
+        },
+      });
+    }
+
+    if (payload.hidden) {
+      await this.prisma.communityReport.updateMany({
+        where: {
+          targetType: 'REPLY',
+          targetId: id,
+          resolvedAt: null,
+        },
+        data: {
+          resolvedAt: new Date(),
+        },
+      });
+    }
+
+    return { reply };
+  }
+
+  async resolveCommunityReport(id: string) {
+    const report = await this.prisma.communityReport.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!report) {
+      throw new NotFoundException('Community report not found');
+    }
+
+    const resolvedReport = await this.prisma.communityReport.update({
+      where: { id },
+      data: {
+        resolvedAt: new Date(),
+      },
+    });
+
+    return { report: resolvedReport };
   }
 }

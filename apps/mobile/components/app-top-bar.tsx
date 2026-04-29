@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 import { palette, spacing, typography } from '@/theme/tokens';
 
 export function AppTopBar({
-  eyebrow,
+  eyebrow: _eyebrow,
   title,
   subtitle,
   action,
@@ -24,18 +24,6 @@ export function AppTopBar({
       }}
     >
       <View style={{ flex: 1, gap: spacing.xs }}>
-        {eyebrow ? (
-          <Text
-            style={{
-              color: palette.inkMuted,
-              fontFamily: typography.bodyStrong,
-              fontSize: 11,
-              textTransform: 'uppercase',
-            }}
-          >
-            {eyebrow}
-          </Text>
-        ) : null}
         <Text
           style={{
             color: palette.ink,

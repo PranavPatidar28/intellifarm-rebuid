@@ -84,9 +84,18 @@ export function apiPost<T>(path: string, body?: unknown, token?: string | null) 
 }
 
 export function apiPatch<T>(path: string, body?: unknown, token?: string | null) {
+  const isFormData = body instanceof FormData;
+
   return apiRequest<T>(path, {
     method: 'PATCH',
     token,
-    body: JSON.stringify(body ?? {}),
+    body: isFormData ? body : JSON.stringify(body ?? {}),
+  });
+}
+
+export function apiDelete<T>(path: string, token?: string | null) {
+  return apiRequest<T>(path, {
+    method: 'DELETE',
+    token,
   });
 }

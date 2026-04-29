@@ -21,6 +21,7 @@ export type MarketQueryInput = {
   cropName?: string;
   state?: string;
   district?: string;
+  limit?: number;
 };
 
 export interface MarketProvider {
@@ -62,7 +63,7 @@ export class SeededMarketProvider implements MarketProvider {
           : {}),
       },
       orderBy: [{ recordDate: 'desc' }, { priceModal: 'desc' }],
-      take: 50,
+      take: query.limit ?? 50,
     });
 
     return records.map((record) => ({
@@ -100,7 +101,7 @@ export class DataGovMarketProvider implements MarketProvider {
     const params = new URLSearchParams({
       'api-key': apiKey,
       format: 'json',
-      limit: '25',
+      limit: String(query.limit ?? 25),
     });
 
     if (query.cropName) {

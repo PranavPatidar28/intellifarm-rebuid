@@ -1,5 +1,15 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 import {
   createAssistantMessageSchema,
@@ -37,15 +47,21 @@ export class AssistantController {
   }
 
   @Post('threads/:id/messages')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'attachments', maxCount: 2 }]))
   createMessage(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: Record<string, unknown>,
+    @UploadedFiles()
+    files: {
+      attachments?: Express.Multer.File[];
+    },
   ) {
     return this.assistantService.createMessage(
       user.sub,
       id,
       parseWithSchema(createAssistantMessageSchema, body),
+      files.attachments ?? [],
     );
   }
 }

@@ -50,6 +50,11 @@ export const storageKeys = {
   language: 'intellifarm.language',
   selectedSeasonId: 'intellifarm.selected-season-id',
   pendingDiseaseReports: 'intellifarm.pending-disease-reports',
+  communityComposerDraft: 'intellifarm.community-composer-draft',
+  communityNotice: 'intellifarm.community-notice',
   expenseEntries: 'intellifarm.expense-entries',
+  pendingExpenseMutations: 'intellifarm.pending-expense-mutations',
   homeTasks: 'intellifarm.home-tasks',
+  marketPinnedCrops: 'intellifarm.market-pinned-crops',
+  profileSettingsNotice: 'intellifarm.profile-settings-notice',
 } as const;

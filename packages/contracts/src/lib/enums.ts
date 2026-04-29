@@ -34,8 +34,58 @@ export type TaskPriority = (typeof taskPriorities)[number];
 export const taskStatuses = ['PENDING', 'COMPLETED', 'SKIPPED', 'OVERDUE'] as const;
 export type TaskStatus = (typeof taskStatuses)[number];
 
-export const alertTypes = ['WEATHER', 'TASK', 'DISEASE', 'SYSTEM'] as const;
+export const expenseCategories = [
+  'FERTILIZER',
+  'LABOUR',
+  'EQUIPMENT',
+  'TRANSPORT',
+  'SEEDS',
+  'PESTICIDE',
+  'IRRIGATION',
+  'OTHER',
+] as const;
+export type ExpenseCategory = (typeof expenseCategories)[number];
+
+export const expenseStatuses = ['PAID', 'PENDING'] as const;
+export type ExpenseStatus = (typeof expenseStatuses)[number];
+
+export const expenseScopes = ['month', 'season', 'year'] as const;
+export type ExpenseScope = (typeof expenseScopes)[number];
+
+export const alertTypes = ['WEATHER', 'TASK', 'DISEASE', 'SYSTEM', 'COMMUNITY'] as const;
 export type AlertType = (typeof alertTypes)[number];
+
+export const communityCategories = [
+  'QUESTION',
+  'PEST_DISEASE',
+  'WATER',
+  'NUTRITION',
+  'MARKET',
+  'SUCCESS',
+  'WARNING',
+] as const;
+export type CommunityCategory = (typeof communityCategories)[number];
+
+export const communityFeedScopes = [
+  'FOR_YOU',
+  'NEARBY',
+  'TRENDING',
+  'MY_POSTS',
+  'SAVED',
+] as const;
+export type CommunityFeedScope = (typeof communityFeedScopes)[number];
+
+export const communityReportTargets = ['POST', 'REPLY'] as const;
+export type CommunityReportTarget = (typeof communityReportTargets)[number];
+
+export const communityReportReasons = [
+  'MISLEADING',
+  'ABUSIVE',
+  'UNSAFE',
+  'SPAM',
+  'OTHER',
+] as const;
+export type CommunityReportReason = (typeof communityReportReasons)[number];
 
 export const severityLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 export type Severity = (typeof severityLevels)[number];
@@ -72,6 +122,19 @@ export type SeasonClimateMethod = (typeof seasonClimateMethods)[number];
 
 export const assistantMessageRoles = ['USER', 'ASSISTANT'] as const;
 export type AssistantMessageRole = (typeof assistantMessageRoles)[number];
+
+export const assistantAttachmentTypes = ['image'] as const;
+export type AssistantAttachmentType = (typeof assistantAttachmentTypes)[number];
+
+export const assistantConfidenceLabels = [
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'GENERAL',
+  'ROUTED',
+] as const;
+export type AssistantConfidenceLabel =
+  (typeof assistantConfidenceLabels)[number];
 
 export const diseaseCaptureModes = ['STANDARD', 'CAMERA_DUAL_ANGLE'] as const;
 export type DiseaseCaptureMode = (typeof diseaseCaptureModes)[number];
@@ -111,6 +174,9 @@ export type FieldWindowStatus = (typeof fieldWindowStatuses)[number];
 
 export const marketTrendDirections = ['UP', 'DOWN', 'STABLE'] as const;
 export type MarketTrendDirection = (typeof marketTrendDirections)[number];
+
+export const marketExplorerScopes = ['district', 'state'] as const;
+export type MarketExplorerScope = (typeof marketExplorerScopes)[number];
 
 export const schemeEligibilityTones = [
   'LIKELY_ELIGIBLE',

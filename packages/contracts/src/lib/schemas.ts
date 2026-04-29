@@ -2,9 +2,18 @@ import { z } from 'zod';
 
 import {
   alertTypes,
+  assistantAttachmentTypes,
+  assistantConfidenceLabels,
   assistantSafetyLevels,
   assistantMessageRoles,
+  communityCategories,
+  communityFeedScopes,
+  communityReportReasons,
+  communityReportTargets,
   cropSeasonStatuses,
+  expenseCategories,
+  expenseScopes,
+  expenseStatuses,
   diseaseConfidenceBands,
   diseaseAnalysisSources,
   diseaseCaptureModes,
@@ -12,6 +21,7 @@ import {
   fieldWindowStatuses,
   facilityTypes,
   irrigationTypes,
+  marketExplorerScopes,
   marketTrendDirections,
   predictionInputConfidenceLevels,
   predictionStatuses,
@@ -51,6 +61,14 @@ const facilityTypesQuerySchema = z.preprocess((value) => {
 
   return value;
 }, z.array(z.enum(facilityTypes)).optional());
+
+const optionalUuidStringSchema = z.preprocess((value) => {
+  if (typeof value === 'string' && !value.trim()) {
+    return undefined;
+  }
+
+  return value;
+}, z.string().uuid().optional());
 
 export const phoneSchema = z
   .string()
@@ -101,6 +119,101 @@ export const updateTaskSchema = z.object({
   status: z.enum(taskStatuses),
 });
 
+const bodyBooleanSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true';
+  }
+
+  return value;
+}, z.boolean());
+
+const nullablePositiveAmountSchema = z.preprocess((value) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    return Number(trimmed);
+  }
+
+  return value;
+}, z.number().positive().nullable());
+
+const optionalShortTextSchema = (maxLength: number) =>
+  z.preprocess((value) => {
+    if (typeof value === 'string' && !value.trim()) {
+      return undefined;
+    }
+
+    return value;
+  }, z.string().trim().max(maxLength).optional());
+
+export const createExpenseSchema = z.object({
+  cropSeasonId: z.string().uuid(),
+  title: z.string().trim().min(2).max(120),
+  amount: z.coerce.number().positive().max(10_000_000),
+  expenseDate: z.coerce.date(),
+  category: z.enum(expenseCategories),
+  status: z.enum(expenseStatuses).default('PAID'),
+  isRecurring: bodyBooleanSchema.default(false),
+  vendor: optionalShortTextSchema(80),
+  note: optionalShortTextSchema(500),
+});
+
+export const updateExpenseSchema = createExpenseSchema
+  .partial()
+  .extend({
+    deleteReceipt: bodyBooleanSchema.optional(),
+  })
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    'Provide at least one field to update',
+  );
+
+export const expenseListQuerySchema = z
+  .object({
+    scope: z.enum(expenseScopes).optional(),
+    cropSeasonId: z.string().uuid().optional(),
+    status: z.enum(expenseStatuses).optional(),
+    category: z.enum(expenseCategories).optional(),
+    recurring: queryBooleanSchema.optional(),
+    search: z.string().trim().max(80).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.scope === 'season' && !value.cropSeasonId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Choose a crop season for season scope',
+        path: ['cropSeasonId'],
+      });
+    }
+  });
+
+export const expenseSummaryQuerySchema = z
+  .object({
+    scope: z.enum(expenseScopes),
+    cropSeasonId: z.string().uuid().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.scope === 'season' && !value.cropSeasonId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Choose a crop season for season scope',
+        path: ['cropSeasonId'],
+      });
+    }
+  });
+
+export const expenseBudgetUpsertSchema = z.object({
+  cropSeasonId: z.string().uuid(),
+  amount: nullablePositiveAmountSchema,
+});
+
 export const marketQuerySchema = z.object({
   cropName: z.string().trim().optional(),
   state: z.string().trim().optional(),
@@ -121,6 +234,28 @@ export const marketQuerySchema = z.object({
     });
   }
 });
+
+export const marketExplorerQuerySchema = z
+  .object({
+    scope: z.enum(marketExplorerScopes).default('district'),
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional(),
+    page: z.coerce.number().int().positive().optional().default(1),
+    pageSize: z.coerce.number().int().positive().max(50).optional().default(12),
+    search: z.string().trim().max(80).optional(),
+  })
+  .superRefine((value, context) => {
+    const hasLatitude = typeof value.latitude === 'number';
+    const hasLongitude = typeof value.longitude === 'number';
+
+    if (hasLatitude !== hasLongitude) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Latitude and longitude must be provided together',
+        path: hasLatitude ? ['longitude'] : ['latitude'],
+      });
+    }
+  });
 
 export const nearbyFacilitiesQuerySchema = z.object({
   latitude: z.coerce.number().min(-90).max(90),
@@ -311,6 +446,34 @@ export const createAssistantThreadSchema = z.object({
 
 export const createAssistantMessageSchema = z.object({
   content: z.string().trim().min(2).max(2000),
+  focusCropSeasonId: optionalUuidStringSchema,
+  focusFarmPlotId: optionalUuidStringSchema,
+  originRoute: optionalShortTextSchema(80),
+  language: z.enum(preferredLanguages).optional(),
+});
+
+export const communityFeedQuerySchema = z.object({
+  scope: z.enum(communityFeedScopes).optional(),
+  category: z.enum(communityCategories).optional(),
+  cursor: z.string().trim().optional(),
+  query: z.string().trim().max(80).optional(),
+});
+
+export const createCommunityPostSchema = z.object({
+  category: z.enum(communityCategories),
+  title: z.string().trim().min(4).max(120),
+  body: z.string().trim().min(8).max(2000),
+  cropSeasonId: optionalUuidStringSchema,
+});
+
+export const createCommunityReplySchema = z.object({
+  body: z.string().trim().min(2).max(1200),
+});
+
+export const reportCommunityContentSchema = z.object({
+  targetType: z.enum(communityReportTargets),
+  reason: z.enum(communityReportReasons),
+  note: z.string().trim().max(300).optional(),
 });
 
 export const userSummarySchema = z.object({
@@ -333,6 +496,76 @@ export const dashboardTaskSchema = z.object({
   taskType: z.enum(taskTypes),
   priority: z.enum(taskPriorities),
   status: z.enum(taskStatuses),
+});
+
+export const expenseCropSeasonSummarySchema = z.object({
+  id: z.string().uuid(),
+  cropName: z.string(),
+  currentStage: z.string(),
+  sowingDate: z.string(),
+  farmPlotId: z.string().uuid(),
+  status: z.enum(cropSeasonStatuses),
+});
+
+export const expenseEntrySchema = z.object({
+  id: z.string().uuid(),
+  cropSeasonId: z.string().uuid(),
+  title: z.string(),
+  amount: z.number(),
+  expenseDate: z.string(),
+  category: z.enum(expenseCategories),
+  status: z.enum(expenseStatuses),
+  isRecurring: z.boolean(),
+  vendor: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  receiptUrl: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  cropSeason: expenseCropSeasonSummarySchema,
+});
+
+export const expenseCategorySummarySchema = z.object({
+  category: z.enum(expenseCategories),
+  amount: z.number(),
+  paidAmount: z.number(),
+  pendingAmount: z.number(),
+  count: z.number().int().min(0),
+  percent: z.number(),
+  previousAmount: z.number(),
+  deltaAmount: z.number(),
+  deltaPercent: z.number().nullable(),
+});
+
+export const expenseBudgetSchema = z.object({
+  cropSeasonId: z.string().uuid(),
+  amount: z.number().positive(),
+  spentAmount: z.number(),
+  pendingAmount: z.number(),
+  remainingAmount: z.number(),
+  usedPercent: z.number(),
+  updatedAt: z.string(),
+});
+
+export const expenseTrendSchema = z.object({
+  direction: z.enum(marketTrendDirections),
+  percentChange: z.number(),
+  deltaAmount: z.number(),
+  currentAmount: z.number(),
+  previousAmount: z.number(),
+  comparisonLabel: z.string(),
+});
+
+export const expenseSummarySchema = z.object({
+  scope: z.enum(expenseScopes),
+  periodLabel: z.string(),
+  totalAmount: z.number(),
+  paidAmount: z.number(),
+  pendingAmount: z.number(),
+  entryCount: z.number().int().min(0),
+  averageAmount: z.number(),
+  categories: z.array(expenseCategorySummarySchema),
+  trend: expenseTrendSchema,
+  budget: expenseBudgetSchema.nullable(),
 });
 
 export const dashboardAlertSchema = z.object({
@@ -469,8 +702,8 @@ export const cropHealthSummarySchema = z.object({
 });
 
 export const marketResponseRecordSchema = z.object({
-  id: z.string().uuid(),
-  facilityId: z.string().uuid().nullable().optional(),
+  id: z.string(),
+  facilityId: z.string().nullable().optional(),
   cropName: z.string(),
   mandiName: z.string(),
   district: z.string(),
@@ -657,6 +890,101 @@ export const marketsResponseSchema = z.object({
   topNearby: z.array(marketResponseRecordSchema),
 });
 
+export const marketExplorerPageInfoSchema = z.object({
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalCount: z.number().int().min(0),
+  hasMore: z.boolean(),
+});
+
+export const marketCropSummarySchema = z.object({
+  cropKey: z.string(),
+  cropName: z.string(),
+  latestRecord: marketResponseRecordSchema.nullable(),
+  bestRecord: marketResponseRecordSchema.nullable(),
+  nearestRecord: marketResponseRecordSchema.nullable(),
+  trendDirection: z.enum(marketTrendDirections).nullable(),
+  trendLabel: z.string(),
+  freshnessLabel: z.string(),
+  mandiCount: z.number().int().min(0),
+});
+
+export const marketMandiSummarySchema = z.object({
+  mandiKey: z.string(),
+  mandiName: z.string(),
+  district: z.string(),
+  state: z.string(),
+  distanceKm: z.number().nullable(),
+  cropCount: z.number().int().min(0),
+  topRecord: marketResponseRecordSchema.nullable(),
+  freshestRecord: marketResponseRecordSchema.nullable(),
+  linkedFacilityId: z.string().uuid().nullable(),
+  hasLinkedFacility: z.boolean(),
+});
+
+export const linkedMandiFacilitySchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(facilityTypes),
+  name: z.string(),
+  district: z.string(),
+  state: z.string(),
+  village: z.string().nullable().optional(),
+  distanceKm: z.number().nullable(),
+  distanceBucket: z.string(),
+  travelHint: z.string(),
+  primaryServiceLabel: z.string(),
+  services: z.array(z.string()),
+});
+
+export const marketExplorerCropsResponseSchema = z.object({
+  generatedAt: z.string(),
+  scope: z.enum(marketExplorerScopes),
+  pageInfo: marketExplorerPageInfoSchema,
+  crops: z.array(marketCropSummarySchema),
+});
+
+export const marketExplorerMandisResponseSchema = z.object({
+  generatedAt: z.string(),
+  scope: z.enum(marketExplorerScopes),
+  pageInfo: marketExplorerPageInfoSchema,
+  mandis: z.array(marketMandiSummarySchema),
+});
+
+export const marketCropDetailSchema = z.object({
+  cropKey: z.string(),
+  cropName: z.string(),
+  scope: z.enum(marketExplorerScopes),
+  bestRecord: marketResponseRecordSchema.nullable(),
+  nearestRecord: marketResponseRecordSchema.nullable(),
+  nearbyRecords: z.array(marketResponseRecordSchema),
+  records: z.array(marketResponseRecordSchema),
+  mandiCount: z.number().int().min(0),
+});
+
+export const marketMandiDetailSchema = z.object({
+  mandiKey: z.string(),
+  mandiName: z.string(),
+  district: z.string(),
+  state: z.string(),
+  scope: z.enum(marketExplorerScopes),
+  distanceKm: z.number().nullable(),
+  topRecord: marketResponseRecordSchema.nullable(),
+  freshestRecord: marketResponseRecordSchema.nullable(),
+  linkedFacility: linkedMandiFacilitySchema.nullable(),
+  records: z.array(marketResponseRecordSchema),
+  cropCount: z.number().int().min(0),
+});
+
+export const marketCropDetailResponseSchema = z.object({
+  generatedAt: z.string(),
+  crop: marketCropDetailSchema,
+});
+
+export const marketMandiDetailResponseSchema = z.object({
+  generatedAt: z.string(),
+  mandi: marketMandiDetailSchema,
+});
+
 export const facilitiesResponseSchema = z.object({
   facilities: z.array(facilitySummarySchema),
 });
@@ -671,6 +999,13 @@ export const assistantSourceSchema = z.object({
   type: z.string(),
   label: z.string(),
   referenceId: z.string().optional(),
+});
+
+export const assistantAttachmentSchema = z.object({
+  type: z.enum(assistantAttachmentTypes),
+  url: z.string(),
+  mimeType: z.string(),
+  fileName: z.string(),
 });
 
 export const assistantActionCardSchema = z.object({
@@ -693,9 +1028,11 @@ export const assistantMessageSchema = z.object({
   content: z.string(),
   answer: z.string(),
   spokenSummary: z.string(),
+  attachments: z.array(assistantAttachmentSchema),
   sources: z.array(assistantSourceSchema),
   safetyLevel: z.enum(assistantSafetyLevels),
   safetyFlags: z.array(z.string()),
+  confidenceLabel: z.enum(assistantConfidenceLabels).nullable(),
   actionCards: z.array(assistantActionCardSchema),
   suggestedNextStep: assistantSuggestedNextStepSchema.nullable(),
   createdAt: z.string(),
@@ -725,6 +1062,59 @@ export const assistantThreadResponseSchema = z.object({
 
 export const assistantMessageResponseSchema = z.object({
   message: assistantMessageSchema,
+});
+
+export const communityAuthorSummarySchema = z.object({
+  firstName: z.string(),
+  profilePhotoUrl: z.string().nullable(),
+  village: z.string().nullable(),
+  district: z.string().nullable(),
+  state: z.string().nullable(),
+});
+
+export const communityReplySummarySchema = z.object({
+  id: z.string().uuid(),
+  body: z.string(),
+  createdAt: z.string(),
+  author: communityAuthorSummarySchema,
+});
+
+export const communityPostSummarySchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  body: z.string(),
+  category: z.enum(communityCategories),
+  cropSeasonId: z.string().uuid().nullable(),
+  cropName: z.string().nullable(),
+  currentStage: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  likeCount: z.number().int().min(0),
+  replyCount: z.number().int().min(0),
+  saveCount: z.number().int().min(0),
+  locked: z.boolean(),
+  viewerHasLiked: z.boolean(),
+  viewerHasSaved: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  author: communityAuthorSummarySchema,
+});
+
+export const communityPostDetailSchema = communityPostSummarySchema.extend({
+  replies: z.array(communityReplySummarySchema),
+});
+
+export const communityFeedResponseSchema = z.object({
+  scope: z.enum(communityFeedScopes),
+  nextCursor: z.string().nullable(),
+  posts: z.array(communityPostSummarySchema),
+});
+
+export const communityPostResponseSchema = z.object({
+  post: communityPostDetailSchema,
+});
+
+export const communityPostSummaryResponseSchema = z.object({
+  post: communityPostSummarySchema,
 });
 
 export const alertSummarySchema = z.object({
@@ -777,4 +1167,24 @@ export const diseaseReportsResponseSchema = z.object({
 
 export const diseaseReportResponseSchema = z.object({
   report: diseaseReportSchema,
+});
+
+export const expenseListResponseSchema = z.object({
+  expenses: z.array(expenseEntrySchema),
+});
+
+export const expenseResponseSchema = z.object({
+  expense: expenseEntrySchema,
+});
+
+export const expenseSummaryResponseSchema = z.object({
+  summary: expenseSummarySchema,
+});
+
+export const expenseBudgetResponseSchema = z.object({
+  budget: expenseBudgetSchema.nullable(),
+});
+
+export const expenseDeleteResponseSchema = z.object({
+  success: z.boolean(),
 });

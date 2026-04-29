@@ -83,6 +83,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^@intellifarm/contracts$": "<rootDir>/../../../packages/contracts/dist/index.cjs"
+    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

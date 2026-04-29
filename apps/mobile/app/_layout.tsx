@@ -91,7 +91,14 @@ function RootLayoutNav() {
       <Stack.Screen name="schemes" options={{ presentation: 'card' }} />
       <Stack.Screen name="scheme/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="profile-settings" options={{ presentation: 'card' }} />
-      <Stack.Screen name="expenses" options={{ presentation: 'card' }} />
+      <Stack.Screen
+        name="profile-settings-edit"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.76, 1.0],
+        }}
+      />
       <Stack.Screen
         name="expenses/add"
         options={{
@@ -100,6 +107,23 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.78, 1.0],
         }}
       />
+      <Stack.Screen
+        name="expenses/edit/[id]"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.78, 1.0],
+        }}
+      />
+      <Stack.Screen
+        name="expenses/budget"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.62, 0.92],
+        }}
+      />
+      <Stack.Screen name="expenses/report" options={{ presentation: 'card' }} />
       <Stack.Screen name="facilities" options={{ presentation: 'card' }} />
       <Stack.Screen name="sell-store" options={{ presentation: 'card' }} />
       <Stack.Screen name="expert-help" options={{ presentation: 'card' }} />

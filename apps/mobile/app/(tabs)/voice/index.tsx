@@ -1,41 +1,81 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
-import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
+import {
+  Camera,
+  ImagePlus,
+  MessageSquarePlus,
+  Send,
+  X,
+} from 'lucide-react-native';
 
-import { ActionCTAGroup } from '@/components/action-cta-group';
+import { AppHeroHeader } from '@/components/app-hero-header';
 import { Button } from '@/components/button';
 import { ConversationBubbleCard } from '@/components/conversation-bubble-card';
-import { PageShell } from '@/components/page-shell';
 import { RichEmptyState } from '@/components/rich-empty-state';
-import { SectionTitle } from '@/components/section-title';
 import { SunriseCard } from '@/components/sunrise-card';
-import { TextField } from '@/components/text-field';
 import { VoiceOrb } from '@/components/voice-orb';
 import { useSession } from '@/features/session/session-provider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
-import { apiGet, apiPost, ApiError } from '@/lib/api';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { createAssistantThread, sendAssistantMessage, type AssistantComposerImage } from '@/lib/assistant';
+import { apiGet, ApiError } from '@/lib/api';
 import type {
-  AssistantMessageResponse,
   AssistantThreadResponse,
   AssistantThreadsResponse,
 } from '@/lib/api-types';
-import { assistantPrompts } from '@/lib/constants';
+import { assistantPrompts, storageKeys } from '@/lib/constants';
+import { findSeasonContext } from '@/lib/domain';
 import { formatRelativeTime } from '@/lib/format';
-import { palette, spacing, typography } from '@/theme/tokens';
+import { useStoredValue } from '@/lib/storage';
+import { palette, radii, shadow, spacing, typography } from '@/theme/tokens';
+
+type RouteParams = {
+  prompt?: string | string[];
+  originRoute?: string | string[];
+  focusCropSeasonId?: string | string[];
+  focusFarmPlotId?: string | string[];
+};
+
+type PendingMessage = AssistantThreadResponse['thread']['messages'][number] & {
+  pendingState?: 'sending' | 'typing';
+};
 
 export default function VoiceAssistantRoute() {
+  const params = useLocalSearchParams<RouteParams>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { token } = useSession();
+  const network = useNetworkStatus();
+  const { token, authUser, profile, language } = useSession();
+  const [selectedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');
   const [activeThreadId, setActiveThreadId] = useState('');
   const [composer, setComposer] = useState('');
-  const [transcript, setTranscript] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<AssistantComposerImage[]>([]);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [optimisticUserMessage, setOptimisticUserMessage] =
+    useState<PendingMessage | null>(null);
+
+  const promptParam = normalizeRouteParam(params.prompt);
+  const originRoute = normalizeRouteParam(params.originRoute);
+  const focusCropSeasonId = normalizeRouteParam(params.focusCropSeasonId) || selectedSeasonId;
+  const focusFarmPlotId = normalizeRouteParam(params.focusFarmPlotId);
+  const focusSeason = findSeasonContext(profile, focusCropSeasonId);
+  const mediaHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
   const threadsQuery = useCachedQuery({
     cacheKey: 'assistant-threads',
@@ -43,7 +83,6 @@ export default function VoiceAssistantRoute() {
     enabled: Boolean(token),
     queryFn: () => apiGet<AssistantThreadsResponse>('/assistant/threads', token),
   });
-
   const threads = threadsQuery.data?.threads ?? [];
 
   useEffect(() => {
@@ -51,6 +90,12 @@ export default function VoiceAssistantRoute() {
       setActiveThreadId(threads[0].id);
     }
   }, [activeThreadId, threads]);
+
+  useEffect(() => {
+    if (promptParam && !composer.trim()) {
+      setComposer(promptParam);
+    }
+  }, [composer, promptParam]);
 
   const threadQuery = useCachedQuery({
     cacheKey: `assistant-thread:${activeThreadId || 'draft'}`,
@@ -60,132 +105,310 @@ export default function VoiceAssistantRoute() {
   });
 
   const messages = threadQuery.data?.thread.messages ?? [];
-  const lastAssistantMessage = useMemo(
-    () => [...messages].reverse().find((item) => item.role === 'ASSISTANT') ?? null,
-    [messages],
-  );
+  const visibleMessages = useMemo(() => {
+    const items: PendingMessage[] = [...messages];
 
-  const sendMessage = async (content: string) => {
-    const trimmed = content.trim();
-    if (!trimmed || !token) {
+    if (optimisticUserMessage) {
+      items.push(optimisticUserMessage);
+    }
+
+    if (busy) {
+      items.push({
+        id: 'assistant-typing',
+        role: 'ASSISTANT',
+        content: 'Thinking through your farm context...',
+        answer: 'Thinking through your farm context...',
+        spokenSummary: 'Thinking through your farm context...',
+        attachments: [],
+        sources: [],
+        safetyLevel: 'INFO',
+        safetyFlags: [],
+        confidenceLabel: null,
+        actionCards: [],
+        suggestedNextStep: null,
+        createdAt: new Date().toISOString(),
+        pendingState: 'typing',
+      });
+    }
+
+    return items;
+  }, [busy, messages, optimisticUserMessage]);
+
+  const sendCurrentMessage = async (overrideContent?: string) => {
+    const content = (overrideContent ?? composer).trim();
+
+    if (!content || !token || busy) {
       return;
     }
 
+    if (network.isOffline) {
+      setStatusMessage(
+        'Assistant is read-only while offline. You can browse saved chats, but new questions need internet.',
+      );
+      return;
+    }
+
+    const optimisticAttachments = attachments.map((attachment) => ({
+      type: 'image' as const,
+      url: attachment.uri,
+      mimeType: attachment.mimeType,
+      fileName: attachment.fileName,
+    }));
+
+    setStatusMessage(null);
     setBusy(true);
-    setMessage(null);
-    setTranscript(trimmed);
+    setOptimisticUserMessage({
+      id: `pending-${Date.now()}`,
+      role: 'USER',
+      content,
+      answer: content,
+      spokenSummary: content,
+      attachments: optimisticAttachments,
+      sources: [],
+      safetyLevel: 'INFO',
+      safetyFlags: [],
+      confidenceLabel: null,
+      actionCards: [],
+      suggestedNextStep: null,
+      createdAt: new Date().toISOString(),
+      pendingState: 'sending',
+    });
 
     try {
       let threadId = activeThreadId;
 
       if (!threadId) {
-        const created = await apiPost<AssistantThreadResponse>(
-          '/assistant/threads',
-          { title: trimmed.slice(0, 80) },
-          token,
-        );
+        const created = await createAssistantThread(token, content.slice(0, 80));
         threadId = created.thread.id;
         setActiveThreadId(threadId);
       }
 
-      await apiPost<AssistantMessageResponse>(
-        `/assistant/threads/${threadId}/messages`,
-        { content: trimmed },
+      await sendAssistantMessage({
         token,
-      );
+        threadId,
+        content,
+        focusCropSeasonId: focusCropSeasonId || undefined,
+        focusFarmPlotId: focusFarmPlotId || undefined,
+        originRoute: originRoute || undefined,
+        language: authUser?.preferredLanguage ?? language ?? undefined,
+        attachments,
+      });
 
       setComposer('');
+      setAttachments([]);
+      setOptimisticUserMessage(null);
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['assistant-threads', token] }),
         queryClient.invalidateQueries({ queryKey: ['assistant-thread', token, threadId] }),
       ]);
     } catch (error) {
-      setMessage(
-        error instanceof ApiError ? error.message : 'Could not contact IntelliFarm right now.',
+      setStatusMessage(
+        error instanceof ApiError
+          ? error.message
+          : 'Could not contact IntelliFarm right now.',
       );
+      setOptimisticUserMessage(null);
     } finally {
       setBusy(false);
     }
   };
 
-  return (
-    <PageShell
-      eyebrow="Ask IntelliFarm"
-      title="Voice and text assistant"
-      subtitle="Use the mic orb, device dictation, or a typed question to get grounded farm guidance."
-      heroTone="assistant"
-      hero={
-        <SunriseCard accent="soft" title="Quick voice help">
-          <View style={{ gap: spacing.md }}>
-            <VoiceOrb
-              label="Tap, then dictate"
-              onPress={() => {
-                void Haptics.selectionAsync();
-                setTranscript('Tip: use the keyboard microphone on your phone, then tap Send.');
-              }}
-            />
-            <Text
-              style={{
-                color: palette.inkSoft,
-                fontFamily: typography.bodyRegular,
-                fontSize: 12,
-                lineHeight: 18,
-              }}
-            >
-              Expo Go-safe voice mode: real audio playback, plus device dictation or typed questions for input.
-            </Text>
-          </View>
-        </SunriseCard>
-      }
-    >
-      <SunriseCard accent="brand" title="Ask something simple">
-        <View style={{ gap: spacing.md }}>
-          <TextField
-            label="Question"
-            value={composer}
-            onChangeText={setComposer}
-            placeholder="Should I irrigate today?"
-            multiline
-          />
-          <Button
-            label={busy ? 'Asking IntelliFarm...' : 'Send question'}
-            loading={busy}
-            onPress={() => {
-              void sendMessage(composer);
-            }}
-          />
-        </View>
-      </SunriseCard>
+  const startNewConversation = () => {
+    setActiveThreadId('');
+    setComposer(promptParam ?? '');
+    setAttachments([]);
+    setStatusMessage(null);
+    setOptimisticUserMessage(null);
+  };
 
-      <SectionTitle eyebrow="Prompt ideas" title="Try one tap questions" />
-      <ActionCTAGroup
-        actions={assistantPrompts.map((prompt) => ({
-          label: prompt,
-          variant: 'soft' as const,
-          onPress: () => {
-            void sendMessage(prompt);
-          },
-        }))}
+  const pickAttachment = async (mode: 'camera' | 'library') => {
+    if (attachments.length >= 2) {
+      setStatusMessage('You can attach up to 2 images per question.');
+      return;
+    }
+
+    const permission =
+      mode === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permission.status !== 'granted') {
+      setStatusMessage(
+        mode === 'camera'
+          ? 'Camera permission is needed to capture crop photos.'
+          : 'Photo library permission is needed to attach crop photos.',
+      );
+      return;
+    }
+
+    const result =
+      mode === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.8,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.8,
+          });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    if (!asset?.uri) {
+      setStatusMessage('Could not read that image.');
+      return;
+    }
+
+    setAttachments((current) => [
+      ...current,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        uri: asset.uri,
+        mimeType: asset.mimeType ?? inferMimeType(asset.uri),
+        fileName:
+          asset.fileName ??
+          `assistant-photo-${current.length + 1}.${getFileExtension(asset.uri)}`,
+      },
+    ]);
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: palette.canvas }}
+      behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
+    >
+      <AppHeroHeader
+        eyebrow="Ask IntelliFarm"
+        title="Assistant"
+        subtitle={
+          network.isOffline
+            ? 'Read saved conversations while offline. New questions need internet.'
+            : 'Grounded help across weather, markets, tasks, crop health, and schemes.'
+        }
+        tone="assistant"
+        action={
+          <Button
+            label="New chat"
+            fullWidth={false}
+            variant="soft"
+            icon={<MessageSquarePlus color={palette.leafDark} size={15} />}
+            onPress={startNewConversation}
+          />
+        }
+        hero={
+          <View style={{ gap: spacing.md }}>
+            <SunriseCard accent="soft" title="Use text, photos, and device dictation">
+              <View style={{ gap: spacing.md }}>
+                <VoiceOrb
+                  label="Use keyboard mic"
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    setStatusMessage(
+                      'Use your phone keyboard microphone, then tap Send. For crop-health image questions, attach the close-up first and the full-crop view second.',
+                    );
+                  }}
+                />
+                <Text
+                  selectable
+                  style={{
+                    color: palette.inkSoft,
+                    fontFamily: typography.bodyRegular,
+                    fontSize: 12,
+                    lineHeight: 18,
+                  }}
+                >
+                  Attach up to 2 images per question. For crop problems, add the affected part
+                  first and the full plant or field view second.
+                </Text>
+              </View>
+            </SunriseCard>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing.sm }}
+            >
+              <ThreadChip
+                label="New draft"
+                active={!activeThreadId}
+                onPress={startNewConversation}
+              />
+              {threads.map((thread) => (
+                <ThreadChip
+                  key={thread.id}
+                  label={`${thread.title} · ${formatRelativeTime(thread.updatedAt)}`}
+                  active={activeThreadId === thread.id}
+                  onPress={() => {
+                    setActiveThreadId(thread.id);
+                    setStatusMessage(null);
+                    setOptimisticUserMessage(null);
+                  }}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        }
       />
 
-      {transcript ? (
-        <SunriseCard accent="soft" title="Latest transcript">
+      {focusSeason ? (
+        <View
+          style={{
+            marginHorizontal: spacing.lg,
+            marginTop: spacing.sm,
+            padding: spacing.md,
+            borderRadius: radii.lg,
+            borderCurve: 'continuous',
+            backgroundColor: palette.white,
+            borderWidth: 1,
+            borderColor: palette.outline,
+          }}
+        >
           <Text
+            selectable
             style={{
               color: palette.ink,
-              fontFamily: typography.bodyRegular,
+              fontFamily: typography.bodyStrong,
               fontSize: 13,
-              lineHeight: 19,
             }}
           >
-            {transcript}
+            Focused season: {focusSeason.cropName} · {focusSeason.currentStage}
           </Text>
-        </SunriseCard>
+          <Text
+            selectable
+            style={{
+              color: palette.inkSoft,
+              fontFamily: typography.bodyRegular,
+              fontSize: 12,
+              lineHeight: 18,
+              marginTop: spacing.xs,
+            }}
+          >
+            Questions from this screen will prioritize {focusSeason.farmPlot.name} in the
+            assistant context.
+          </Text>
+        </View>
       ) : null}
 
-      {message ? (
-        <SunriseCard accent="warning" title="Assistant note">
+      {statusMessage ? (
+        <View
+          style={{
+            marginHorizontal: spacing.lg,
+            marginTop: spacing.sm,
+            padding: spacing.md,
+            borderRadius: radii.lg,
+            borderCurve: 'continuous',
+            backgroundColor: palette.mustardSoft,
+            borderWidth: 1,
+            borderColor: palette.outline,
+          }}
+        >
           <Text
+            selectable
             style={{
               color: palette.inkSoft,
               fontFamily: typography.bodyRegular,
@@ -193,67 +416,291 @@ export default function VoiceAssistantRoute() {
               lineHeight: 19,
             }}
           >
-            {message}
+            {statusMessage}
           </Text>
-        </SunriseCard>
+        </View>
       ) : null}
 
-      <SectionTitle eyebrow="Conversations" title="Recent threads" />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        {threads.length ? (
-          threads.map((thread) => (
-            <Button
-              key={thread.id}
-              label={`${thread.title} - ${formatRelativeTime(thread.updatedAt)}`}
-              fullWidth={false}
-              variant={activeThreadId === thread.id ? 'primary' : 'soft'}
-              onPress={() => setActiveThreadId(thread.id)}
-            />
-          ))
-        ) : (
-          <RichEmptyState
-            title="No threads yet"
-            description="Your first question creates the first saved conversation."
+      <FlatList
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        data={visibleMessages}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <ConversationBubbleCard
+            message={item}
+            mediaHeaders={mediaHeaders}
+            onOpenRoute={(route) => router.push(route as never)}
+            onSpeak={
+              item.role === 'ASSISTANT'
+                ? () => {
+                    Speech.stop();
+                    Speech.speak(item.spokenSummary || item.answer);
+                  }
+                : undefined
+            }
           />
         )}
-      </View>
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.md,
+          gap: spacing.sm,
+        }}
+        ListEmptyComponent={
+          <View style={{ gap: spacing.md, paddingTop: spacing.md }}>
+            <RichEmptyState
+              title="Ask your first question"
+              description="Try weather, mandi prices, crop stress, schemes, or attach crop photos for grounded help."
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {assistantPrompts.map((prompt) => (
+                <Button
+                  key={prompt}
+                  label={prompt}
+                  fullWidth={false}
+                  variant="soft"
+                  onPress={() => {
+                    void sendCurrentMessage(prompt);
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        }
+      />
 
-      <SectionTitle eyebrow="Answer" title="Current conversation" />
-      <View style={{ gap: spacing.sm }}>
-        {messages.length ? (
-          messages.map((item) => (
-            <ConversationBubbleCard
-              key={item.id}
-              message={item}
-              onSpeak={
-                item.role === 'ASSISTANT'
-                  ? () => {
-                      Speech.stop();
-                      Speech.speak(item.spokenSummary || item.answer);
-                    }
-                  : undefined
+      <View
+        style={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.lg,
+          gap: spacing.sm,
+          borderTopWidth: 1,
+          borderTopColor: palette.outline,
+          backgroundColor: palette.parchmentSoft,
+        }}
+      >
+        {attachments.length ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.sm }}
+          >
+            {attachments.map((attachment) => (
+              <View
+                key={attachment.id}
+                style={{
+                  width: 96,
+                  gap: spacing.xs,
+                }}
+              >
+                <View
+                  style={{
+                    width: 96,
+                    height: 96,
+                    overflow: 'hidden',
+                    borderRadius: radii.md,
+                    borderCurve: 'continuous',
+                    borderWidth: 1,
+                    borderColor: palette.outline,
+                  }}
+                >
+                  <Image
+                    source={attachment.uri}
+                    contentFit="cover"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                </View>
+                <Pressable
+                  onPress={() =>
+                    setAttachments((current) =>
+                      current.filter((item) => item.id !== attachment.id),
+                    )
+                  }
+                  style={{
+                    alignSelf: 'flex-start',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.xs,
+                  }}
+                >
+                  <X color={palette.terracotta} size={14} />
+                  <Text
+                    selectable
+                    style={{
+                      color: palette.terracotta,
+                      fontFamily: typography.bodyStrong,
+                      fontSize: 11,
+                    }}
+                  >
+                    Remove
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+          <Button
+            label="Gallery"
+            fullWidth={false}
+            variant="soft"
+            disabled={network.isOffline || busy}
+            icon={<ImagePlus color={palette.leafDark} size={15} />}
+            onPress={() => {
+              void pickAttachment('library');
+            }}
+          />
+          <Button
+            label="Camera"
+            fullWidth={false}
+            variant="soft"
+            disabled={network.isOffline || busy}
+            icon={<Camera color={palette.leafDark} size={15} />}
+            onPress={() => {
+              void pickAttachment('camera');
+            }}
+          />
+        </View>
+
+        <View
+          style={{
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.md,
+            borderRadius: radii.xl,
+            borderCurve: 'continuous',
+            borderWidth: 1,
+            borderColor: palette.outline,
+            backgroundColor: palette.white,
+            boxShadow: shadow.soft,
+            gap: spacing.sm,
+          }}
+        >
+          <TextInput
+            value={composer}
+            onChangeText={(value) => {
+              setComposer(value);
+              if (statusMessage) {
+                setStatusMessage(null);
               }
+            }}
+            editable={!network.isOffline && !busy}
+            multiline
+            placeholder={
+              network.isOffline
+                ? 'Assistant is read-only while offline.'
+                : 'Ask about irrigation, mandi timing, crop stress, schemes, or attach photos.'
+            }
+            placeholderTextColor={palette.inkMuted}
+            textAlignVertical="top"
+            style={{
+              minHeight: 64,
+              color: palette.ink,
+              fontFamily: typography.bodyRegular,
+              fontSize: 14,
+              lineHeight: 21,
+            }}
+          />
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: spacing.sm,
+            }}
+          >
+            <Text
+              selectable
+              style={{
+                flex: 1,
+                color: palette.inkSoft,
+                fontFamily: typography.bodyRegular,
+                fontSize: 11,
+                lineHeight: 17,
+              }}
+            >
+              {originRoute
+                ? `This question is being grounded from the ${originRoute} screen.`
+                : 'Assistant responses combine your IntelliFarm data with general farming guidance.'}
+            </Text>
+            <Button
+              label={busy ? 'Sending...' : 'Send'}
+              fullWidth={false}
+              loading={busy}
+              disabled={!composer.trim() || network.isOffline}
+              icon={<Send color={palette.white} size={15} />}
+              onPress={() => {
+                void sendCurrentMessage();
+              }}
             />
-          ))
-        ) : (
-          <RichEmptyState
-            title="Ask the first question"
-            description="Try weather, mandi prices, crop stress, or scheme discovery."
-          />
-        )}
+          </View>
+        </View>
       </View>
-
-      {lastAssistantMessage?.actionCards?.length ? (
-        <SunriseCard accent="soft" title="Suggested actions">
-          <ActionCTAGroup
-            actions={lastAssistantMessage.actionCards.map((card) => ({
-              label: card.ctaLabel,
-              variant: card.tone === 'expert' ? 'secondary' : 'soft',
-              onPress: () => router.push(card.ctaRoute as never),
-            }))}
-          />
-        </SunriseCard>
-      ) : null}
-    </PageShell>
+    </KeyboardAvoidingView>
   );
+}
+
+function ThreadChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: radii.pill,
+        borderCurve: 'continuous',
+        backgroundColor: active ? palette.leaf : palette.white,
+        borderWidth: 1,
+        borderColor: active ? palette.leafDark : palette.outline,
+      }}
+    >
+      <Text
+        selectable
+        style={{
+          color: active ? palette.white : palette.leafDark,
+          fontFamily: typography.bodyStrong,
+          fontSize: 12,
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function normalizeRouteParam(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? '';
+  }
+
+  return value ?? '';
+}
+
+function inferMimeType(uri: string) {
+  const extension = getFileExtension(uri).toLowerCase();
+
+  if (extension === 'png') {
+    return 'image/png';
+  }
+
+  if (extension === 'webp') {
+    return 'image/webp';
+  }
+
+  return 'image/jpeg';
+}
+
+function getFileExtension(uri: string) {
+  return uri.split('.').pop()?.split('?')[0] ?? 'jpg';
 }

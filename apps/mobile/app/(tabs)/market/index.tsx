@@ -2,264 +2,170 @@ import { useMemo, useState } from 'react';
 
 import { useRouter } from 'expo-router';
 
-import { MandiMarketScreen } from '@/components/mandi-market-screen';
-import { useSession } from '@/features/session/session-provider';
-import { useCachedQuery } from '@/hooks/use-cached-query';
-import { useDeviceLocation } from '@/hooks/use-device-location';
-import { apiGet } from '@/lib/api';
-import type { FacilitiesResponse, MarketsResponse } from '@/lib/api-types';
-import { findSeasonContext } from '@/lib/domain';
+import {
+  MandiMarketScreen,
+  type MarketCropListItem,
+  type MarketMandiListItem,
+} from '@/components/mandi-market-screen';
 import { storageKeys } from '@/lib/constants';
+import { findSeasonContext } from '@/lib/domain';
+import { type MarketExplorerView, type MarketPinnedCrop } from '@/lib/market-explorer';
+import {
+  getMockCropSummaries,
+  getMockMandiSummaries,
+  getMockPinnedCropItems,
+  mockCropOptions,
+  type MarketTradeMode,
+} from '@/lib/mock-market-data';
 import { useStoredValue } from '@/lib/storage';
-
-type TradeMode = 'buy' | 'sell';
-type FilterMode = 'price' | 'distance' | 'verified';
+import { useSession } from '@/features/session/session-provider';
 
 export default function MarketRoute() {
   const router = useRouter();
-  const { profile, token } = useSession();
-  const { location } = useDeviceLocation();
-  const [selectedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');
-  const [tradeMode, setTradeMode] = useState<TradeMode>('buy');
-  const [filterMode, setFilterMode] = useState<FilterMode>('price');
+  const { profile } = useSession();
+  const [tradeMode, setTradeMode] = useState<MarketTradeMode>('sell');
+  const [view, setView] = useState<MarketExplorerView>('crops');
   const [searchText, setSearchText] = useState('');
-
+  const [selectedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');
+  const [pinnedCrops, setPinnedCrops] = useStoredValue<MarketPinnedCrop[]>(
+    storageKeys.marketPinnedCrops,
+    [],
+  );
   const selectedSeason = findSeasonContext(profile, selectedSeasonId);
-  const plotLocation =
-    selectedSeason?.farmPlot.latitude != null && selectedSeason?.farmPlot.longitude != null
-      ? {
-          latitude: selectedSeason.farmPlot.latitude,
-          longitude: selectedSeason.farmPlot.longitude,
-        }
-      : null;
-  const activeLocation = plotLocation ?? location;
 
-  const marketQueryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (selectedSeason?.cropName) {
-      params.set('cropName', selectedSeason.cropName);
-    }
-    if (activeLocation) {
-      params.set('latitude', String(activeLocation.latitude));
-      params.set('longitude', String(activeLocation.longitude));
-      params.set('includeDistance', 'true');
-    }
-    return params.toString();
-  }, [activeLocation, selectedSeason?.cropName]);
+  const trimmedSearchText = searchText.trim().toLowerCase();
+  const pinnedKeySet = useMemo(
+    () => new Set(pinnedCrops.map((crop) => crop.cropKey)),
+    [pinnedCrops],
+  );
 
-  const marketsQuery = useCachedQuery({
-    cacheKey: `markets:${selectedSeason?.cropName ?? 'default'}`,
-    queryKey: ['markets', token, marketQueryString],
-    enabled: Boolean(token && selectedSeason?.cropName),
-    queryFn: () => apiGet<MarketsResponse>(`/markets?${marketQueryString}`, token),
-  });
+  const cropItems = useMemo<MarketCropListItem[]>(() => {
+    return getMockCropSummaries(tradeMode)
+      .map((item) => ({
+        ...item,
+        pinned: pinnedKeySet.has(item.cropKey),
+      }))
+      .filter((item) =>
+        trimmedSearchText ? item.cropName.toLowerCase().includes(trimmedSearchText) : true,
+      );
+  }, [pinnedKeySet, tradeMode, trimmedSearchText]);
 
-  const facilitiesQuery = useCachedQuery({
-    cacheKey: `facilities-preview:${selectedSeason?.cropName ?? 'default'}`,
-    queryKey: ['facilities-preview', token, selectedSeason?.cropName, activeLocation],
-    enabled: Boolean(token && activeLocation),
-    queryFn: () =>
-      apiGet<FacilitiesResponse>(
-        `/facilities/nearby?latitude=${activeLocation?.latitude}&longitude=${activeLocation?.longitude}${
-          selectedSeason?.cropName
-            ? `&cropName=${encodeURIComponent(selectedSeason.cropName)}`
-            : ''
-        }`,
-        token,
-      ),
-  });
-
-  const recommendedRecord = marketsQuery.data?.recommendedRecord ?? null;
-  const cropName = selectedSeason?.cropName ?? recommendedRecord?.cropName ?? 'Wheat';
-  const districtLabel =
-    selectedSeason?.farmPlot.district ?? profile?.user.district ?? profile?.user.state ?? 'Nashik';
-
-  const pinnedCrops = useMemo(() => {
-    const primaryPrice = recommendedRecord?.priceModal ?? 2450;
-
-    return [
-      {
-        id: 'primary-crop',
-        title:
-          cropName.toLowerCase() === 'wheat' ? 'Wheat (Sonalika)' : `${cropName} (Primary)`,
-        price: primaryPrice,
-        changeLabel: '+1.2%',
-        trendLabel: 'Trending Up',
-        trend: 'up' as const,
-        icon: 'wheat' as const,
-      },
-      {
-        id: 'basmati-rice',
-        title: 'Basmati Rice',
-        price: 4820,
-        changeLabel: '-0.8%',
-        trendLabel: 'Minor Dip',
-        trend: 'down' as const,
-        icon: 'sprout' as const,
-      },
-      {
-        id: 'tur-dal',
-        title: 'Tur Dal',
-        price: 5930,
-        changeLabel: '+2.5%',
-        trendLabel: 'Steady Demand',
-        trend: 'up' as const,
-        icon: 'field' as const,
-      },
-    ];
-  }, [cropName, recommendedRecord?.priceModal]);
-
-  const nearbyCards = useMemo(() => {
-    const fallback = [
-      {
-        id: 'fallback-market-1',
-        title: 'Krishi Mandi Nashik',
-        distanceKm: 4.2,
-        statusLabel: 'Open now',
-        statusTone: 'open' as const,
-        price: 2440,
-        image: 'market' as const,
-        iconTone: 'active' as const,
-        detailsRoute: '/sell-store' as const,
-      },
-      {
-        id: 'fallback-market-2',
-        title: 'Krishi Mandi Nashik',
-        distanceKm: 4.2,
-        statusLabel: 'Open now',
-        statusTone: 'open' as const,
-        price: 2440,
-        image: 'market' as const,
-        iconTone: 'active' as const,
-        detailsRoute: '/sell-store' as const,
-      },
-      {
-        id: 'fallback-warehouse-1',
-        title: 'Royal Agro Warehouse',
-        distanceKm: 6.8,
-        statusLabel: 'Closes at 6 PM',
-        statusTone: 'closing' as const,
-        price: 2465,
-        image: 'warehouse' as const,
-        iconTone: 'muted' as const,
-        detailsRoute: '/facilities' as const,
-      },
-      {
-        id: 'fallback-warehouse-2',
-        title: 'Royal Agro Warehouse',
-        distanceKm: 6.8,
-        statusLabel: 'Closes at 6 PM',
-        statusTone: 'closing' as const,
-        price: 2465,
-        image: 'warehouse' as const,
-        iconTone: 'muted' as const,
-        detailsRoute: '/facilities' as const,
-      },
-      {
-        id: 'fallback-warehouse-3',
-        title: 'Royal Agro Warehouse',
-        distanceKm: 6.8,
-        statusLabel: 'Closes at 6 PM',
-        statusTone: 'closing' as const,
-        price: 2465,
-        image: 'warehouse' as const,
-        iconTone: 'muted' as const,
-        detailsRoute: '/facilities' as const,
-      },
-      {
-        id: 'fallback-apmc',
-        title: 'Pimpalgaon APMC',
-        distanceKm: 12.5,
-        statusLabel: 'Verified',
-        statusTone: 'verified' as const,
-        price: 2430,
-        image: 'apmc' as const,
-        iconTone: 'muted' as const,
-        detailsRoute: '/facilities' as const,
-      },
-    ];
-
-    const liveMarkets =
-      marketsQuery.data?.topNearby?.slice(0, 2).map((record, index) => ({
-        ...fallback[index],
-        id: record.id,
-        title: record.mandiName,
-        distanceKm: record.distanceKm ?? fallback[index].distanceKm,
-        price: record.priceModal,
-      })) ?? [];
-
-    const liveFacilities =
-      facilitiesQuery.data?.facilities?.slice(0, 4).map((facility, index) => {
-        const fallbackIndex = index + 2;
-        const price = facility.marketContext?.priceModal ?? fallback[fallbackIndex].price;
-
-        return {
-          ...fallback[fallbackIndex],
-          id: facility.id,
-          title: facility.name,
-          distanceKm: facility.distanceKm,
-          statusLabel:
-            facility.type === 'WAREHOUSE'
-              ? 'Closes at 6 PM'
-              : fallbackIndex === 5
-                ? 'Verified'
-                : 'Open now',
-          statusTone:
-            facility.type === 'WAREHOUSE'
-              ? ('closing' as const)
-              : fallbackIndex === 5
-                ? ('verified' as const)
-                : ('open' as const),
-          image:
-            facility.type === 'WAREHOUSE'
-              ? ('warehouse' as const)
-              : fallbackIndex === 5
-                ? ('apmc' as const)
-                : ('market' as const),
-          iconTone: facility.type === 'WAREHOUSE' ? ('muted' as const) : ('active' as const),
-          price,
-          detailsRoute: facility.type === 'WAREHOUSE' ? ('/facilities' as const) : ('/sell-store' as const),
-        };
-      }) ?? [];
-
-    return fallback.map((card, index) => {
-      if (index < 2) {
-        return liveMarkets[index] ?? card;
+  const mandiItems = useMemo<MarketMandiListItem[]>(() => {
+    return getMockMandiSummaries(tradeMode).filter((item) => {
+      if (!trimmedSearchText) {
+        return true;
       }
 
-      return liveFacilities[index - 2] ?? card;
+      const searchTarget = `${item.mandiName} ${item.district} ${item.state}`.toLowerCase();
+      return searchTarget.includes(trimmedSearchText);
     });
-  }, [facilitiesQuery.data?.facilities, marketsQuery.data?.topNearby]);
+  }, [tradeMode, trimmedSearchText]);
+
+  const pinnedItems = useMemo<MarketCropListItem[]>(() => {
+    return getMockPinnedCropItems(pinnedCrops, tradeMode)
+      .map((item) => ({
+        ...item,
+        pinned: true,
+      }))
+      .filter((item) =>
+        trimmedSearchText ? item.cropName.toLowerCase().includes(trimmedSearchText) : true,
+      );
+  }, [pinnedCrops, tradeMode, trimmedSearchText]);
+
+  const addCropOptions = useMemo(() => {
+    return mockCropOptions.filter((item) => !pinnedKeySet.has(item.value));
+  }, [pinnedKeySet]);
+
+  const emptyState = useMemo(() => {
+    if (view === 'pinned') {
+      return {
+        title: 'No pinned crops yet',
+        description: 'Pin crops from All Crops or add one to your watchlist.',
+        actionLabel: 'Browse crops',
+        onAction: () => setView('crops'),
+      };
+    }
+
+    if (view === 'mandis') {
+      return {
+        title: 'No mandis found',
+        description: 'Try a different mandi name or clear the search.',
+      };
+    }
+
+    return {
+      title: 'No crops found',
+      description: 'Try a different crop name or clear the search.',
+    };
+  }, [view]);
 
   return (
     <MandiMarketScreen
-      cropName={cropName}
-      filterMode={filterMode}
-      insightBody={
-        tradeMode === 'buy'
-          ? `Recommendation: Hold current stock for 5-7 days for better margins in ${districtLabel}.`
-          : `Recommendation: Monitor nearby verified stores and time the release window over the next 5-7 days.`
-      }
-      insightHeadline={`${cropName} prices in ${districtLabel} expected to rise by 8% next week.`}
-      nearbyCards={nearbyCards}
-      onBackPress={() => {
-        if (router.canGoBack()) {
-          router.back();
+      addCropOptions={addCropOptions}
+      cropItems={cropItems}
+      emptyState={emptyState}
+      mandiItems={mandiItems}
+      onAddPinnedCrop={(cropKey) => {
+        const cropLabel = mockCropOptions.find((item) => item.value === cropKey)?.label;
+
+        if (!cropLabel || pinnedKeySet.has(cropKey)) {
           return;
         }
 
-        router.push('/home');
+        setPinnedCrops([...pinnedCrops, { cropKey, cropName: cropLabel }]);
       }}
-      onBellPress={() => router.push('/alerts')}
-      onDetailsPress={(card) => router.push(card.detailsRoute)}
-      onFilterModeChange={setFilterMode}
-      onOpenAi={() => router.push('/voice')}
+      onOpenAi={() =>
+        router.push({
+          pathname: '/voice',
+          params: {
+            prompt:
+              tradeMode === 'sell'
+                ? 'Compare whether I should sell now, store for later, or wait for a better mandi price.'
+                : 'Help me compare the current market before I decide what to buy or arrange.',
+            originRoute: 'market',
+            focusCropSeasonId: selectedSeason?.id,
+            focusFarmPlotId: selectedSeason?.farmPlot.id,
+          },
+        } as never)
+      }
+      onOpenCrop={(item) =>
+        router.push({
+          pathname: '/market/crop/[cropName]',
+          params: { cropName: item.cropName, mode: tradeMode },
+        })
+      }
+      onOpenMandi={(item) =>
+        router.push({
+          pathname: '/market/mandi/[mandiKey]',
+          params: { mandiKey: item.mandiKey, mode: tradeMode },
+        })
+      }
       onSearchTextChange={setSearchText}
+      onTogglePinnedCrop={(item) => {
+        const exists = pinnedKeySet.has(item.cropKey);
+
+        if (exists) {
+          setPinnedCrops(pinnedCrops.filter((crop) => crop.cropKey !== item.cropKey));
+          return;
+        }
+
+        setPinnedCrops([
+          ...pinnedCrops,
+          {
+            cropKey: item.cropKey,
+            cropName: item.cropName,
+          },
+        ]);
+      }}
       onTradeModeChange={setTradeMode}
-      onViewAllPinned={() => router.push('/crop-plan')}
-      pinnedCrops={pinnedCrops}
+      onViewChange={(nextView) => {
+        setView(nextView);
+        setSearchText('');
+      }}
+      pinnedItems={pinnedItems}
       searchText={searchText}
       tradeMode={tradeMode}
+      view={view}
     />
   );
 }

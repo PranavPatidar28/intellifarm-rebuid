@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { MapPinned, Phone, Sprout } from 'lucide-react-native';
@@ -7,7 +6,7 @@ import { FarmerAvatar } from '@/components/farmer-avatar';
 import { InsetCard } from '@/components/inset-card';
 import { StatChip } from '@/components/stat-chip';
 import type { AuthUser } from '@/lib/api-types';
-import { palette, radii, spacing, typography } from '@/theme/tokens';
+import { palette, spacing, typography } from '@/theme/tokens';
 
 export function ProfileHeroCard({
   user,
@@ -71,19 +70,7 @@ export function ProfileHeroCard({
             </View>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          <StatChip
-            label="Plots"
-            value={String(farmCount)}
-            icon={<MapPinned color={palette.sky} size={14} />}
-          />
-          <StatChip
-            label="Active crops"
-            value={String(cropCount)}
-            icon={<Sprout color={palette.leafDark} size={14} />}
-            minWidth={120}
-          />
-        </View>
+        
       </View>
     </InsetCard>
   );

@@ -8,6 +8,7 @@ type TextFieldProps = {
   value: string;
   placeholder?: string;
   onChangeText: (value: string) => void;
+  onFocus?: () => void;
   helper?: string;
   error?: string | null;
   keyboardType?: 'default' | 'numeric' | 'phone-pad';
@@ -20,6 +21,7 @@ export function TextField({
   value,
   placeholder,
   onChangeText,
+  onFocus,
   helper,
   error,
   keyboardType = 'default',
@@ -57,6 +59,7 @@ export function TextField({
           placeholder={placeholder}
           placeholderTextColor={palette.inkMuted}
           onChangeText={onChangeText}
+          onFocus={onFocus}
           keyboardType={keyboardType}
           multiline={multiline}
           textAlignVertical={multiline ? 'top' : 'center'}

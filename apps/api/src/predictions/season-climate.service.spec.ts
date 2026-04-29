@@ -42,12 +42,11 @@ describe('SeasonClimateService', () => {
 
     const weatherProvider = {
       getForecast: jest.fn().mockResolvedValue({
-        currentTemperatureC: 31,
-        forecastSummary: 'Current fallback weather',
-        rainfallExpectedMm: 14,
-        humidityPercent: 68,
-        advisories: [],
-        forecastDays: [],
+        current: {
+          temperatureC: 31,
+          humidityPercent: 68,
+          rainfallExpectedMm: 14,
+        },
       }),
     };
 

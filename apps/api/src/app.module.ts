@@ -8,8 +8,10 @@ import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
 import { CropSeasonsModule } from './crop-seasons/crop-seasons.module';
 import { CropCatalogModule } from './crop-catalog/crop-catalog.module';
+import { CommunityModule } from './community/community.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DiseaseReportsModule } from './disease-reports/disease-reports.module';
+import { ExpensesModule } from './expenses/expenses.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { FarmsModule } from './farms/farms.module';
 import { MarketsModule } from './markets/markets.module';
@@ -38,12 +40,14 @@ import { AdminModule } from './admin/admin.module';
     FarmsModule,
     CropCatalogModule,
     CropSeasonsModule,
+    CommunityModule,
     RulesEngineModule,
     PredictionsModule,
     TasksModule,
     AlertsModule,
     WeatherModule,
     DashboardModule,
+    ExpensesModule,
     FacilitiesModule,
     DiseaseReportsModule,
     MarketsModule,

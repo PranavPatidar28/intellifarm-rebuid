@@ -64,6 +64,22 @@ const schemeSchema = z.object({
   active: z.boolean().default(true),
 });
 
+const communityPostModerationSchema = z
+  .object({
+    hidden: z.boolean().optional(),
+    locked: z.boolean().optional(),
+  })
+  .refine(
+    (value) => typeof value.hidden === 'boolean' || typeof value.locked === 'boolean',
+    {
+      message: 'Provide at least one moderation field',
+    },
+  );
+
+const communityReplyModerationSchema = z.object({
+  hidden: z.boolean(),
+});
+
 @ApiTags('admin')
 @Roles('ADMIN')
 @UseGuards(AuthGuard, RolesGuard)
@@ -172,5 +188,31 @@ export class AdminController {
   @Get('disease-reports')
   listDiseaseReports() {
     return this.adminService.listDiseaseReports();
+  }
+
+  @Get('community/reports')
+  listCommunityReports() {
+    return this.adminService.listCommunityReports();
+  }
+
+  @Patch('community/posts/:id')
+  moderateCommunityPost(@Param('id') id: string, @Body() body: unknown) {
+    return this.adminService.moderateCommunityPost(
+      id,
+      parseWithSchema(communityPostModerationSchema, body),
+    );
+  }
+
+  @Patch('community/replies/:id')
+  moderateCommunityReply(@Param('id') id: string, @Body() body: unknown) {
+    return this.adminService.moderateCommunityReply(
+      id,
+      parseWithSchema(communityReplyModerationSchema, body),
+    );
+  }
+
+  @Patch('community/reports/:id/resolve')
+  resolveCommunityReport(@Param('id') id: string) {
+    return this.adminService.resolveCommunityReport(id);
   }
 }

@@ -1,8 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { CheckCircle2, Circle, Pencil, Trash2 } from 'lucide-react-native';
 
 import type { HomeTaskEntry } from '@/lib/home-tasks';
+import { MotionPressable } from '@/components/motion-pressable';
 import { palette, radii, shadow, spacing, typography } from '@/theme/tokens';
 
 export function TaskCard({
@@ -75,7 +76,7 @@ export function TaskCard({
       </View>
 
       {onDelete ? (
-        <Pressable
+        <MotionPressable
           onPress={(event) => {
             event.stopPropagation();
             onDelete();
@@ -89,10 +90,10 @@ export function TaskCard({
           }}
         >
           <Trash2 color={palette.inkMuted} size={18} />
-        </Pressable>
+        </MotionPressable>
       ) : null}
 
-      <Pressable
+      <MotionPressable
         onPress={(event) => {
           event.stopPropagation();
           onToggleComplete?.();
@@ -104,13 +105,13 @@ export function TaskCard({
           alignItems: 'center',
           justifyContent: 'center',
         }}
-      >
+        >
         {task.completed ? (
           <CheckCircle2 color={palette.leaf} size={22} />
         ) : (
           <Circle color={palette.inkMuted} size={22} />
         )}
-      </Pressable>
+      </MotionPressable>
     </View>
   );
 
@@ -119,14 +120,12 @@ export function TaskCard({
   }
 
   return (
-    <Pressable
+    <MotionPressable
       onPress={onPress}
-      style={({ pressed }) => ({
-        opacity: pressed ? 0.97 : 1,
-        transform: [{ scale: pressed ? 0.996 : 1 }],
-      })}
+      pressedOpacity={0.97}
+      pressedScale={0.992}
     >
       {content}
-    </Pressable>
+    </MotionPressable>
   );
 }

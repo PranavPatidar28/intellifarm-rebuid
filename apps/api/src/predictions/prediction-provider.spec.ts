@@ -94,6 +94,21 @@ describe('RailwayCropPredictionProvider', () => {
       'https://web-production-d1166.up.railway.app/predict',
       expect.objectContaining({
         method: 'POST',
+        body: JSON.stringify({
+          N: 80,
+          P: 40,
+          K: 40,
+          temperature: 27,
+          humidity: 72,
+          ph: 6.4,
+          rainfall: 14,
+          n: 80,
+          p: 40,
+          k: 40,
+          temp: 27,
+          soil_ph: 6.4,
+          rainfall_mm: 14,
+        }),
       }),
     );
   });
@@ -134,5 +149,77 @@ describe('RailwayCropPredictionProvider', () => {
 
     expect(result.weeklyWaterMm).toBe(32);
     expect(predictResources).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to mock suggestions when the railway endpoint is unavailable', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () =>
+        Promise.resolve({
+          status: 'error',
+          code: 404,
+          message: 'Application not found',
+        }),
+    });
+
+    const fallbackSuggestions = [
+      {
+        cropName: 'Wheat',
+        score: 0.71,
+        rationale: 'Mock fallback for Wheat.',
+      },
+      {
+        cropName: 'Cotton',
+        score: 0.68,
+        rationale: 'Mock fallback for Cotton.',
+      },
+      {
+        cropName: 'Paddy',
+        score: 0.65,
+        rationale: 'Mock fallback for Paddy.',
+      },
+    ];
+
+    const provider = new RailwayCropPredictionProvider(
+      {
+        get: jest
+          .fn()
+          .mockImplementation((key: string) =>
+            key === 'PREDICTION_PROVIDER_URL'
+              ? 'https://web-production-d1166.up.railway.app'
+              : undefined,
+          ),
+      } as never,
+      {
+        predictCropSuggestions: jest.fn().mockResolvedValue(fallbackSuggestions),
+        predictResources: jest.fn(),
+      } as never,
+    );
+
+    const suggestions = await provider.predictCropSuggestions({
+      farmPlot: {
+        irrigationType: 'RAIN_FED',
+        state: 'Punjab',
+      },
+      cropCatalog: [
+        { slug: 'wheat', nameEn: 'Wheat' },
+        { slug: 'paddy', nameEn: 'Paddy' },
+        { slug: 'cotton', nameEn: 'Cotton' },
+      ],
+      weather: {
+        currentTemperatureC: 27,
+        humidityPercent: 72,
+        rainfallExpectedMm: 14,
+      },
+      soilMetrics: {
+        n: 45,
+        p: 55,
+        k: 80,
+        ph: 7.2,
+      },
+    });
+
+    expect(suggestions).toEqual(fallbackSuggestions);
   });
 });

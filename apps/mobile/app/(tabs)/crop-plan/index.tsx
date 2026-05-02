@@ -19,6 +19,7 @@ import { TimelineHeroHeader } from '@/components/timeline-hero-header';
 import { TimelineSkeleton } from '@/components/timeline-skeleton';
 import { useSession } from '@/features/session/session-provider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
+import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { apiGet } from '@/lib/api';
 import type { CropTimelineResponse, DashboardWeeklyResponse } from '@/lib/api-types';
@@ -44,6 +45,7 @@ export default function CropPlanRoute() {
     '',
   );
   const [focusedStageId, setFocusedStageId] = useState('');
+  const { location, refreshLocation } = useDeviceLocation();
 
   const seasons = useMemo(() => getAllSeasons(profile), [profile]);
   const selectedSeasonContext = findSeasonContext(profile, selectedSeasonId);
@@ -54,8 +56,26 @@ export default function CropPlanRoute() {
     }
   }, [selectedSeasonContext, selectedSeasonId, setSelectedSeasonId]);
 
+  useEffect(() => {
+    void refreshLocation();
+  }, [refreshLocation]);
+
   const seasonId = selectedSeasonContext?.id ?? '';
-  const queryString = seasonId ? `?cropSeasonId=${seasonId}` : '';
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+
+    if (seasonId) {
+      params.set('cropSeasonId', seasonId);
+    }
+
+    if (location) {
+      params.set('latitude', String(location.latitude));
+      params.set('longitude', String(location.longitude));
+    }
+
+    const resolved = params.toString();
+    return resolved ? `?${resolved}` : '';
+  }, [location, seasonId]);
 
   const timelineQuery = useCachedQuery({
     cacheKey: `timeline:${seasonId || 'none'}`,
@@ -65,8 +85,8 @@ export default function CropPlanRoute() {
   });
 
   const dashboardQuery = useCachedQuery({
-    cacheKey: `dashboard-weekly:${seasonId || 'default'}`,
-    queryKey: ['dashboard-weekly', token, seasonId],
+    cacheKey: `dashboard-weekly:${seasonId || 'default'}:${location?.latitude ?? 'na'}:${location?.longitude ?? 'na'}`,
+    queryKey: ['dashboard-weekly', token, seasonId, location?.latitude, location?.longitude],
     enabled: Boolean(token && seasonId),
     queryFn: () => apiGet<DashboardWeeklyResponse>(`/dashboard/weekly${queryString}`, token),
   });
@@ -218,7 +238,12 @@ export default function CropPlanRoute() {
               onPress={() =>
                 router.push({
                   pathname: '/weather/[farmPlotId]',
-                  params: { farmPlotId: selectedSeasonContext.farmPlot.id },
+                  params: {
+                    farmPlotId: selectedSeasonContext.farmPlot.id,
+                    latitude: location?.latitude != null ? String(location.latitude) : undefined,
+                    longitude:
+                      location?.longitude != null ? String(location.longitude) : undefined,
+                  },
                 })
               }
             />

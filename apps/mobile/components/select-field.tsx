@@ -1,9 +1,17 @@
-import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  Text,
+  View,
+  useWindowDimensions,
+  type View as ViewInstance,
+} from 'react-native';
 
 import { Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 import { InsetCard } from '@/components/inset-card';
+import { MotionPressable } from '@/components/motion-pressable';
 import { palette, radii, shadow, spacing, typography } from '@/theme/tokens';
 
 export function SelectField<T extends string>({
@@ -26,12 +34,58 @@ export function SelectField<T extends string>({
   onOpenChange?: (open: boolean) => void;
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const [menuLayout, setMenuLayout] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  });
+  const triggerRef = useRef<ViewInstance | null>(null);
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value) ?? null,
     [options, value],
   );
   const expanded = open ?? internalOpen;
   const setExpanded = onOpenChange ?? setInternalOpen;
+  const menuWidth = Math.min(
+    Math.max(menuLayout.width, 180),
+    windowWidth - spacing.lg * 2,
+  );
+  const optionRowHeight = 46;
+  const menuChromeHeight = 16;
+  const desiredMenuHeight = options.length * optionRowHeight + menuChromeHeight;
+
+  const updateMenuLayout = useCallback(() => {
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setMenuLayout({ x, y, width, height });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) {
+      return;
+    }
+
+    updateMenuLayout();
+  }, [expanded, updateMenuLayout, windowHeight, windowWidth]);
+
+  const closeMenu = () => setExpanded(false);
+  const availableBelow = windowHeight - (menuLayout.y + menuLayout.height) - spacing.lg;
+  const availableAbove = menuLayout.y - spacing.lg;
+  const shouldOpenAbove =
+    availableBelow < desiredMenuHeight && availableAbove > availableBelow;
+  const menuTop = shouldOpenAbove
+    ? Math.max(spacing.lg, menuLayout.y - Math.min(desiredMenuHeight, availableAbove) - spacing.xs)
+    : menuLayout.y + menuLayout.height + spacing.xs;
+  const menuLeft = Math.min(
+    Math.max(spacing.lg, menuLayout.x),
+    windowWidth - menuWidth - spacing.lg,
+  );
+  const menuMaxHeight = Math.max(
+    120,
+    shouldOpenAbove ? availableAbove : availableBelow,
+  );
 
   return (
     <View
@@ -52,10 +106,19 @@ export function SelectField<T extends string>({
         {label}
       </Text>
 
-      <View style={{ position: 'relative', zIndex: expanded ? 60 : 1 }}>
-        <Pressable
-          onPress={() => setExpanded(!expanded)}
-          style={{
+      <View
+        ref={triggerRef}
+        collapsable={false}
+        style={{ position: 'relative', zIndex: expanded ? 60 : 1 }}
+      >
+        <MotionPressable
+          onPress={() => {
+            if (!expanded) {
+              updateMenuLayout();
+            }
+            setExpanded(!expanded);
+          }}
+          contentStyle={{
             minHeight: 50,
             flexDirection: 'row',
             alignItems: 'center',
@@ -85,62 +148,82 @@ export function SelectField<T extends string>({
           ) : (
             <ChevronDown color={palette.inkSoft} size={18} />
           )}
-        </Pressable>
+        </MotionPressable>
+      </View>
 
-        {expanded ? (
+      <Modal
+        animationType="fade"
+        transparent
+        visible={expanded}
+        onRequestClose={closeMenu}
+      >
+        <Pressable
+          onPress={closeMenu}
+          style={{
+            flex: 1,
+            backgroundColor: 'transparent',
+          }}
+        >
           <View
+            pointerEvents="box-none"
             style={{
-              position: 'absolute',
-              top: 56,
-              left: 0,
-              right: 0,
-              zIndex: 80,
+              flex: 1,
             }}
           >
-            <InsetCard padding={8}>
-              <View style={{ gap: 4 }}>
-                {options.map((option) => {
-                  const active = option.value === value;
+            <View
+              style={{
+                position: 'absolute',
+                top: menuTop,
+                left: menuLeft,
+                width: menuWidth,
+                maxHeight: menuMaxHeight,
+              }}
+            >
+              <InsetCard padding={8}>
+                <View style={{ gap: 4 }}>
+                  {options.map((option) => {
+                    const active = option.value === value;
 
-                  return (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => {
-                        onChange(option.value);
-                        setExpanded(false);
-                      }}
-                      style={{
-                        minHeight: 42,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: spacing.sm,
-                        paddingHorizontal: spacing.md,
-                        paddingVertical: 10,
-                        borderRadius: radii.md,
-                        borderCurve: 'continuous',
-                        backgroundColor: active ? palette.leafMist : palette.white,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          flex: 1,
-                          color: active ? palette.leafDark : palette.inkSoft,
-                          fontFamily: active ? typography.bodyStrong : typography.bodyRegular,
-                          fontSize: 13,
+                    return (
+                      <MotionPressable
+                        key={option.value}
+                        onPress={() => {
+                          onChange(option.value);
+                          closeMenu();
+                        }}
+                        contentStyle={{
+                          minHeight: 42,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: spacing.sm,
+                          paddingHorizontal: spacing.md,
+                          paddingVertical: 10,
+                          borderRadius: radii.md,
+                          borderCurve: 'continuous',
+                          backgroundColor: active ? palette.leafMist : palette.white,
                         }}
                       >
-                        {option.label}
-                      </Text>
-                      {active ? <Check color={palette.leafDark} size={16} /> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </InsetCard>
+                        <Text
+                          style={{
+                            flex: 1,
+                            color: active ? palette.leafDark : palette.inkSoft,
+                            fontFamily: active ? typography.bodyStrong : typography.bodyRegular,
+                            fontSize: 13,
+                          }}
+                        >
+                          {option.label}
+                        </Text>
+                        {active ? <Check color={palette.leafDark} size={16} /> : null}
+                      </MotionPressable>
+                    );
+                  })}
+                </View>
+              </InsetCard>
+            </View>
           </View>
-        ) : null}
-      </View>
+        </Pressable>
+      </Modal>
 
       {helper ? (
         <Text

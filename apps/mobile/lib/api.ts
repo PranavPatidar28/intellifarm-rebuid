@@ -60,9 +60,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
     }
 
     throw new ApiError(
-      typeof payload === 'object' && payload && 'message' in payload
-        ? String((payload as { message?: string }).message)
-        : 'Request failed',
+      extractErrorMessage(payload),
       response.status,
       payload,
     );
@@ -98,4 +96,37 @@ export function apiDelete<T>(path: string, token?: string | null) {
     method: 'DELETE',
     token,
   });
+}
+
+function extractErrorMessage(payload: unknown) {
+  if (typeof payload === 'string' && payload.trim()) {
+    return payload;
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return 'Request failed';
+  }
+
+  if ('message' in payload && typeof payload.message === 'string') {
+    return payload.message;
+  }
+
+  if ('error' in payload) {
+    const nestedError = payload.error;
+
+    if (typeof nestedError === 'string' && nestedError.trim()) {
+      return nestedError;
+    }
+
+    if (
+      nestedError &&
+      typeof nestedError === 'object' &&
+      'message' in nestedError &&
+      typeof nestedError.message === 'string'
+    ) {
+      return nestedError.message;
+    }
+  }
+
+  return 'Request failed';
 }

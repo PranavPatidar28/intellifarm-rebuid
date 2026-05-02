@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Text, View, useWindowDimensions } from 'react-native';
 
 import { useRouter } from 'expo-router';
 import {
@@ -19,6 +19,8 @@ import { HomeSchemeCard } from '@/components/home-scheme-card';
 import { HomeSeasonContextRow } from '@/components/home-season-context-row';
 import { LoadingScreen } from '@/components/loading-screen';
 import { MetricBadge } from '@/components/metric-badge';
+import { MotionPressable } from '@/components/motion-pressable';
+import { MotionSection } from '@/components/motion-section';
 import { OfflineBanner } from '@/components/offline-banner';
 import { PageShell } from '@/components/page-shell';
 import { RichEmptyState } from '@/components/rich-empty-state';
@@ -27,6 +29,7 @@ import { TaskCard } from '@/components/task-card';
 import { WeatherHeroCard } from '@/components/weather-hero-card';
 import { useSession } from '@/features/session/session-provider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
+import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { apiGet } from '@/lib/api';
 import type {
@@ -52,11 +55,29 @@ export default function HomeDashboardRoute() {
   );
   const [pendingUploads] = useStoredValue(storageKeys.pendingDiseaseReports, []);
   const [homeTasks] = useStoredValue(storageKeys.homeTasks, readHomeTasks());
+  const { location, refreshLocation } = useDeviceLocation();
 
-  const queryString = selectedSeasonId ? `?cropSeasonId=${selectedSeasonId}` : '';
+  useEffect(() => {
+    void refreshLocation();
+  }, [refreshLocation]);
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+
+    if (selectedSeasonId) {
+      params.set('cropSeasonId', selectedSeasonId);
+    }
+
+    if (location) {
+      params.set('latitude', String(location.latitude));
+      params.set('longitude', String(location.longitude));
+    }
+
+    const resolved = params.toString();
+    return resolved ? `?${resolved}` : '';
+  }, [location, selectedSeasonId]);
   const dashboardQuery = useCachedQuery({
-    cacheKey: `dashboard-weekly:${selectedSeasonId || 'default'}`,
-    queryKey: ['dashboard-weekly', token, selectedSeasonId],
+    cacheKey: `dashboard-weekly:${selectedSeasonId || 'default'}:${location?.latitude ?? 'na'}:${location?.longitude ?? 'na'}`,
+    queryKey: ['dashboard-weekly', token, selectedSeasonId, location?.latitude, location?.longitude],
     enabled: Boolean(token),
     queryFn: () => apiGet<DashboardWeeklyResponse>(`/dashboard/weekly${queryString}`, token),
     placeholderData: (previous) => previous,
@@ -142,9 +163,9 @@ export default function HomeDashboardRoute() {
   const farmerFirstName = getFirstName(authUser?.name) ?? 'farmer';
   const homeHeaderAction = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-      <Pressable
+      <MotionPressable
         onPress={() => router.push('/alerts')}
-        style={{
+        contentStyle={{
           width: 40,
           height: 40,
           alignItems: 'center',
@@ -156,14 +177,14 @@ export default function HomeDashboardRoute() {
         }}
       >
         <Bell color={palette.leafDark} size={20} />
-      </Pressable>
-      <Pressable onPress={() => router.push('/profile-settings')}>
+      </MotionPressable>
+      <MotionPressable onPress={() => router.push('/profile-settings')}>
         <FarmerAvatar
           name={authUser?.name}
           profilePhotoUrl={authUser?.profilePhotoUrl}
           size={40}
         />
-      </Pressable>
+      </MotionPressable>
     </View>
   );
 
@@ -179,12 +200,16 @@ export default function HomeDashboardRoute() {
         subtitle="Set up a crop season to unlock weekly farm actions."
         action={homeHeaderAction}
       >
-        <RichEmptyState
-          title="No active crop yet"
-          description="Finish the crop setup to unlock weather guidance, mandi signals, expense tracking, and scheme suggestions."
-          icon={<Sparkles color={palette.leafDark} size={20} />}
-        />
-        <Button label="Set up my current crop" onPress={() => router.push('/season')} />
+        <MotionSection>
+          <RichEmptyState
+            title="No active crop yet"
+            description="Finish the crop setup to unlock weather guidance, mandi signals, expense tracking, and scheme suggestions."
+            icon={<Sparkles color={palette.leafDark} size={20} />}
+          />
+        </MotionSection>
+        <MotionSection delay={40}>
+          <Button label="Set up my current crop" onPress={() => router.push('/season')} />
+        </MotionSection>
       </PageShell>
     );
   }
@@ -215,36 +240,45 @@ export default function HomeDashboardRoute() {
       }
     >
       {cacheBannerNeeded ? (
-        <OfflineBanner
-          cachedAt={dashboardQuery.cachedAt}
-          pendingLabel={
-            pendingUploads.length
-              ? `${pendingUploads.length} diagnosis upload(s) are waiting to sync.`
-              : undefined
-          }
-        />
+        <MotionSection>
+          <OfflineBanner
+            cachedAt={dashboardQuery.cachedAt}
+            pendingLabel={
+              pendingUploads.length
+                ? `${pendingUploads.length} diagnosis upload(s) are waiting to sync.`
+                : undefined
+            }
+          />
+        </MotionSection>
       ) : null}
 
-      <WeatherHeroCard
-        weather={dashboard?.weatherHero ?? null}
-        loading={dashboardQuery.isLoading && !dashboard?.weatherHero}
-        refreshing={dashboardQuery.isFetching}
-        errorMessage={
-          dashboardQuery.error ? 'Unable to refresh weather data right now.' : null
-        }
-        onRefresh={() => {
-          void dashboardQuery.refetch();
-        }}
-        onForecast={() =>
-          router.push({
-            pathname: '/weather/[farmPlotId]',
-            params: { farmPlotId: featuredSeason.farmPlotId },
-          })
-        }
-        onAdvisory={() => router.push('/crop-plan')}
-      />
+      <MotionSection delay={40}>
+        <WeatherHeroCard
+          weather={dashboard?.weatherHero ?? null}
+          loading={dashboardQuery.isLoading && !dashboard?.weatherHero}
+          refreshing={dashboardQuery.isFetching}
+          errorMessage={
+            dashboardQuery.error ? 'Unable to refresh weather data right now.' : null
+          }
+          onRefresh={() => {
+            void dashboardQuery.refetch();
+          }}
+          onForecast={() =>
+            router.push({
+              pathname: '/weather/[farmPlotId]',
+              params: {
+                farmPlotId: featuredSeason.farmPlotId,
+                latitude: location?.latitude != null ? String(location.latitude) : undefined,
+                longitude: location?.longitude != null ? String(location.longitude) : undefined,
+              },
+            })
+          }
+          onAdvisory={() => router.push('/crop-plan')}
+        />
+      </MotionSection>
 
-      <View style={{ gap: spacing.sm }}>
+      <MotionSection delay={80}>
+        <View style={{ gap: spacing.sm }}>
         <SectionTitle title="Quick tools" />
         <View
           style={{
@@ -265,16 +299,18 @@ export default function HomeDashboardRoute() {
             onPress={() => router.push('/diagnose')}
           />
         </View>
-      </View>
+        </View>
+      </MotionSection>
 
-      <View style={{ gap: spacing.sm }}>
+      <MotionSection delay={120}>
+        <View style={{ gap: spacing.sm }}>
         <SectionTitle
           title="Your tasks"
           action={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Pressable
+              <MotionPressable
                 onPress={() => router.push('/personal-tasks' as never)}
-                style={{
+                contentStyle={{
                   minHeight: 34,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -290,21 +326,21 @@ export default function HomeDashboardRoute() {
                   style={{
                     color: palette.inkSoft,
                     fontFamily: typography.bodyStrong,
-                    fontSize: 12,
-                  }}
-                >
-                  View all
-                </Text>
-                <ArrowRight color={palette.inkSoft} size={14} />
-              </Pressable>
-              <Pressable
+                  fontSize: 12,
+                }}
+              >
+                View all
+              </Text>
+              <ArrowRight color={palette.inkSoft} size={14} />
+              </MotionPressable>
+              <MotionPressable
                 onPress={() =>
                   router.push({
                     pathname: '/personal-task/[id]',
                     params: { id: 'new' },
                   } as never)
                 }
-                style={{
+                contentStyle={{
                   minHeight: 34,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -321,12 +357,12 @@ export default function HomeDashboardRoute() {
                   style={{
                     color: palette.leafDark,
                     fontFamily: typography.bodyStrong,
-                    fontSize: 12,
-                  }}
-                >
-                  Add
-                </Text>
-              </Pressable>
+                  fontSize: 12,
+                }}
+              >
+                Add
+              </Text>
+              </MotionPressable>
             </View>
           }
         />
@@ -392,9 +428,11 @@ export default function HomeDashboardRoute() {
             />
           </View>
         ) : null}
-      </View>
+        </View>
+      </MotionSection>
 
-      <View style={{ gap: spacing.sm }}>
+      <MotionSection delay={160}>
+        <View style={{ gap: spacing.sm }}>
         <SectionTitle title="News & Schemes" />
         <View
           style={{
@@ -425,7 +463,8 @@ export default function HomeDashboardRoute() {
             />
           </View>
         </View>
-      </View>
+        </View>
+      </MotionSection>
     </PageShell>
   );
 }

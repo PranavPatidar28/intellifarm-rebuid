@@ -26,6 +26,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getResponse()
         : 'Internal server error';
+    const message = resolveErrorMessage(exceptionResponse);
 
     if (status >= 500) {
       this.logger.error(
@@ -38,7 +39,32 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       path: request.url,
       timestamp: new Date().toISOString(),
+      message,
       error: exceptionResponse,
     });
   }
+}
+
+function resolveErrorMessage(exceptionResponse: unknown) {
+  if (typeof exceptionResponse === 'string') {
+    return exceptionResponse;
+  }
+
+  if (
+    exceptionResponse &&
+    typeof exceptionResponse === 'object' &&
+    'message' in exceptionResponse
+  ) {
+    const value = exceptionResponse.message;
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+  }
+
+  return 'Request failed';
 }

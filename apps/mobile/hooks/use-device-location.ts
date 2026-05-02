@@ -2,9 +2,12 @@ import { useCallback, useState } from 'react';
 
 import * as Location from 'expo-location';
 
+const DEFAULT_LOCATION_LABEL = 'Bhopal, MP';
+
 type DeviceLocation = {
   latitude: number;
   longitude: number;
+  label: string | null;
 };
 
 export function useDeviceLocation() {
@@ -30,12 +33,19 @@ export function useDeviceLocation() {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      setLocation({
+      const placemarks = await Location.reverseGeocodeAsync({
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       });
+      const label = formatLocationLabel(placemarks[0]) ?? DEFAULT_LOCATION_LABEL;
+
+      setLocation({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+        label,
+      });
       setStatus('ready');
-      setMessage('Using current GPS location.');
+      setMessage(`Using ${label}.`);
     } catch {
       setStatus('error');
       setMessage('Could not read the current location right now.');
@@ -48,4 +58,32 @@ export function useDeviceLocation() {
     message,
     refreshLocation,
   };
+}
+
+function formatLocationLabel(
+  placemark: Location.LocationGeocodedAddress | null | undefined,
+) {
+  if (!placemark) {
+    return null;
+  }
+
+  const locality =
+    placemark.city ||
+    placemark.subregion ||
+    placemark.district ||
+    placemark.region ||
+    null;
+  const area =
+    placemark.district ||
+    placemark.subregion ||
+    placemark.region ||
+    placemark.country ||
+    null;
+
+  const parts = [locality, area].filter(
+    (value, index, values): value is string =>
+      Boolean(value) && values.indexOf(value) === index,
+  );
+
+  return parts.length ? parts.join(', ') : null;
 }

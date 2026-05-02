@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 
+import { MotionPressable } from '@/components/motion-pressable';
 import { palette, radii, shadow, spacing, typography } from '@/theme/tokens';
 
 type ButtonProps = {
@@ -46,18 +47,14 @@ export function Button({
           : palette.leaf;
 
   return (
-    <Pressable
+    <MotionPressable
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => ({
+      style={{
         minHeight: 50,
         width: fullWidth ? '100%' : undefined,
-        opacity: disabled ? 0.45 : 1,
-        transform: [{ scale: pressed ? 0.985 : 1 }],
-      })}
-    >
-      <View
-        style={{
+      }}
+      contentStyle={{
           minHeight: 50,
           paddingHorizontal: spacing.lg,
           borderRadius: radii.pill,
@@ -71,18 +68,17 @@ export function Button({
           backgroundColor,
           boxShadow: variant === 'ghost' ? undefined : shadow.soft,
         }}
+    >
+      {loading ? <ActivityIndicator color={textColor} /> : icon}
+      <Text
+        style={{
+          color: textColor,
+          fontFamily: typography.bodyStrong,
+          fontSize: 14,
+        }}
       >
-        {loading ? <ActivityIndicator color={textColor} /> : icon}
-        <Text
-          style={{
-            color: textColor,
-            fontFamily: typography.bodyStrong,
-            fontSize: 14,
-          }}
-        >
-          {label}
-        </Text>
-      </View>
-    </Pressable>
+        {label}
+      </Text>
+    </MotionPressable>
   );
 }

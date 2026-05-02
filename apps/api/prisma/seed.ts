@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '../src/generated/prisma';
+import { Prisma, PrismaClient, type CommunityCategory } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -492,6 +492,243 @@ const marketRecords = [
   },
 ];
 
+const seededCommunityUsers = [
+  {
+    key: 'gurpreet',
+    phone: '9990000001',
+    name: 'Gurpreet Singh',
+    state: 'Punjab',
+    district: 'Ludhiana',
+    village: 'Baddowal',
+  },
+  {
+    key: 'meena',
+    phone: '9990000002',
+    name: 'Meena Devi',
+    state: 'Haryana',
+    district: 'Karnal',
+    village: 'Nilokheri',
+  },
+  {
+    key: 'suresh',
+    phone: '9990000003',
+    name: 'Suresh Patil',
+    state: 'Maharashtra',
+    district: 'Yavatmal',
+    village: 'Babhulgaon',
+  },
+  {
+    key: 'asha',
+    phone: '9990000004',
+    name: 'Asha Verma',
+    state: 'Uttar Pradesh',
+    district: 'Bareilly',
+    village: 'Nawabganj',
+  },
+  {
+    key: 'harjit',
+    phone: '9990000005',
+    name: 'Harjit Kaur',
+    state: 'Punjab',
+    district: 'Ludhiana',
+    village: 'Pakhowal',
+  },
+] as const;
+
+type CommunitySeedUserKey = (typeof seededCommunityUsers)[number]['key'] | 'demo';
+type DemoSeasonKey = 'wheat' | 'cotton';
+
+type SeededCommunityUserRecord = {
+  id: string;
+  name: string | null;
+  state: string | null;
+  district: string | null;
+  village: string | null;
+};
+
+type DemoSeasonRecord = {
+  id: string;
+  cropName: string;
+  currentStage: string;
+  state: string | null;
+  district: string | null;
+  village: string | null;
+};
+
+type CommunityReplySeed = {
+  authorKey: CommunitySeedUserKey;
+  body: string;
+  hoursAgo: number;
+};
+
+type CommunityPostSeed = {
+  authorKey: CommunitySeedUserKey;
+  title: string;
+  body: string;
+  category: CommunityCategory;
+  hoursAgo: number;
+  cropSeasonKey?: DemoSeasonKey;
+  cropName?: string;
+  currentStage?: string;
+  likedBy: CommunitySeedUserKey[];
+  savedBy: CommunitySeedUserKey[];
+  replies: CommunityReplySeed[];
+  location?: {
+    state: string;
+    district: string;
+    village: string;
+  };
+};
+
+const communityPostSeeds: CommunityPostSeed[] = [
+  {
+    authorKey: 'gurpreet',
+    title: 'Flowering wheat after last night rain - irrigate or wait?',
+    body:
+      'We had a good shower in Baddowal last night. The top layer is moist but the lower bed still feels slightly dry. Is anyone waiting a day or two before the next irrigation at flowering?',
+    category: 'QUESTION',
+    hoursAgo: 5,
+    cropName: 'Wheat',
+    currentStage: 'Flowering',
+    likedBy: ['demo', 'harjit'],
+    savedBy: ['demo'],
+    replies: [
+      {
+        authorKey: 'demo',
+        body:
+          'I usually wait until the soil stops sticking at 2 to 3 inches. If the breeze stays cool today, I will skip one irrigation turn.',
+        hoursAgo: 3,
+      },
+      {
+        authorKey: 'meena',
+        body:
+          'Waiting one day helped us avoid lodging in a similar shower last season, but only where drainage was clear.',
+        hoursAgo: 2,
+      },
+    ],
+  },
+  {
+    authorKey: 'demo',
+    title: 'Cotton leaves curling on the canal side plot - what should I check first?',
+    body:
+      'In square formation, some top leaves are curling inward and a few plants look dull by noon. Drip timing is unchanged and I have not sprayed anything yet. What would you inspect first?',
+    category: 'PEST_DISEASE',
+    hoursAgo: 20,
+    cropSeasonKey: 'cotton',
+    cropName: 'Cotton',
+    currentStage: 'Square Formation',
+    likedBy: ['gurpreet', 'harjit', 'suresh'],
+    savedBy: [],
+    replies: [
+      {
+        authorKey: 'harjit',
+        body:
+          'Check the underside of the newest leaves first. We saw early sucking pest pressure before the field looked serious from a distance.',
+        hoursAgo: 18,
+      },
+      {
+        authorKey: 'suresh',
+        body:
+          'Also compare one stressed patch with a healthy patch after sunrise. In our case, a partially blocked line made the noon wilt look like a pest issue.',
+        hoursAgo: 16,
+      },
+    ],
+  },
+  {
+    authorKey: 'meena',
+    title: 'Selling small wheat lots: do you combine with neighbors or go alone?',
+    body:
+      'A trader is quoting lower rates for a small lot from our side. How are others managing transport and weighing when harvest is less than one trolley?',
+    category: 'MARKET',
+    hoursAgo: 36,
+    cropName: 'Wheat',
+    currentStage: 'Harvest Ready',
+    likedBy: ['demo', 'asha'],
+    savedBy: ['demo'],
+    replies: [
+      {
+        authorKey: 'asha',
+        body:
+          'We combine loads with one trusted neighbor and settle by weight slip. It reduces transport cost and gives better bargaining room.',
+        hoursAgo: 30,
+      },
+    ],
+  },
+  {
+    authorKey: 'asha',
+    title: 'Paddy spacing change gave stronger tillers this season',
+    body:
+      'We kept the rows a little wider and were more careful during line transplanting. Tillers look more even this season and seed use was lower than last year.',
+    category: 'SUCCESS',
+    hoursAgo: 60,
+    cropName: 'Paddy',
+    currentStage: 'Vegetative',
+    likedBy: ['demo', 'meena', 'harjit'],
+    savedBy: [],
+    replies: [
+      {
+        authorKey: 'demo',
+        body:
+          'That is useful. Did you also notice any difference in weed pressure with the wider spacing?',
+        hoursAgo: 50,
+      },
+    ],
+  },
+  {
+    authorKey: 'suresh',
+    title: 'Pink bollworm trap count is rising in nearby fields',
+    body:
+      'Three neighboring cotton fields saw a jump in trap counts this week. No major square damage yet, but farmers have started closer scouting on early fruiting branches.',
+    category: 'WARNING',
+    hoursAgo: 10,
+    cropName: 'Cotton',
+    currentStage: 'Square Formation',
+    likedBy: ['demo', 'gurpreet', 'harjit'],
+    savedBy: ['demo'],
+    replies: [
+      {
+        authorKey: 'harjit',
+        body:
+          'We started evening scouting in five rows per side and it made the first signs easier to catch before damage spread.',
+        hoursAgo: 7,
+      },
+    ],
+  },
+  {
+    authorKey: 'harjit',
+    title: 'Drip block in one wheat corner - flushing fixed flow for us',
+    body:
+      'If one corner stays lighter green, check the last lateral first. A quick flush cleared sediment in our field and the color improved within three days.',
+    category: 'WATER',
+    hoursAgo: 14,
+    cropName: 'Wheat',
+    currentStage: 'Flowering',
+    likedBy: ['demo'],
+    savedBy: [],
+    replies: [],
+  },
+  {
+    authorKey: 'gurpreet',
+    title: 'Anyone splitting the last nitrogen top-up after cloudy weather?',
+    body:
+      'The crop is moving well but I am unsure whether to keep the full top-up together after this cloudy spell. Interested in what worked without pushing too much lush growth.',
+    category: 'NUTRITION',
+    hoursAgo: 26,
+    cropName: 'Wheat',
+    currentStage: 'Flowering',
+    likedBy: ['demo', 'harjit'],
+    savedBy: [],
+    replies: [
+      {
+        authorKey: 'demo',
+        body:
+          'I would rather split it if the forecast keeps humidity high. That has kept the crop steadier for us than a single heavy dose.',
+        hoursAgo: 22,
+      },
+    ],
+  },
+];
+
 async function seedCrops() {
   for (const crop of cropSeeds) {
     const cropDefinition = await prisma.cropDefinition.upsert({
@@ -598,7 +835,7 @@ async function seedDemoFarmer() {
     where: { userId: demoUser.id },
   });
   if (existingPlots > 0) {
-    return;
+    return demoUser;
   }
 
   const wheat = await prisma.cropDefinition.findUniqueOrThrow({
@@ -658,6 +895,8 @@ async function seedDemoFarmer() {
       },
     ],
   });
+
+  return demoUser;
 }
 
 async function seedAdminUser() {
@@ -683,11 +922,239 @@ async function seedAdminUser() {
   });
 }
 
+async function seedCommunityUsers() {
+  const users = await Promise.all(
+    seededCommunityUsers.map((user) =>
+      prisma.user.upsert({
+        where: { phone: user.phone },
+        update: {
+          name: user.name,
+          preferredLanguage: 'en',
+          state: user.state,
+          district: user.district,
+          village: user.village,
+          role: 'FARMER',
+        },
+        create: {
+          phone: user.phone,
+          name: user.name,
+          preferredLanguage: 'en',
+          state: user.state,
+          district: user.district,
+          village: user.village,
+          role: 'FARMER',
+        },
+        select: {
+          id: true,
+          name: true,
+          state: true,
+          district: true,
+          village: true,
+        },
+      }),
+    ),
+  );
+
+  return Object.fromEntries(
+    users.map((user, index) => [seededCommunityUsers[index].key, user]),
+  ) as Record<(typeof seededCommunityUsers)[number]['key'], SeededCommunityUserRecord>;
+}
+
+async function loadDemoSeasonMap(demoUserId: string) {
+  const seasons = await prisma.cropSeason.findMany({
+    where: {
+      farmPlot: {
+        userId: demoUserId,
+      },
+      cropName: {
+        in: ['Wheat', 'Cotton'],
+      },
+    },
+    select: {
+      id: true,
+      cropName: true,
+      currentStage: true,
+      farmPlot: {
+        select: {
+          state: true,
+          district: true,
+          village: true,
+        },
+      },
+    },
+  });
+
+  const findSeason = (cropName: string): DemoSeasonRecord | null => {
+    const season = seasons.find((entry) => entry.cropName === cropName);
+
+    if (!season) {
+      return null;
+    }
+
+    return {
+      id: season.id,
+      cropName: season.cropName,
+      currentStage: season.currentStage,
+      state: season.farmPlot.state,
+      district: season.farmPlot.district,
+      village: season.farmPlot.village,
+    };
+  };
+
+  return {
+    wheat: findSeason('Wheat'),
+    cotton: findSeason('Cotton'),
+  } satisfies Record<DemoSeasonKey, DemoSeasonRecord | null>;
+}
+
+async function seedCommunityData(demoUser: SeededCommunityUserRecord) {
+  const seededUsers = await seedCommunityUsers();
+  const demoSeasons = await loadDemoSeasonMap(demoUser.id);
+  const usersByKey: Record<CommunitySeedUserKey, SeededCommunityUserRecord> = {
+    demo: demoUser,
+    ...seededUsers,
+  };
+
+  const existingSeedPosts = await prisma.communityPost.findMany({
+    where: {
+      title: {
+        in: communityPostSeeds.map((post) => post.title),
+      },
+      authorId: {
+        in: Object.values(usersByKey).map((user) => user.id),
+      },
+    },
+    select: {
+      id: true,
+      replies: {
+        select: {
+          id: true,
+        },
+      },
+    },
+  });
+
+  if (existingSeedPosts.length > 0) {
+    const postIds = existingSeedPosts.map((post) => post.id);
+    const replyIds = existingSeedPosts.flatMap((post) =>
+      post.replies.map((reply) => reply.id),
+    );
+
+    await prisma.communityReport.deleteMany({
+      where: {
+        OR: [
+          {
+            targetType: 'POST',
+            targetId: {
+              in: postIds,
+            },
+          },
+          ...(replyIds.length > 0
+            ? [
+                {
+                  targetType: 'REPLY' as const,
+                  targetId: {
+                    in: replyIds,
+                  },
+                },
+              ]
+            : []),
+        ],
+      },
+    });
+
+    await prisma.communityPost.deleteMany({
+      where: {
+        id: {
+          in: postIds,
+        },
+      },
+    });
+  }
+
+  for (const postSeed of communityPostSeeds) {
+    const author = usersByKey[postSeed.authorKey];
+    const season = postSeed.cropSeasonKey ? demoSeasons[postSeed.cropSeasonKey] : null;
+    const createdAt = hoursAgo(postSeed.hoursAgo);
+    const replies = postSeed.replies.map((reply) => ({
+      authorId: usersByKey[reply.authorKey].id,
+      body: reply.body,
+      createdAt: hoursAgo(reply.hoursAgo),
+    }));
+    const lastActivityAt = replies.reduce(
+      (latest, reply) =>
+        reply.createdAt.getTime() > latest.getTime() ? reply.createdAt : latest,
+      createdAt,
+    );
+    const state = postSeed.location?.state ?? season?.state ?? author.state;
+    const district = postSeed.location?.district ?? season?.district ?? author.district;
+    const village = postSeed.location?.village ?? season?.village ?? author.village;
+
+    await prisma.communityPost.create({
+      data: {
+        authorId: author.id,
+        title: postSeed.title,
+        body: postSeed.body,
+        category: postSeed.category,
+        cropSeasonId: season?.id ?? null,
+        cropName: season?.cropName ?? postSeed.cropName ?? null,
+        currentStage: season?.currentStage ?? postSeed.currentStage ?? null,
+        state,
+        district,
+        village,
+        likeCount: postSeed.likedBy.length,
+        replyCount: replies.length,
+        saveCount: postSeed.savedBy.length,
+        lastActivityAt,
+        createdAt,
+        ...(postSeed.likedBy.length > 0
+          ? {
+              likes: {
+                create: postSeed.likedBy.map((userKey) => ({
+                  userId: usersByKey[userKey].id,
+                  createdAt,
+                })),
+              },
+            }
+          : {}),
+        ...(postSeed.savedBy.length > 0
+          ? {
+              saves: {
+                create: postSeed.savedBy.map((userKey) => ({
+                  userId: usersByKey[userKey].id,
+                  createdAt,
+                })),
+              },
+            }
+          : {}),
+        ...(replies.length > 0
+          ? {
+              replies: {
+                create: replies,
+              },
+            }
+          : {}),
+      },
+    });
+  }
+}
+
+function hoursAgo(value: number) {
+  return new Date(Date.now() - value * 60 * 60 * 1000);
+}
+
 async function main() {
   await seedCrops();
   await seedSchemesAndMarkets();
-  await seedDemoFarmer();
+  const demoUser = await seedDemoFarmer();
   await seedAdminUser();
+  await seedCommunityData({
+    id: demoUser.id,
+    name: demoUser.name,
+    state: demoUser.state,
+    district: demoUser.district,
+    village: demoUser.village,
+  });
 }
 
 main()

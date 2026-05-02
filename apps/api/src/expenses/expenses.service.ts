@@ -8,7 +8,7 @@ import {
   type ExpenseEntry as PrismaExpenseEntry,
   type ExpenseStatus,
   Prisma,
-} from '../generated/prisma';
+} from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import type { CropDefinition, FarmPlot } from '../generated/prisma';
+import type { CropDefinition, FarmPlot } from '@prisma/client';
 
 import { addDays, diffInDays, startOfToday } from '../common/utils/date.util';
 import { NotificationsService } from '../notifications/notifications.service';

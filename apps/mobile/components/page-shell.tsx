@@ -15,6 +15,26 @@ type PageShellProps = {
   scrollProps?: ScrollViewProps;
 };
 
+export function PageShellHeader({
+  eyebrow,
+  title,
+  subtitle,
+  hero,
+  action,
+  heroTone = 'sunrise',
+}: Omit<PageShellProps, 'children' | 'scrollProps'>) {
+  return (
+    <AppHeroHeader
+      eyebrow={eyebrow}
+      title={title}
+      subtitle={subtitle}
+      hero={hero}
+      action={action}
+      tone={heroTone}
+    />
+  );
+}
+
 export function PageShell({
   eyebrow,
   title,
@@ -35,13 +55,13 @@ export function PageShell({
       }}
       {...scrollProps}
     >
-      <AppHeroHeader
+      <PageShellHeader
         eyebrow={eyebrow}
         title={title}
         subtitle={subtitle}
         hero={hero}
         action={action}
-        tone={heroTone}
+        heroTone={heroTone}
       />
 
       <View

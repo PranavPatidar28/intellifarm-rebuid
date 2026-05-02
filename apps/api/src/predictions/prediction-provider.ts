@@ -211,22 +211,26 @@ export class RailwayCropPredictionProvider implements PredictionProvider {
   ) {}
 
   async predictCropSuggestions(input: CropSuggestionRequest) {
-    const { payload, defaultedFields } = buildRailwayPredictionPayload(input);
-    const response = await this.postPredict(payload);
-    const liveSuggestions = normalizeRailwaySuggestions(
-      response,
-      input.cropCatalog,
-      defaultedFields,
-    );
-
-    if (liveSuggestions.length >= 3) {
-      return liveSuggestions.slice(0, 3);
-    }
-
     const fallbackSuggestions =
       await this.mockPredictionProvider.predictCropSuggestions(input);
 
-    return mergeCropSuggestions(liveSuggestions, fallbackSuggestions);
+    try {
+      const { payload, defaultedFields } = buildRailwayPredictionPayload(input);
+      const response = await this.postPredict(payload);
+      const liveSuggestions = normalizeRailwaySuggestions(
+        response,
+        input.cropCatalog,
+        defaultedFields,
+      );
+
+      if (liveSuggestions.length >= 3) {
+        return liveSuggestions.slice(0, 3);
+      }
+
+      return mergeCropSuggestions(liveSuggestions, fallbackSuggestions);
+    } catch {
+      return fallbackSuggestions;
+    }
   }
 
   predictResources(input: ResourcePredictionRequest) {
@@ -259,6 +263,7 @@ export class RailwayCropPredictionProvider implements PredictionProvider {
     return (await response.json()) as Record<string, unknown>;
   }
 }
+
 
 function buildCropSuggestion(
   cropName: string,
@@ -312,29 +317,46 @@ function buildCropSuggestion(
 function buildRailwayPredictionPayload(input: CropSuggestionRequest) {
   const defaultedFields: string[] = [];
   const soilMetrics = input.soilMetrics ?? {};
+  const n = readMetricOrDefault(soilMetrics.n, 80, 'N', defaultedFields);
+  const p = readMetricOrDefault(soilMetrics.p, 40, 'P', defaultedFields);
+  const k = readMetricOrDefault(soilMetrics.k, 40, 'K', defaultedFields);
+  const ph = readMetricOrDefault(soilMetrics.ph, 6.5, 'soil pH', defaultedFields);
+  const temperature = readMetricOrDefault(
+    input.weather.currentTemperatureC,
+    28,
+    'temperature',
+    defaultedFields,
+  );
+  const humidity = readMetricOrDefault(
+    input.weather.humidityPercent,
+    68,
+    'humidity',
+    defaultedFields,
+  );
+  const rainfall = readMetricOrDefault(
+    input.weather.rainfallExpectedMm,
+    10,
+    'rainfall',
+    defaultedFields,
+  );
 
   const payload = {
-    n: readMetricOrDefault(soilMetrics.n, 80, 'N', defaultedFields),
-    p: readMetricOrDefault(soilMetrics.p, 40, 'P', defaultedFields),
-    k: readMetricOrDefault(soilMetrics.k, 40, 'K', defaultedFields),
-    soil_ph: readMetricOrDefault(
-      soilMetrics.ph,
-      6.5,
-      'soil pH',
-      defaultedFields,
-    ),
-    temp: readMetricOrDefault(
-      input.weather.currentTemperatureC,
-      28,
-      'temperature',
-      defaultedFields,
-    ),
-    humidity: readMetricOrDefault(
-      input.weather.humidityPercent,
-      68,
-      'humidity',
-      defaultedFields,
-    ),
+    // Send the canonical ML feature names first so soil/weather changes
+    // consistently affect the live Railway model.
+    N: n,
+    P: p,
+    K: k,
+    temperature,
+    humidity,
+    ph,
+    rainfall,
+    // Keep the legacy aliases too because older deployments may still read them.
+    n,
+    p,
+    k,
+    temp: temperature,
+    soil_ph: ph,
+    rainfall_mm: rainfall,
   };
 
   return { payload, defaultedFields };
@@ -477,15 +499,167 @@ function mapRailwayCropNameToCatalog(
     cropCatalog.map((crop) => [crop.nameEn.trim().toLowerCase(), crop.nameEn]),
   );
   const normalizedCropName = cropName.trim().toLowerCase();
+
+  // Comprehensive alias map for Indian crop names the Railway model may return
   const aliases: Record<string, string> = {
+    // Rice / Paddy variants
     rice: 'paddy',
     paddy: 'paddy',
+    'rice (paddy)': 'paddy',
+    'paddy rice': 'paddy',
+    dhan: 'paddy',
+    sali: 'paddy',
+    boro: 'paddy',
+    // Wheat variants
     wheat: 'wheat',
+    gehun: 'wheat',
+    'bread wheat': 'wheat',
+    'durum wheat': 'wheat',
+    // Cotton variants
     cotton: 'cotton',
+    kapas: 'cotton',
+    kappas: 'cotton',
+    'bt cotton': 'cotton',
+    'american cotton': 'cotton',
+    'desi cotton': 'cotton',
+    // Maize / Corn
+    maize: 'maize',
+    corn: 'maize',
+    makka: 'maize',
+    'sweet corn': 'maize',
+    // Soybean
+    soybean: 'soybean',
+    soya: 'soybean',
+    soyabean: 'soybean',
+    'soya bean': 'soybean',
+    // Sugarcane
+    sugarcane: 'sugarcane',
+    ganna: 'sugarcane',
+    'sugar cane': 'sugarcane',
+    // Groundnut / Peanut
+    groundnut: 'groundnut',
+    peanut: 'groundnut',
+    moongfali: 'groundnut',
+    'ground nut': 'groundnut',
+    // Mustard / Rapeseed
+    mustard: 'mustard',
+    rapeseed: 'mustard',
+    'mustard rapeseed': 'mustard',
+    sarson: 'mustard',
+    raya: 'mustard',
+    // Chickpea / Gram
+    chickpea: 'chickpea',
+    gram: 'chickpea',
+    chana: 'chickpea',
+    'bengal gram': 'chickpea',
+    'kabuli chana': 'chickpea',
+    'desi chana': 'chickpea',
+    // Lentil
+    lentil: 'lentil',
+    masoor: 'lentil',
+    'red lentil': 'lentil',
+    // Pigeon pea / Toor dal
+    'pigeon pea': 'pigeon pea',
+    'tur dal': 'pigeon pea',
+    arhar: 'pigeon pea',
+    toor: 'pigeon pea',
+    'red gram': 'pigeon pea',
+    // Mung bean / Green gram
+    'mung bean': 'mung bean',
+    'green gram': 'mung bean',
+    moong: 'mung bean',
+    // Black gram / Urad
+    'black gram': 'black gram',
+    urad: 'black gram',
+    'urad dal': 'black gram',
+    // Sunflower
+    sunflower: 'sunflower',
+    surajmukhi: 'sunflower',
+    // Jute
+    jute: 'jute',
+    // Tobacco
+    tobacco: 'tobacco',
+    tambaku: 'tobacco',
+    // Barley
+    barley: 'barley',
+    jau: 'barley',
+    // Sorghum / Jowar
+    sorghum: 'sorghum',
+    jowar: 'sorghum',
+    'great millet': 'sorghum',
+    // Pearl millet / Bajra
+    'pearl millet': 'pearl millet',
+    bajra: 'pearl millet',
+    // Finger millet / Ragi
+    'finger millet': 'finger millet',
+    ragi: 'finger millet',
+    // Sesame
+    sesame: 'sesame',
+    til: 'sesame',
+    'sesame seed': 'sesame',
+    // Turmeric
+    turmeric: 'turmeric',
+    haldi: 'turmeric',
+    // Onion
+    onion: 'onion',
+    pyaz: 'onion',
+    'small onion': 'onion',
+    'big onion': 'onion',
+    // Potato
+    potato: 'potato',
+    aloo: 'potato',
+    // Tomato
+    tomato: 'tomato',
+    tamatar: 'tomato',
+    // Banana
+    banana: 'banana',
+    kela: 'banana',
+    // Mango
+    mango: 'mango',
+    aam: 'mango',
+    // Grape
+    grape: 'grape',
+    angoor: 'grape',
+    // Orange
+    orange: 'orange',
+    santra: 'orange',
+    // Coconut
+    coconut: 'coconut',
+    nariyal: 'coconut',
+    // Arecanut
+    arecanut: 'arecanut',
+    'areca nut': 'arecanut',
+    // Coffee
+    coffee: 'coffee',
+    // Tea
+    tea: 'tea',
+    chai: 'tea',
+    // Rubber
+    rubber: 'rubber',
   };
-  const alias = aliases[normalizedCropName] ?? normalizedCropName;
 
-  return catalogMap.get(alias) ?? null;
+  // 1. Check the alias map
+  const aliasTarget = aliases[normalizedCropName];
+  if (aliasTarget) {
+    const mapped = catalogMap.get(aliasTarget);
+    if (mapped) return mapped;
+  }
+
+  // 2. Direct catalog lookup
+  const direct = catalogMap.get(normalizedCropName);
+  if (direct) return direct;
+
+  // 3. Fuzzy: catalog name is contained in the model output or vice versa
+  for (const [catalogKey, catalogValue] of catalogMap) {
+    if (
+      normalizedCropName.includes(catalogKey) ||
+      catalogKey.includes(normalizedCropName)
+    ) {
+      return catalogValue;
+    }
+  }
+
+  return null;
 }
 
 function summarizeRailwayExplanation(value: string | null) {

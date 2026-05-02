@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type SoilType } from '../generated/prisma';
+import { type SoilType } from '@prisma/client';
 
 type SoilMetrics = {
   n?: number;
@@ -24,86 +24,87 @@ type SoilProfileResult = {
   assumptions: string[];
 };
 
-type SoilProxyProfile = {
+type SoilRangeProfile = {
   label: string;
-  n: number;
-  p: number;
-  k: number;
+  nRange: [number, number];
+  pRange: [number, number];
+  kRange: [number, number];
   ph: number;
   summary: string;
 };
 
-const SOIL_PROXY_PROFILES: Record<SoilType, SoilProxyProfile> = {
+const SOIL_PROXY_PROFILES: Record<SoilType, SoilRangeProfile> = {
   ALLUVIAL: {
     label: 'Alluvial',
-    n: 45,
-    p: 55,
-    k: 80,
+    nRange: [36, 54],
+    pRange: [46, 64],
+    kRange: [70, 90],
     ph: 7.2,
     summary:
-      'Using an alluvial-soil proxy with balanced fertility assumptions.',
+      'Using an alluvial-soil estimate based on typical N/P/K ranges and a representative pH.',
   },
   BLACK_REGUR: {
     label: 'Black (Regur)',
-    n: 40,
-    p: 35,
-    k: 85,
+    nRange: [30, 50],
+    pRange: [24, 46],
+    kRange: [76, 94],
     ph: 7.8,
     summary:
-      'Using a black-regur soil proxy with stronger potassium assumptions.',
+      'Using a black-regur estimate based on typical N/P/K ranges and a representative pH.',
   },
   RED: {
     label: 'Red',
-    n: 32,
-    p: 28,
-    k: 55,
+    nRange: [24, 40],
+    pRange: [18, 38],
+    kRange: [46, 64],
     ph: 6.4,
-    summary: 'Using a red-soil proxy with medium-low fertility assumptions.',
+    summary:
+      'Using a red-soil estimate based on typical N/P/K ranges and a representative pH.',
   },
   LATERITE: {
     label: 'Laterite',
-    n: 25,
-    p: 18,
-    k: 40,
+    nRange: [18, 32],
+    pRange: [12, 24],
+    kRange: [30, 50],
     ph: 5.6,
     summary:
-      'Using a laterite-soil proxy with lower fertility and more acidic assumptions.',
+      'Using a laterite-soil estimate based on typical N/P/K ranges and a representative pH.',
   },
   SANDY: {
     label: 'Sandy',
-    n: 20,
-    p: 22,
-    k: 30,
+    nRange: [12, 28],
+    pRange: [16, 28],
+    kRange: [20, 40],
     ph: 7.4,
     summary:
-      'Using a sandy-soil proxy with lower nutrient holding assumptions.',
+      'Using a sandy-soil estimate based on typical N/P/K ranges and a representative pH.',
   },
   CLAY_HEAVY: {
     label: 'Clay-heavy',
-    n: 48,
-    p: 38,
-    k: 75,
+    nRange: [38, 58],
+    pRange: [28, 48],
+    kRange: [64, 86],
     ph: 7.5,
     summary:
-      'Using a clay-heavy soil proxy with stronger moisture and potassium assumptions.',
+      'Using a clay-heavy estimate based on typical N/P/K ranges and a representative pH.',
   },
   LOAMY_MIXED: {
     label: 'Loamy / Mixed',
-    n: 42,
-    p: 45,
-    k: 65,
+    nRange: [34, 50],
+    pRange: [34, 56],
+    kRange: [56, 74],
     ph: 6.8,
     summary:
-      'Using a loamy mixed-soil proxy with moderate balanced fertility assumptions.',
+      'Using a loamy mixed-soil estimate based on typical N/P/K ranges and a representative pH.',
   },
   NOT_SURE: {
     label: 'Not sure',
-    n: 38,
-    p: 35,
-    k: 50,
+    nRange: [28, 48],
+    pRange: [24, 46],
+    kRange: [40, 60],
     ph: 6.8,
     summary:
-      'Using a broad mixed-soil proxy because soil type is not confirmed yet.',
+      'Using a broad mixed-soil estimate because soil type is not confirmed yet.',
   },
 };
 
@@ -131,6 +132,7 @@ export function resolveSoilProfile(input: {
   const savedSoilType = input.savedSoilType ?? null;
   const fallbackSoilType = selectedSoilType ?? savedSoilType ?? 'NOT_SURE';
   const proxyProfile = SOIL_PROXY_PROFILES[fallbackSoilType];
+  const proxyMetrics = pickProxyMetrics(proxyProfile);
 
   if (hasManualMetric) {
     const missingFields = (['n', 'p', 'k', 'ph'] as const).filter(
@@ -140,21 +142,21 @@ export function resolveSoilProfile(input: {
     const assumptions = hasExactAdvancedMetrics
       ? ['Using your exact advanced soil values.']
       : [
-          `Using your advanced soil values with ${proxyProfile.label.toLowerCase()} estimates for ${joinLabels(missingFields.map(toMetricLabel))}.`,
+          `Using your advanced soil values with ${proxyProfile.label.toLowerCase()} fallback estimates for ${joinLabels(missingFields.map(toMetricLabel))}.`,
         ];
 
     return {
       soilMetrics: {
-        n: manualMetrics.n ?? proxyProfile.n,
-        p: manualMetrics.p ?? proxyProfile.p,
-        k: manualMetrics.k ?? proxyProfile.k,
-        ph: manualMetrics.ph ?? proxyProfile.ph,
+        n: manualMetrics.n ?? proxyMetrics.n,
+        p: manualMetrics.p ?? proxyMetrics.p,
+        k: manualMetrics.k ?? proxyMetrics.k,
+        ph: manualMetrics.ph ?? proxyMetrics.ph,
       },
       soilType: selectedSoilType ?? savedSoilType,
       source: 'ADVANCED_METRICS',
       summary: hasExactAdvancedMetrics
         ? 'Using your exact advanced soil values.'
-        : `Using your advanced soil values with ${proxyProfile.label.toLowerCase()} estimates for missing fields.`,
+        : `Using your advanced soil values with ${proxyProfile.label.toLowerCase()} range-based nutrient fallbacks for missing fields.`,
       inputConfidence: hasExactAdvancedMetrics
         ? 'HIGH'
         : fallbackSoilType === 'NOT_SURE'
@@ -172,7 +174,7 @@ export function resolveSoilProfile(input: {
       summary: proxyProfile.summary,
       inputConfidence: selectedSoilType === 'NOT_SURE' ? 'LOW' : 'MEDIUM',
       assumptions: [
-        `Using the selected ${proxyProfile.label.toLowerCase()} soil profile as a proxy.`,
+        `Using the selected ${proxyProfile.label.toLowerCase()} soil profile with N/P/K midpoint estimates from its typical range.`,
       ],
     };
   }
@@ -185,7 +187,7 @@ export function resolveSoilProfile(input: {
       summary: `Using the saved ${proxyProfile.label.toLowerCase()} soil profile for this plot.`,
       inputConfidence: savedSoilType === 'NOT_SURE' ? 'LOW' : 'MEDIUM',
       assumptions: [
-        `Using the saved ${proxyProfile.label.toLowerCase()} soil type from this plot.`,
+        `Using the saved ${proxyProfile.label.toLowerCase()} soil type from this plot with N/P/K midpoint estimates from its typical range.`,
       ],
     };
   }
@@ -197,18 +199,22 @@ export function resolveSoilProfile(input: {
     summary: proxyProfile.summary,
     inputConfidence: 'LOW',
     assumptions: [
-      'Soil type is not confirmed yet, so the prediction is using a broad mixed-soil proxy.',
+      'Soil type is not confirmed yet, so the prediction is using a broad mixed-soil midpoint estimate.',
     ],
   };
 }
 
-function pickProxyMetrics(profile: SoilProxyProfile) {
+function pickProxyMetrics(profile: SoilRangeProfile) {
   return {
-    n: profile.n,
-    p: profile.p,
-    k: profile.k,
+    n: pickRangeMidpoint(profile.nRange),
+    p: pickRangeMidpoint(profile.pRange),
+    k: pickRangeMidpoint(profile.kRange),
     ph: profile.ph,
   };
+}
+
+function pickRangeMidpoint([min, max]: [number, number]) {
+  return Math.round((min + max) / 2);
 }
 
 function toMetricLabel(metric: 'n' | 'p' | 'k' | 'ph') {

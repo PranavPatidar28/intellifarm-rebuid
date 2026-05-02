@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { FarmPlot } from '../generated/prisma';
+import type { FarmPlot } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import {

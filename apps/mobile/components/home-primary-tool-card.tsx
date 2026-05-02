@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ArrowRight } from 'lucide-react-native';
 
+import { MotionPressable } from '@/components/motion-pressable';
 import { palette, radii, shadow, spacing, typography } from '@/theme/tokens';
 
 type HomePrimaryToolTone = 'prediction' | 'diagnosis';
@@ -36,17 +37,13 @@ export function HomePrimaryToolCard({
         };
 
   return (
-    <Pressable
+    <MotionPressable
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={{
         flex: 1,
         minWidth: 144,
-        opacity: pressed ? 0.97 : 1,
-        transform: [{ scale: pressed ? 0.99 : 1 }],
-      })}
-    >
-      <View
-        style={{
+      }}
+      contentStyle={{
           height: 108,
           overflow: 'hidden',
           paddingHorizontal: spacing.md,
@@ -109,7 +106,6 @@ export function HomePrimaryToolCard({
             {title}
           </Text>
         </View>
-      </View>
-    </Pressable>
+      </MotionPressable>
   );
 }

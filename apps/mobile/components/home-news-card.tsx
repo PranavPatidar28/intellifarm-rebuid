@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import {
   ArrowRight,
@@ -12,6 +12,7 @@ import {
 
 import { InsetCard } from '@/components/inset-card';
 import { MetricBadge } from '@/components/metric-badge';
+import { MotionPressable } from '@/components/motion-pressable';
 import type { HomeNewsItem } from '@/lib/home-news';
 import { palette, radii, spacing, typography } from '@/theme/tokens';
 
@@ -60,14 +61,13 @@ export function HomeNewsCard({
             </Text>
           </View>
 
-          <Pressable
+          <MotionPressable
             onPress={onViewAllAlerts}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.72 : 1,
+            contentStyle={{
               flexDirection: 'row',
               alignItems: 'center',
               gap: 4,
-            })}
+            }}
           >
             <Text
               style={{
@@ -79,16 +79,12 @@ export function HomeNewsCard({
               All alerts
             </Text>
             <ArrowRight color={palette.inkSoft} size={14} />
-          </Pressable>
+          </MotionPressable>
         </View>
 
         {leadItem ? (
-          <Pressable
+          <MotionPressable
             onPress={() => onOpenItem(leadItem)}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.92 : 1,
-              transform: [{ scale: pressed ? 0.994 : 1 }],
-            })}
           >
             <View
               style={{
@@ -160,7 +156,7 @@ export function HomeNewsCard({
                 {leadItem.summary}
               </Text>
             </View>
-          </Pressable>
+          </MotionPressable>
         ) : (
           <View
             style={{
@@ -193,12 +189,9 @@ export function HomeNewsCard({
         {supportingItems.length ? (
           <View style={{ gap: spacing.xs }}>
             {supportingItems.map((item) => (
-              <Pressable
+              <MotionPressable
                 key={item.id}
                 onPress={() => onOpenItem(item)}
-                style={({ pressed }) => ({
-                  opacity: pressed ? 0.88 : 1,
-                })}
               >
                 <View
                   style={{
@@ -250,7 +243,7 @@ export function HomeNewsCard({
                   </View>
                   <ArrowRight color={palette.inkMuted} size={14} />
                 </View>
-              </Pressable>
+              </MotionPressable>
             ))}
           </View>
         ) : null}

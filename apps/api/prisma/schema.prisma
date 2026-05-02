@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -140,11 +139,6 @@ enum PredictionStatus {
   FAILED
 }
 
-enum AssistantMessageRole {
-  USER
-  ASSISTANT
-}
-
 enum DiseaseCaptureMode {
   STANDARD
   CAMERA_DUAL_ANGLE
@@ -171,7 +165,6 @@ model User {
   sessions          AuthSession[]
   farmPlots         FarmPlot[]
   diseaseReports    DiseaseReport[]
-  assistantThreads  AssistantThread[]
   communityPostLikes CommunityPostLike[]
   communityPosts    CommunityPost[]
   communityReplies  CommunityReply[]
@@ -581,31 +574,4 @@ model PredictionRun {
   @@index([userId, type, createdAt(sort: Desc)])
   @@index([farmPlotId, createdAt(sort: Desc)])
   @@index([cropSeasonId, createdAt(sort: Desc)])
-}
-
-model AssistantThread {
-  id          String             @id @default(uuid())
-  userId      String
-  title       String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages    AssistantMessage[]
-
-  @@index([userId, updatedAt(sort: Desc)])
-}
-
-model AssistantMessage {
-  id          String               @id @default(uuid())
-  threadId    String
-  role        AssistantMessageRole
-  content     String
-  attachments Json?
-  sources     Json?
-  safetyFlags Json?
-  responseMeta Json?
-  createdAt   DateTime             @default(now())
-  thread      AssistantThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
-
-  @@index([threadId, createdAt])
 }

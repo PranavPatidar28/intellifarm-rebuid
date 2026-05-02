@@ -36,6 +36,8 @@ export function useCachedQuery<TData>({
       return data;
     },
     initialData: cached?.data,
+    initialDataUpdatedAt: cached?.savedAt ? Date.parse(cached.savedAt) : undefined,
+    refetchOnMount: options.refetchOnMount ?? (cached ? 'always' : true),
     ...options,
   });
 

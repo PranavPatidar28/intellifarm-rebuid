@@ -1,5 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { MotionPressable } from '@/components/motion-pressable';
 import { palette, radii, spacing, typography } from '@/theme/tokens';
 
 export function FilterChipRow<T extends string>({
@@ -17,10 +18,10 @@ export function FilterChipRow<T extends string>({
         const active = option.value === value;
 
         return (
-          <Pressable
+          <MotionPressable
             key={option.value}
             onPress={() => onChange(option.value)}
-            style={{
+            contentStyle={{
               paddingHorizontal: spacing.md,
               paddingVertical: 9,
               borderRadius: radii.pill,
@@ -38,7 +39,7 @@ export function FilterChipRow<T extends string>({
             >
               {option.label}
             </Text>
-          </Pressable>
+          </MotionPressable>
         );
       })}
     </View>

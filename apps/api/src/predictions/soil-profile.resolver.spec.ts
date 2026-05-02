@@ -37,6 +37,8 @@ describe('resolveSoilProfile', () => {
       k: 85,
       ph: 7.8,
     });
+    expect(result.summary).toContain('typical N/P/K ranges');
+    expect(result.assumptions[0]).toContain('midpoint estimates');
   });
 
   it('falls back to a broad default profile when soil is unknown', () => {
@@ -51,6 +53,7 @@ describe('resolveSoilProfile', () => {
       k: 50,
       ph: 6.8,
     });
+    expect(result.assumptions[0]).toContain('midpoint estimate');
   });
 
   it('fills missing advanced metrics from the chosen proxy profile', () => {
@@ -70,6 +73,7 @@ describe('resolveSoilProfile', () => {
       k: 40,
       ph: 5.6,
     });
+    expect(result.summary).toContain('range-based nutrient fallbacks');
     expect(result.assumptions[0]).toContain('laterite');
   });
 });

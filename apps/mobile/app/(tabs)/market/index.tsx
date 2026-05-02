@@ -23,7 +23,7 @@ import { useSession } from '@/features/session/session-provider';
 export default function MarketRoute() {
   const router = useRouter();
   const { profile } = useSession();
-  const [tradeMode, setTradeMode] = useState<MarketTradeMode>('sell');
+  const [tradeMode, setTradeMode] = useState<MarketTradeMode>('buy');
   const [view, setView] = useState<MarketExplorerView>('crops');
   const [searchText, setSearchText] = useState('');
   const [selectedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');

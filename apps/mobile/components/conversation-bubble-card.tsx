@@ -23,10 +23,18 @@ export function ConversationBubbleCard({
   mediaHeaders?: Record<string, string>;
 }) {
   const assistant = message.role === 'ASSISTANT';
+  const answer =
+    typeof message.answer === 'string' && message.answer.trim()
+      ? message.answer
+      : message.content;
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const sources = Array.isArray(message.sources) ? message.sources : [];
+  const actionCards = Array.isArray(message.actionCards) ? message.actionCards : [];
+  const safetyLevel = message.safetyLevel ?? 'INFO';
   const safetyTone =
-    message.safetyLevel === 'ESCALATE'
+    safetyLevel === 'ESCALATE'
       ? palette.terracotta
-      : message.safetyLevel === 'CAUTION'
+      : safetyLevel === 'CAUTION'
         ? palette.mustard
         : palette.sky;
 
@@ -100,12 +108,12 @@ export function ConversationBubbleCard({
               />
             ) : null}
             <Chip
-              label={message.safetyLevel.toLowerCase()}
+              label={safetyLevel.toLowerCase()}
               color={assistant ? safetyTone : palette.white}
               backgroundColor={
-                message.safetyLevel === 'ESCALATE'
+                safetyLevel === 'ESCALATE'
                   ? palette.terracottaSoft
-                  : message.safetyLevel === 'CAUTION'
+                  : safetyLevel === 'CAUTION'
                     ? palette.mustardSoft
                     : palette.skySoft
               }
@@ -122,12 +130,12 @@ export function ConversationBubbleCard({
             lineHeight: 21,
           }}
         >
-          {assistant ? message.answer : message.content}
+          {assistant ? answer : message.content}
         </Text>
 
-        {message.attachments.length ? (
+        {attachments.length ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {message.attachments.map((attachment) => (
+            {attachments.map((attachment) => (
               <View
                 key={`${message.id}-${attachment.url}`}
                 style={{
@@ -151,9 +159,9 @@ export function ConversationBubbleCard({
           </View>
         ) : null}
 
-        {assistant && message.sources.length ? (
+        {assistant && sources.length ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-            {message.sources.map((source) => (
+            {sources.map((source) => (
               <Chip
                 key={`${message.id}-${source.type}-${source.referenceId ?? source.label}`}
                 label={source.label}
@@ -164,9 +172,9 @@ export function ConversationBubbleCard({
           </View>
         ) : null}
 
-        {assistant && message.actionCards.length ? (
+        {assistant && actionCards.length ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {message.actionCards.map((card) => (
+            {actionCards.map((card) => (
               <Button
                 key={`${message.id}-${card.ctaRoute}-${card.ctaLabel}`}
                 label={card.ctaLabel}

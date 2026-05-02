@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Image } from 'expo-image';
 import { Bookmark, Heart, Lock, MessageCircle, Sprout } from 'lucide-react-native';
 
 import { FarmerAvatar } from '@/components/farmer-avatar';
 import { InsetCard } from '@/components/inset-card';
+import { MotionPressable } from '@/components/motion-pressable';
 import type { CommunityPost } from '@/lib/api-types';
 import { formatRelativeTime } from '@/lib/format';
 import {
@@ -192,7 +193,13 @@ export function CommunityPostCard({
           />
         ) : null}
 
-        {onPress ? <Pressable onPress={onPress}>{content}</Pressable> : content}
+        {onPress ? (
+          <MotionPressable onPress={onPress} pressedOpacity={0.98} pressedScale={0.994}>
+            {content}
+          </MotionPressable>
+        ) : (
+          content
+        )}
 
         {hasActions || footer ? (
           <View
@@ -347,13 +354,10 @@ function PostActionButton({
   const colors = getActionTone(tone, active);
 
   return (
-    <Pressable
+    <MotionPressable
       onPress={onPress}
       disabled={busy}
-      style={({ pressed }) => ({
-        opacity: busy ? 0.72 : 1,
-        transform: [{ scale: pressed ? 0.985 : 1 }],
-      })}
+      pressedOpacity={0.96}
     >
       <View
         style={{
@@ -375,11 +379,11 @@ function PostActionButton({
             fontFamily: typography.bodyStrong,
             fontSize: 11,
           }}
-        >
-          {label}
-        </Text>
-      </View>
-    </Pressable>
+          >
+            {label}
+          </Text>
+        </View>
+    </MotionPressable>
   );
 }
 

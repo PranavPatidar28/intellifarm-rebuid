@@ -1,5 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { MotionPressable } from '@/components/motion-pressable';
 import { palette, radii, spacing, typography } from '@/theme/tokens';
 
 export function ExpenseScopeSwitch<T extends string>({
@@ -25,11 +26,13 @@ export function ExpenseScopeSwitch<T extends string>({
         const active = option.value === value;
 
         return (
-          <Pressable
+          <MotionPressable
             key={option.value}
             onPress={() => onChange(option.value)}
             style={{
               flex: 1,
+            }}
+            contentStyle={{
               minHeight: 48,
               alignItems: 'center',
               justifyContent: 'center',
@@ -46,7 +49,7 @@ export function ExpenseScopeSwitch<T extends string>({
             >
               {option.label}
             </Text>
-          </Pressable>
+          </MotionPressable>
         );
       })}
     </View>

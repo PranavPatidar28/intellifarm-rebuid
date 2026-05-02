@@ -12,7 +12,7 @@ import { palette, radii, spacing, typography } from '@/theme/tokens';
 
 function formatCurrencyCompact(value: number) {
   if (Math.abs(value) >= 1000) {
-    return `Rs ${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
+    return `₹ ${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
   }
 
   return formatCurrency(value);

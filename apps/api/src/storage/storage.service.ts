@@ -45,7 +45,6 @@ export class StorageService {
       'profile-photos',
       'community-posts',
       'expense-receipts',
-      'assistant-attachments',
     ]);
 
     if (!allowedFolders.has(folder)) {
@@ -58,6 +57,23 @@ export class StorageService {
       if (!isOwned) {
         throw new NotFoundException('Media file not found');
       }
+    }
+
+    const absolutePath = join(this.getUploadRoot(), folder, filename);
+    await access(absolutePath, constants.R_OK).catch(() => {
+      throw new NotFoundException('Media file not found');
+    });
+
+    return absolutePath;
+  }
+
+  async getPublicFilePath(folder: string, filename: string) {
+    const allowedFolders = new Set([
+      'disease-reports',
+    ]);
+
+    if (!allowedFolders.has(folder)) {
+      throw new NotFoundException('Media file not found');
     }
 
     const absolutePath = join(this.getUploadRoot(), folder, filename);
@@ -133,25 +149,6 @@ export class StorageService {
       return Boolean(expense);
     }
 
-    if (folder === 'assistant-attachments') {
-      const assistantMessages = await this.prisma.assistantMessage.findMany({
-        where: {
-          thread: {
-            userId,
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        select: { attachments: true },
-      });
-
-      return assistantMessages.some((message) =>
-        parseAssistantMediaUrls(message.attachments).some(
-          (attachmentUrl) =>
-            attachmentUrl === mediaUrl || attachmentUrl.endsWith(mediaSuffix),
-        ),
-      );
-    }
-
     const report = await this.prisma.diseaseReport.findFirst({
       where: {
         userId,
@@ -188,19 +185,4 @@ export class StorageService {
   private getMediaUrl(folder: string, filename: string) {
     return `${this.getPublicBaseUrl()}/${folder}/${filename}`;
   }
-}
-
-function parseAssistantMediaUrls(value: unknown) {
-  return Array.isArray(value)
-    ? value
-        .map((item) =>
-          item &&
-          typeof item === 'object' &&
-          'url' in item &&
-          typeof item.url === 'string'
-            ? item.url
-            : null,
-        )
-        .filter((url): url is string => Boolean(url))
-    : [];
 }

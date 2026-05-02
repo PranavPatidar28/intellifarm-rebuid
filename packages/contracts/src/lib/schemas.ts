@@ -833,6 +833,7 @@ export const cropPredictionSeasonClimateSchema = z.object({
   averageHumidityPercent: z.number(),
   totalRainfallMm: z.number(),
   label: z.string(),
+  locationLabel: z.string(),
 });
 
 export const cropSuggestionPredictionResponseSchema = z.object({

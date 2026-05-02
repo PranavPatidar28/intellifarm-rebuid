@@ -1,9 +1,10 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ArrowRight, FileHeart } from 'lucide-react-native';
 
 import { InsetCard } from '@/components/inset-card';
 import { MetricBadge } from '@/components/metric-badge';
+import { MotionPressable } from '@/components/motion-pressable';
 import type { HomeSchemeHighlight } from '@/lib/home-news';
 import { palette, radii, spacing, typography } from '@/theme/tokens';
 
@@ -123,11 +124,8 @@ export function HomeSchemeCard({
             </Text>
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-              <Pressable
+              <MotionPressable
                 onPress={onOpenScheme}
-                style={({ pressed }) => ({
-                  opacity: pressed ? 0.88 : 1,
-                })}
               >
                 <View
                   style={{
@@ -154,13 +152,10 @@ export function HomeSchemeCard({
                   </Text>
                   <ArrowRight color={palette.ink} size={14} />
                 </View>
-              </Pressable>
+              </MotionPressable>
 
-              <Pressable
+              <MotionPressable
                 onPress={onViewAllSchemes}
-                style={({ pressed }) => ({
-                  opacity: pressed ? 0.88 : 1,
-                })}
               >
                 <View
                   style={{
@@ -185,7 +180,7 @@ export function HomeSchemeCard({
                     View all schemes
                   </Text>
                 </View>
-              </Pressable>
+              </MotionPressable>
             </View>
           </>
         ) : (
@@ -210,11 +205,8 @@ export function HomeSchemeCard({
               Browse current scheme options for your crop and location whenever you want to explore official support.
             </Text>
             <View style={{ flexDirection: 'row' }}>
-              <Pressable
+              <MotionPressable
                 onPress={onViewAllSchemes}
-                style={({ pressed }) => ({
-                  opacity: pressed ? 0.88 : 1,
-                })}
               >
                 <View
                   style={{
@@ -241,7 +233,7 @@ export function HomeSchemeCard({
                   </Text>
                   <ArrowRight color={palette.inkSoft} size={14} />
                 </View>
-              </Pressable>
+              </MotionPressable>
             </View>
           </View>
         )}

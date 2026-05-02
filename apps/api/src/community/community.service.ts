@@ -10,7 +10,7 @@ import {
   type CommunityReportReason,
   type CommunityReportTarget,
   type CropSeasonStatus,
-} from '../generated/prisma';
+} from '@prisma/client';
 
 import type { AuthUser } from '../common/types/authenticated-request';
 import { NotificationsService } from '../notifications/notifications.service';

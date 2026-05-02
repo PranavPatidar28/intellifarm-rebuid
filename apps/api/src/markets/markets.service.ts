@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { Facility, MarketRecord as PrismaMarketRecord } from '../generated/prisma';
+import type { Facility, MarketRecord as PrismaMarketRecord } from '@prisma/client';
 
 import { diffInDays } from '../common/utils/date.util';
 import { haversineDistanceKm } from '../common/utils/geo.util';

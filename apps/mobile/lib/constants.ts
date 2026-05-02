@@ -48,6 +48,8 @@ export const assistantPrompts = [
 
 export const storageKeys = {
   language: 'intellifarm.language',
+  assistantConversations: 'intellifarm.assistant-conversations',
+  assistantActiveConversationId: 'intellifarm.assistant-active-conversation-id',
   selectedSeasonId: 'intellifarm.selected-season-id',
   pendingDiseaseReports: 'intellifarm.pending-disease-reports',
   communityComposerDraft: 'intellifarm.community-composer-draft',

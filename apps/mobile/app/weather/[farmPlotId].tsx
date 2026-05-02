@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react';
 import { Text, View } from 'react-native';
 
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,20 +11,64 @@ import { SunriseCard } from '@/components/sunrise-card';
 import { WeatherHeroCard } from '@/components/weather-hero-card';
 import { useSession } from '@/features/session/session-provider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
+import { useDeviceLocation } from '@/hooks/use-device-location';
 import { apiGet } from '@/lib/api';
 import type { WeatherResponse } from '@/lib/api-types';
 import { palette, spacing, typography } from '@/theme/tokens';
 
 export default function WeatherRoute() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ farmPlotId: string }>();
+  const params = useLocalSearchParams<{
+    farmPlotId: string;
+    latitude?: string;
+    longitude?: string;
+  }>();
   const { token } = useSession();
+  const { location, refreshLocation } = useDeviceLocation();
+
+  useEffect(() => {
+    void refreshLocation();
+  }, [refreshLocation]);
+
+  const liveLocation = useMemo(() => {
+    if (location) {
+      return location;
+    }
+
+    const latitude =
+      typeof params.latitude === 'string' ? Number.parseFloat(params.latitude) : Number.NaN;
+    const longitude =
+      typeof params.longitude === 'string' ? Number.parseFloat(params.longitude) : Number.NaN;
+
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      return { latitude, longitude };
+    }
+
+    return null;
+  }, [location, params.latitude, params.longitude]);
+
+  const weatherQueryString = useMemo(() => {
+    if (!liveLocation) {
+      return '';
+    }
+
+    const query = new URLSearchParams({
+      latitude: String(liveLocation.latitude),
+      longitude: String(liveLocation.longitude),
+    });
+
+    return `?${query.toString()}`;
+  }, [liveLocation]);
 
   const weatherQuery = useCachedQuery({
-    cacheKey: `weather:${params.farmPlotId}`,
-    queryKey: ['weather', token, params.farmPlotId],
+    cacheKey: `weather:${params.farmPlotId}:${liveLocation?.latitude ?? 'na'}:${liveLocation?.longitude ?? 'na'}`,
+    queryKey: ['weather', token, params.farmPlotId, liveLocation?.latitude, liveLocation?.longitude],
     enabled: Boolean(token && params.farmPlotId),
-    queryFn: () => apiGet<WeatherResponse>(`/farm-plots/${params.farmPlotId}/weather`, token),
+    queryFn: () =>
+      apiGet<WeatherResponse>(
+        `/farm-plots/${params.farmPlotId}/weather${weatherQueryString}`,
+        token,
+      ),
   });
 
   const weather = weatherQuery.data?.weather;

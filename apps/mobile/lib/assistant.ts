@@ -9,7 +9,8 @@ export type AssistantChatMessage = {
 };
 
 type AssistantChatResponse = {
-  reply: string;
+  role: string;
+  content: string;
 };
 
 export async function sendAssistantMessage(input: {
@@ -17,20 +18,20 @@ export async function sendAssistantMessage(input: {
   message: string;
   history: AssistantChatMessage[];
 }) {
-  const history = input.history
+  const messages = input.history
     .filter((item) => !item.pending && item.text.trim().length > 0)
-    .slice(-20)
     .map((item) => ({
-      role: item.role === 'assistant' ? 'model' : 'user',
-      text: item.text,
+      role: item.role,
+      content: item.text,
     }));
 
-  return apiPost<AssistantChatResponse>(
+  const result = await apiPost<AssistantChatResponse>(
     '/assistant/chat',
     {
-      message: input.message,
-      history,
+      messages,
     },
     input.token,
   );
+
+  return { reply: result.content || '' };
 }

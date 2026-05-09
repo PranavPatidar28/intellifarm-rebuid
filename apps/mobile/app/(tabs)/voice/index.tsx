@@ -1086,7 +1086,11 @@ function normalizeRouteParam(value?: string | string[]) {
   return value ?? '';
 }
 
-function splitMessageBlocks(text: string) {
+function splitMessageBlocks(text?: string | null) {
+  if (!text) {
+    return [{ type: 'paragraph' as const, text: '' }];
+  }
+
   const normalized = text.replace(/\r\n/g, '\n').trim();
 
   if (!normalized) {

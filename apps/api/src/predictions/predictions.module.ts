@@ -55,5 +55,6 @@ import { SoilProfileResolver } from './soil-profile.resolver';
       },
     },
   ],
+  exports: [PredictionsService],
 })
 export class PredictionsModule {}

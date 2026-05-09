@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No automated web tests configured yet\"",
+    "test": "node --experimental-strip-types --test 'src/**/*.spec.ts'",
     "format": "prettier --check ."
   },
   "dependencies": {

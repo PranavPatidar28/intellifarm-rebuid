@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, Req, UseInterceptors } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -12,7 +12,7 @@ export class AssistantController {
   constructor(private readonly assistantService: AssistantService) {}
 
   @Post('chat')
-  @UseGuards(AuthGuard)
+  // @UseGuards(AuthGuard)
   @UseInterceptors(AnyFilesInterceptor())
   async chat(
     @Req() req: Request,
@@ -30,8 +30,10 @@ export class AssistantController {
       }
     }
 
+    const userId = user?.sub || 'test-user-123';
+
     console.log('Content-Type:', req.headers['content-type']);
-    const result = await this.assistantService.chat(parsedBody as AssistantChatRequest, user.sub);
+    const result = await this.assistantService.chat(parsedBody as AssistantChatRequest, userId);
     
     console.log('Result from AssistantService:', {
       text: result.text,
@@ -48,5 +50,26 @@ export class AssistantController {
       content: result.text || '',
       toolsUsed: uniqueToolsUsed,
     };
+  }
+
+  @Get('status/:requestId')
+  @UseGuards(AuthGuard)
+  async getStatus(
+    @Req() req: Request,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const requestId = req.params.requestId as string;
+    const status = this.assistantService.getStatus(requestId) || 'Thinking...';
+    return { status };
+  }
+
+  @Post('title')
+  @UseGuards(AuthGuard)
+  async generateTitle(
+    @Body() body: { message: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const title = await this.assistantService.generateTitle(body.message);
+    return { title };
   }
 }

@@ -21,6 +21,7 @@ import type { AssistantChatRequest } from './assistant.schemas';
 @Injectable()
 export class AssistantService {
   private readonly logger = new Logger(AssistantService.name);
+  private statusMap = new Map<string, { text: string; timestamp: number }>();
 
   constructor(
     private readonly configService: ConfigService,
@@ -30,7 +31,25 @@ export class AssistantService {
     private readonly diseaseReportsService: DiseaseReportsService,
     @Inject(DISEASE_PROVIDER)
     private readonly diseaseProvider: DiseaseProvider,
-  ) {}
+  ) {
+    // Periodically clean up old statuses
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, value] of this.statusMap.entries()) {
+        if (now - value.timestamp > 5 * 60 * 1000) { // 5 minutes
+          this.statusMap.delete(key);
+        }
+      }
+    }, 60 * 1000);
+  }
+
+  setStatus(requestId: string, status: string) {
+    this.statusMap.set(requestId, { text: status, timestamp: Date.now() });
+  }
+
+  getStatus(requestId: string) {
+    return this.statusMap.get(requestId)?.text;
+  }
 
   async chat(payload: AssistantChatRequest, userId: string): Promise<any> {
     const apiKey =
@@ -54,6 +73,10 @@ export class AssistantService {
         throw new BadRequestException('Messages array is required');
       }
 
+      if (payload.requestId) {
+        this.setStatus(payload.requestId, 'Analyzing request...');
+      }
+
       // Vercel AI SDK frontend sends UIMessage with `parts`, but streamText expects ModelMessage with `content`.
       // We map it manually here.
       const mappedMessages = payload.messages.map((msg: any) => ({
@@ -69,9 +92,8 @@ Always check the user's data before giving specific advice.
 
 Multi-modal capabilities:
 - You can see images sent by the user.
-- If a user sends an image of a crop and asks about a disease, use your internal vision capabilities to describe what you see.
-- IMPORTANT: For a formal, scientifically-backed diagnosis using our proprietary AI model, use the 'diagnoseDisease' tool.
-- If the user has sent an image in the current conversation, you can trigger this tool. Use 'LATEST' for the image fields if you want to use the most recent image(s) provided by the user.
+- IMPORTANT: If a user sends an image of a crop and asks about a disease, pest, or what is wrong, you MUST ALWAYS use the 'diagnoseDisease' tool. DO NOT try to diagnose it using your own internal vision capabilities.
+- Set both 'diseasedImageBase64' and 'healthyImageBase64' parameters to the literal string 'LATEST' to route the user's uploaded images to the tool.
 
 Crop Prediction:
 - If a user asks what they should grow, use the 'predictCropSuitability' tool. This uses our own crop prediction model.
@@ -93,6 +115,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
             description: 'Get a list of all farms belonging to the user',
             parameters: z.object({}),
             execute: async () => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Accessing farm profiles...');
               return await this.prisma.farmPlot.findMany({
                 where: { userId },
               });
@@ -102,6 +125,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
             description: 'Get all active crop seasons for the user',
             parameters: z.object({}),
             execute: async () => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Loading active crop seasons...');
               return await this.prisma.cropSeason.findMany({
                 where: {
                   farmPlot: { userId },
@@ -119,6 +143,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
               farmPlotId: z.string().describe('The ID of the farm plot'),
             }),
             execute: async ({ farmPlotId }: { farmPlotId: string }) => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Checking live weather conditions...');
               return await this.prisma.weatherSnapshot.findFirst({
                 where: { farmPlotId },
                 orderBy: { createdAt: 'desc' },
@@ -132,6 +157,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
               state: z.string().describe('The state (e.g., Punjab, Haryana)'),
             }),
             execute: async ({ cropName, state }: { cropName: string; state: string }) => {
+              if (payload.requestId) this.setStatus(payload.requestId, `Fetching market prices for ${cropName}...`);
               return await this.prisma.marketRecord.findMany({
                 where: {
                   cropName: { contains: cropName, mode: 'insensitive' },
@@ -148,6 +174,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
               cropSeasonId: z.string().describe('The ID of the crop season'),
             }),
             execute: async ({ cropSeasonId }: { cropSeasonId: string }) => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Retrieving pending crop tasks...');
               return await this.prisma.cropTask.findMany({
                 where: {
                   cropSeasonId,
@@ -164,6 +191,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
               cropSeasonId: z.string().describe('The ID of the active crop season'),
             }),
             execute: async ({ cropSeasonId }: { cropSeasonId: string }) => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Running agronomic advisory rules...');
               const season = await this.prisma.cropSeason.findUnique({
                 where: { id: cropSeasonId },
                 include: { farmPlot: true },
@@ -202,6 +230,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
               cropSeasonId: z.string().optional().describe('Filter expenses by crop season ID'),
             }),
             execute: async ({ cropSeasonId }: { cropSeasonId?: string }) => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Loading financial records...');
               return await this.prisma.expenseEntry.findMany({
                 where: {
                   userId,
@@ -216,6 +245,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
             description: 'Get expense budgets for the users active crop seasons',
             parameters: z.object({}),
             execute: async () => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Loading crop budgets...');
               return await this.prisma.expenseBudget.findMany({
                 where: {
                   cropSeason: {
@@ -233,6 +263,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
             description: 'Get recent active alerts for the user',
             parameters: z.object({}),
             execute: async () => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Checking active notifications...');
               return await this.prisma.alert.findMany({
                 where: {
                   userId,
@@ -252,6 +283,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
               season: z.enum(['KHARIF', 'RABI', 'ZAID', 'CUSTOM']).optional(),
             }),
             execute: async ({ farmPlotId, state, irrigationType, season }: { farmPlotId?: string; state?: string; irrigationType?: any; season?: any }) => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Running crop prediction model...');
               return await this.predictionsService.predictCropSuggestions(userId, {
                 farmPlotId,
                 explorerContext: state ? {
@@ -274,6 +306,7 @@ The current date is ${new Date().toLocaleDateString()}.`,
               userNote: z.string().optional().describe('Users observation about the disease'),
             }),
             execute: async ({ cropName, diseasedImageBase64, healthyImageBase64, userNote }: { cropName: string; diseasedImageBase64: string; healthyImageBase64?: string; userNote?: string }) => {
+              if (payload.requestId) this.setStatus(payload.requestId, 'Analyzing images for disease markers...');
               let diseasedB64 = diseasedImageBase64;
               let healthyB64 = healthyImageBase64;
 
@@ -318,6 +351,37 @@ The current date is ${new Date().toLocaleDateString()}.`,
         `Gemini chat failed. ${error instanceof Error ? error.message : String(error)}`,
       );
       throw new BadGatewayException('Gemini request failed');
+    }
+  }
+
+  async generateTitle(message: string): Promise<string> {
+    const apiKey =
+      this.configService.get<string>('GEMINI_API_KEY') ||
+      this.configService.get<string>('AI_ASSISTANT_API_KEY');
+
+    if (!apiKey) {
+      throw new ServiceUnavailableException('Gemini API key is not configured');
+    }
+
+    const modelName =
+      this.configService.get<string>('AI_ASSISTANT_MODEL') ||
+      'gemini-1.5-flash';
+
+    const google = createGoogleGenerativeAI({
+      apiKey,
+    });
+
+    try {
+      const result = await generateText({
+        model: google(modelName),
+        system: "You are a title generator. Generate a very short (max 4-5 words) description of the user's request. Return ONLY the title, no quotes or extra text.",
+        prompt: message,
+      });
+
+      return result.text || 'New conversation';
+    } catch (error) {
+      this.logger.warn(`Failed to generate title: ${error}`);
+      return 'New conversation';
     }
   }
 }

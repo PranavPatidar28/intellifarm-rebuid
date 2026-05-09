@@ -11,10 +11,12 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -24,8 +26,10 @@ import {
   CloudSun,
   Database,
   History,
+  ImagePlus,
   LineChart,
   ListTodo,
+  Loader,
   Microscope,
   Sprout,
   Plus,
@@ -36,12 +40,13 @@ import {
   User,
   Wrench,
   X,
+  XCircle,
 } from 'lucide-react-native';
 
 import { MotionPressable } from '@/components/motion-pressable';
 import { useSession } from '@/features/session/session-provider';
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { sendAssistantMessage, type AssistantChatMessage } from '@/lib/assistant';
+import { sendAssistantMessage, getAssistantStatus, generateAssistantTitle, type AssistantChatMessage } from '@/lib/assistant';
 import { ApiError } from '@/lib/api';
 import { storageKeys } from '@/lib/constants';
 import { formatRelativeTime } from '@/lib/format';
@@ -120,6 +125,27 @@ export default function VoiceAssistantRoute() {
   const [promptRowHeight, setPromptRowHeight] = useState(50);
   const [pendingAssistantMessage, setPendingAssistantMessage] =
     useState<AssistantChatMessage | null>(null);
+  const [stagingImages, setStagingImages] = useState<string[]>([]);
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        setStagingImages((prev) => [...prev, result.assets[0].uri]);
+      }
+    } catch (error) {
+      setStatusMessage('Could not select image.');
+    }
+  };
+
+  const removeStagingImage = (indexToRemove: number) => {
+    setStagingImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+  };
 
   const promptParam = normalizeRouteParam(params.prompt);
   const keyboardGap = 8;
@@ -271,7 +297,7 @@ export default function VoiceAssistantRoute() {
   const sendCurrentMessage = async (overrideMessage?: string) => {
     const content = (overrideMessage ?? composer).trim();
 
-    if (!content || !token || busy || !activeConversation) {
+    if ((!content && stagingImages.length === 0) || !token || busy || !activeConversation) {
       return;
     }
 
@@ -281,20 +307,25 @@ export default function VoiceAssistantRoute() {
     }
 
     const timestamp = new Date().toISOString();
+    const currentImagesToProcess = [...stagingImages];
     const userMessage: AssistantChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       text: content,
       createdAt: timestamp,
+      imageUris: currentImagesToProcess.length > 0 ? currentImagesToProcess : undefined,
     };
 
+    const requestId = `req-${Date.now()}`;
     const typingMessage: AssistantChatMessage = {
       id: `assistant-pending-${Date.now()}`,
       role: 'assistant',
-      text: 'Thinking...',
+      text: 'Analyzing request...',
       createdAt: timestamp,
       pending: true,
     };
+
+    const isFirstMessage = (activeConversation.messages.length === 0);
 
     const nextConversations = updateConversationList((current) =>
       current.map((conversation) => {
@@ -306,13 +337,33 @@ export default function VoiceAssistantRoute() {
           ...conversation,
           title:
             conversation.messages.length === 0
-              ? buildConversationTitle(content)
+              ? buildConversationTitle(content || 'Image upload')
               : conversation.title,
           updatedAt: timestamp,
           messages: [...conversation.messages, userMessage],
         };
       }),
     );
+
+    if (isFirstMessage) {
+      generateAssistantTitle(token, content || 'Image upload').then((res) => {
+        if (res.title) {
+          updateConversationList((current) =>
+            current.map((conversation) => {
+              if (conversation.id !== activeConversation.id) {
+                return conversation;
+              }
+              return {
+                ...conversation,
+                title: res.title,
+              };
+            }),
+          );
+        }
+      }).catch(() => {
+        // ignore errors
+      });
+    }
 
     const updatedConversation =
       nextConversations.find((conversation) => conversation.id === activeConversation.id) ??
@@ -323,14 +374,32 @@ export default function VoiceAssistantRoute() {
     setBusy(true);
     setStatusMessage(null);
     setComposer('');
+    setStagingImages([]);
     setPendingAssistantMessage(typingMessage);
+
+    let statusInterval: ReturnType<typeof setInterval> | null = null;
+    let currentStatus = 'Analyzing request...';
+
+    statusInterval = setInterval(async () => {
+      const { status } = await getAssistantStatus(token, requestId);
+      if (status !== currentStatus) {
+        currentStatus = status;
+        setPendingAssistantMessage((prev) => 
+          prev ? { ...prev, text: status } : prev
+        );
+      }
+    }, 800);
 
     try {
       const result = await sendAssistantMessage({
         token,
         message: content,
         history: updatedConversation?.messages ?? [userMessage],
+        requestId,
+        currentImages: currentImagesToProcess,
       });
+
+      if (statusInterval) clearInterval(statusInterval);
 
       const assistantTimestamp = new Date().toISOString();
       const assistantMessage: AssistantChatMessage = {
@@ -357,12 +426,14 @@ export default function VoiceAssistantRoute() {
       
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (error) {
+      if (statusInterval) clearInterval(statusInterval);
       setStatusMessage(
         error instanceof ApiError
           ? error.message
           : 'Could not contact the chat service right now.',
       );
     } finally {
+      if (statusInterval) clearInterval(statusInterval);
       setPendingAssistantMessage(null);
       setBusy(false);
     }
@@ -377,15 +448,14 @@ export default function VoiceAssistantRoute() {
     statusMessage ??
     (network.isOffline
       ? 'Offline. Reconnect to keep chatting.'
-      : activeConversation?.messages.length
-        ? `Updated ${formatRelativeTime(activeConversation.updatedAt)}`
-        : 'Start a fresh conversation or open history.');
+      : '');
 
   return (
       <View style={{ flex: 1, backgroundColor: screenPalette.page }}>
         <FlatList
           ref={listRef}
           data={visibleMessages}
+          extraData={pendingAssistantMessage}
           keyExtractor={(item) => item.id}
           contentInsetAdjustmentBehavior="automatic"
           keyboardDismissMode="interactive"
@@ -433,35 +503,32 @@ export default function VoiceAssistantRoute() {
               onPress={() => setHistoryOpen(true)}
               disabled={busy}
               contentStyle={{
-                minWidth: 88,
+                width: 40,
                 height: 40,
-                paddingHorizontal: 12,
                 borderRadius: radii.pill,
                 borderCurve: 'continuous',
-                flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6,
                 backgroundColor: 'rgba(255,255,255,0.8)',
                 borderWidth: 1,
                 borderColor: screenPalette.cardBorder,
               }}
             >
-              <History color={palette.leafDark} size={16} strokeWidth={2.2} />
-              <Text
-                selectable
-                style={{
-                  color: palette.leafDark,
-                  fontFamily: typography.bodyStrong,
-                  fontSize: 12,
-                  lineHeight: 16,
-                }}
-              >
-                History
-              </Text>
+              <History color={palette.leafDark} size={18} strokeWidth={2.2} />
             </MotionPressable>
 
-            <View style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Text
                 selectable
                 numberOfLines={1}
@@ -473,18 +540,6 @@ export default function VoiceAssistantRoute() {
                 }}
               >
                 AI Assistant
-              </Text>
-              <Text
-                selectable
-                numberOfLines={1}
-                style={{
-                  color: palette.inkSoft,
-                  fontFamily: typography.bodyRegular,
-                  fontSize: 12,
-                  lineHeight: 16,
-                }}
-              >
-                {currentConversationLabel}
               </Text>
             </View>
 
@@ -526,17 +581,35 @@ export default function VoiceAssistantRoute() {
             </View>
           </View>
 
-          <Text
-            selectable
-            style={{
-              color: palette.inkSoft,
-              fontFamily: typography.bodyRegular,
-              fontSize: 12,
-              lineHeight: 18,
-            }}
-          >
-            {headerMessage}
-          </Text>
+          <View style={{ alignItems: 'center', marginHorizontal: 8 }}>
+            <Text
+              selectable
+              numberOfLines={1}
+              style={{
+                color: palette.leafDark,
+                fontFamily: typography.bodyStrong,
+                fontSize: 14,
+                lineHeight: 20,
+              }}
+            >
+              {currentConversationLabel}
+            </Text>
+          </View>
+
+          {!!headerMessage && (
+            <Text
+              selectable
+              style={{
+                color: palette.inkSoft,
+                fontFamily: typography.bodyRegular,
+                fontSize: 12,
+                lineHeight: 18,
+                textAlign: 'center',
+              }}
+            >
+              {headerMessage}
+            </Text>
+          )}
         </BlurView>
 
         {!keyboardVisible ? (
@@ -607,59 +680,108 @@ export default function VoiceAssistantRoute() {
               boxShadow: '0 10px 28px rgba(17, 54, 32, 0.08)',
               paddingHorizontal: 14,
               paddingVertical: 10,
-              flexDirection: 'row',
-              alignItems: 'flex-end',
-              gap: 12,
+              flexDirection: 'column',
               overflow: 'hidden',
             }}
           >
-            <TextInput
-              value={composer}
-              onChangeText={(value) => {
-                setComposer(value);
-                if (statusMessage) {
-                  setStatusMessage(null);
-                }
-              }}
-              editable={!network.isOffline && !busy}
-              multiline
-              maxLength={4000}
-              placeholder={
-                network.isOffline ? 'Offline' : 'Ask IntelliFarm something...'
-              }
-              placeholderTextColor={palette.inkMuted}
-              textAlignVertical="center"
-              style={{
-                flex: 1,
-                minHeight: 48,
-                maxHeight: 120,
-                color: palette.ink,
-                fontFamily: typography.bodyRegular,
-                fontSize: 16,
-                lineHeight: 24,
-                paddingTop: 6,
-                paddingBottom: 4,
-              }}
-            />
+            {stagingImages.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 10, gap: 8 }}
+              >
+                {stagingImages.map((uri, index) => (
+                  <View key={index} style={{ position: 'relative' }}>
+                    <Image
+                      source={{ uri }}
+                      style={{
+                        width: 60,
+                        height: 60,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: screenPalette.cardBorder,
+                      }}
+                    />
+                    <Pressable
+                      onPress={() => removeStagingImage(index)}
+                      style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 10,
+                      }}
+                    >
+                      <XCircle color={palette.leafDark} size={20} fill="#FFFFFF" />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
 
-            <MotionPressable
-              onPress={() => {
-                void sendCurrentMessage();
-              }}
-              disabled={!composer.trim() || network.isOffline || busy}
-              contentStyle={{
-                width: 48,
-                height: 48,
-                borderRadius: radii.pill,
-                borderCurve: 'continuous',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: palette.leaf,
-                boxShadow: shadow.glow,
-              }}
-            >
-              <Send color={palette.white} size={18} strokeWidth={2.3} />
-            </MotionPressable>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
+              <MotionPressable
+                onPress={pickImage}
+                disabled={network.isOffline || busy}
+                contentStyle={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: radii.pill,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ImagePlus color={palette.leafDark} size={22} strokeWidth={2.2} />
+              </MotionPressable>
+
+              <TextInput
+                value={composer}
+                onChangeText={(value) => {
+                  setComposer(value);
+                  if (statusMessage) {
+                    setStatusMessage(null);
+                  }
+                }}
+                editable={!network.isOffline && !busy}
+                multiline
+                maxLength={4000}
+                placeholder={
+                  network.isOffline ? 'Offline' : 'Ask IntelliFarm something...'
+                }
+                placeholderTextColor={palette.inkMuted}
+                textAlignVertical="center"
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  maxHeight: 120,
+                  color: palette.ink,
+                  fontFamily: typography.bodyRegular,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  paddingTop: 6,
+                  paddingBottom: 4,
+                }}
+              />
+
+              <MotionPressable
+                onPress={() => {
+                  void sendCurrentMessage();
+                }}
+                disabled={(!composer.trim() && stagingImages.length === 0) || network.isOffline || busy}
+                contentStyle={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: radii.pill,
+                  borderCurve: 'continuous',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: palette.leaf,
+                  boxShadow: shadow.glow,
+                }}
+              >
+                <Send color={palette.white} size={18} strokeWidth={2.3} />
+              </MotionPressable>
+            </View>
           </BlurView>
         </View>
 
@@ -960,8 +1082,26 @@ function ChatBubble({ message }: { message: AssistantChatMessage }) {
           gap: 4,
         }}
       >
+        {message.imageUris && message.imageUris.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+            {message.imageUris.map((uri, idx) => (
+              <Image
+                key={idx}
+                source={{ uri }}
+                style={{
+                  width: 140,
+                  height: 140,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.2)',
+                }}
+              />
+            ))}
+          </View>
+        )}
+
         {message.pending ? (
-          <TypingIndicator />
+          <LiveStatusIndicator statusText={message.text} />
         ) : (
           <FormattedMessageText text={message.text} color={textColor} />
         )}
@@ -990,31 +1130,62 @@ function ChatBubble({ message }: { message: AssistantChatMessage }) {
   );
 }
 
-function TypingIndicator() {
-  const opacities = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
+function LiveStatusIndicator({ statusText }: { statusText: string }) {
+  const pulse = useRef(new Animated.Value(0.5)).current;
+  const spin = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animations = opacities.map((op, i) =>
+    Animated.loop(
       Animated.sequence([
-        Animated.delay(i * 150),
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(op, { toValue: 1, duration: 300, useNativeDriver: true }),
-            Animated.timing(op, { toValue: 0.3, duration: 300, useNativeDriver: true }),
-            Animated.delay(300),
-          ])
-        ),
+        Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.5, duration: 800, useNativeDriver: true }),
       ])
-    );
-    Animated.parallel(animations).start();
-  }, [opacities]);
+    ).start();
+
+    Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [pulse, spin]);
+
+  const spinInterpolate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   return (
-    <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center', height: 24, paddingHorizontal: 4 }}>
-      {opacities.map((op, i) => (
-        <Animated.View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.leafDark, opacity: op }} />
-      ))}
-    </View>
+    <Animated.View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: radii.pill,
+        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+        borderWidth: 1,
+        borderColor: 'rgba(10, 114, 72, 0.1)',
+        opacity: pulse,
+        marginVertical: 2,
+      }}
+    >
+      <Animated.View style={{ transform: [{ rotate: spinInterpolate }] }}>
+        <Loader color={palette.leafDark} size={16} strokeWidth={2.5} />
+      </Animated.View>
+      <Text
+        style={{
+          color: palette.leafDark,
+          fontFamily: typography.bodyStrong,
+          fontSize: 13,
+          lineHeight: 18,
+        }}
+      >
+        {statusText}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -1217,6 +1388,14 @@ function ConversationHistoryRow({
 }
 
 function WelcomeCard() {
+  const capabilities = [
+    { icon: CloudSun, text: 'Check live weather & agronomic advisories' },
+    { icon: LineChart, text: 'Track real-time market prices' },
+    { icon: Microscope, text: 'Diagnose crop diseases from photos' },
+    { icon: Sprout, text: 'Predict the best crops for your season' },
+    { icon: Database, text: 'Manage farm tasks and financials' },
+  ];
+
   return (
     <View
       style={{
@@ -1225,39 +1404,87 @@ function WelcomeCard() {
         borderWidth: 1,
         borderColor: screenPalette.cardBorder,
         backgroundColor: palette.white,
-        paddingHorizontal: 18,
-        paddingVertical: 18,
-        gap: 14,
+        paddingHorizontal: 20,
+        paddingVertical: 24,
+        gap: 16,
         boxShadow: '0 10px 26px rgba(17, 54, 32, 0.06)',
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Sparkles color={palette.leafDark} size={16} strokeWidth={2.1} />
-        <Text
-          selectable
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View
           style={{
-            color: palette.ink,
-            fontFamily: typography.displayBold,
-            fontSize: 16,
-            lineHeight: 22,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: '#EAF7ED',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          Simple IntelliFarm Chat
-        </Text>
+          <Sparkles color={palette.leafDark} size={20} strokeWidth={2.5} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            selectable
+            style={{
+              color: palette.ink,
+              fontFamily: typography.displayBold,
+              fontSize: 18,
+              lineHeight: 24,
+            }}
+          >
+            Your AI Agronomist
+          </Text>
+          <Text
+            selectable
+            style={{
+              color: palette.inkSoft,
+              fontFamily: typography.bodyRegular,
+              fontSize: 13,
+              lineHeight: 18,
+              marginTop: 2,
+            }}
+          >
+            I'm here to help manage your farm.
+          </Text>
+        </View>
       </View>
 
-      <Text
-        selectable
-        style={{
-          color: palette.inkSoft,
-          fontFamily: typography.bodyRegular,
-          fontSize: 14,
-          lineHeight: 22,
-        }}
-      >
-        Start a conversation, keep it in local history, and come back to it later
-        from the Assistant tab.
-      </Text>
+      <View style={{ height: 1, backgroundColor: screenPalette.cardBorder, marginVertical: 4 }} />
+
+      <View style={{ gap: 14 }}>
+        {capabilities.map((cap, i) => {
+          const Icon = cap.icon;
+          return (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: '#F4FAF4',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon color={palette.leafDark} size={16} strokeWidth={2.2} />
+              </View>
+              <Text
+                selectable
+                style={{
+                  flex: 1,
+                  color: palette.ink,
+                  fontFamily: typography.bodyRegular,
+                  fontSize: 14,
+                  lineHeight: 20,
+                }}
+              >
+                {cap.text}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }

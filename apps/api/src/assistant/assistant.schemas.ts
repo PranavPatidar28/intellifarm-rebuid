@@ -19,6 +19,7 @@ export const AssistantChatMessageSchema = z.object({
 
 export const AssistantChatRequestSchema = z.object({
   messages: z.array(AssistantChatMessageSchema),
+  requestId: z.string().optional(),
 });
 
 export class AssistantChatRequest {
@@ -26,4 +27,5 @@ export class AssistantChatRequest {
     role: 'user' | 'assistant' | 'system';
     content: string | Array<any>;
   }> = [];
+  requestId?: string;
 }

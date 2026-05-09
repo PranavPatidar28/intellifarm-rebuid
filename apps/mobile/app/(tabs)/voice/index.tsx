@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   Keyboard,
   type KeyboardEvent,
+  LayoutAnimation,
   Pressable,
   ScrollView,
   Text,
@@ -11,14 +13,28 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Bell,
+  ChevronDown,
+  ChevronUp,
+  CloudSun,
+  Database,
   History,
+  LineChart,
+  ListTodo,
+  Microscope,
+  Sprout,
   Plus,
   Send,
+  ShieldAlert,
   Sparkles,
+  TreeDeciduous,
+  User,
+  Wrench,
   X,
 } from 'lucide-react-native';
 
@@ -302,6 +318,8 @@ export default function VoiceAssistantRoute() {
       nextConversations.find((conversation) => conversation.id === activeConversation.id) ??
       null;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
     setBusy(true);
     setStatusMessage(null);
     setComposer('');
@@ -320,6 +338,7 @@ export default function VoiceAssistantRoute() {
         role: 'assistant',
         text: result.reply,
         createdAt: assistantTimestamp,
+        toolsUsed: result.toolsUsed,
       };
 
       updateConversationList((current) =>
@@ -335,6 +354,8 @@ export default function VoiceAssistantRoute() {
           };
         }),
       );
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (error) {
       setStatusMessage(
         error instanceof ApiError
@@ -362,13 +383,41 @@ export default function VoiceAssistantRoute() {
 
   return (
       <View style={{ flex: 1, backgroundColor: screenPalette.page }}>
-        <View
+        <FlatList
+          ref={listRef}
+          data={visibleMessages}
+          keyExtractor={(item) => item.id}
+          contentInsetAdjustmentBehavior="automatic"
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1, backgroundColor: screenPalette.page }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 16,
+            paddingTop: insets.top + 130,
+            paddingBottom: conversationBottomInset,
+            gap: 14,
+          }}
+          renderItem={({ item }) => <ChatBubble message={item} />}
+          ListEmptyComponent={<WelcomeCard />}
+        />
+
+        <BlurView
+          intensity={80}
+          tint="light"
           style={{
-            backgroundColor: screenPalette.header,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(237, 248, 238, 0.65)',
             paddingTop: insets.top + 14,
             paddingHorizontal: 20,
             paddingBottom: 18,
             gap: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: 'rgba(212, 230, 215, 0.4)',
           }}
         >
           <View
@@ -393,7 +442,7 @@ export default function VoiceAssistantRoute() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 6,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: 'rgba(255,255,255,0.8)',
                 borderWidth: 1,
                 borderColor: screenPalette.cardBorder,
               }}
@@ -450,7 +499,7 @@ export default function VoiceAssistantRoute() {
                   borderCurve: 'continuous',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: 'rgba(255,255,255,0.8)',
                   borderWidth: 1,
                   borderColor: screenPalette.cardBorder,
                 }}
@@ -467,7 +516,7 @@ export default function VoiceAssistantRoute() {
                   borderCurve: 'continuous',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: 'rgba(255,255,255,0.8)',
                   borderWidth: 1,
                   borderColor: screenPalette.cardBorder,
                 }}
@@ -488,27 +537,7 @@ export default function VoiceAssistantRoute() {
           >
             {headerMessage}
           </Text>
-        </View>
-
-        <FlatList
-          ref={listRef}
-          data={visibleMessages}
-          keyExtractor={(item) => item.id}
-          contentInsetAdjustmentBehavior="automatic"
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1, backgroundColor: screenPalette.page }}
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingHorizontal: 16,
-            paddingTop: 16,
-            paddingBottom: conversationBottomInset,
-            gap: 14,
-          }}
-          renderItem={({ item }) => <ChatBubble message={item} />}
-          ListEmptyComponent={<WelcomeCard />}
-        />
+        </BlurView>
 
         {!keyboardVisible ? (
           <View
@@ -559,7 +588,9 @@ export default function VoiceAssistantRoute() {
             bottom: activeComposerBottom,
           }}
         >
-          <View
+          <BlurView
+            intensity={80}
+            tint="light"
             onLayout={(event) => {
               const nextHeight = Math.ceil(event.nativeEvent.layout.height);
               if (Math.abs(nextHeight - composerCardHeight) > 1) {
@@ -571,14 +602,15 @@ export default function VoiceAssistantRoute() {
               borderRadius: 28,
               borderCurve: 'continuous',
               borderWidth: 1,
-              borderColor: screenPalette.composerBorder,
-              backgroundColor: palette.white,
+              borderColor: 'rgba(213, 222, 214, 0.4)',
+              backgroundColor: 'rgba(255, 255, 255, 0.75)',
               boxShadow: '0 10px 28px rgba(17, 54, 32, 0.08)',
               paddingHorizontal: 14,
               paddingVertical: 10,
               flexDirection: 'row',
               alignItems: 'flex-end',
               gap: 12,
+              overflow: 'hidden',
             }}
           >
             <TextInput
@@ -628,7 +660,7 @@ export default function VoiceAssistantRoute() {
             >
               <Send color={palette.white} size={18} strokeWidth={2.3} />
             </MotionPressable>
-          </View>
+          </BlurView>
         </View>
 
         {historyOpen ? (
@@ -772,6 +804,111 @@ export default function VoiceAssistantRoute() {
   );
 }
 
+const TOOL_CONFIG: Record<string, { label: string; icon: any }> = {
+  getUserFarms: { label: 'Accessed Farm Data', icon: TreeDeciduous },
+  getActiveCropSeasons: { label: 'Accessed Active Seasons', icon: Sprout },
+  getWeather: { label: 'Checked Weather', icon: CloudSun },
+  getMarketPrices: { label: 'Checked Market Prices', icon: LineChart },
+  getTasks: { label: 'Checked Tasks', icon: ListTodo },
+  getWeatherAdvisories: { label: 'Generated Advisory', icon: ShieldAlert },
+  getExpenses: { label: 'Accessed Financials', icon: Database },
+  getBudgets: { label: 'Accessed Budgets', icon: Database },
+  getAlerts: { label: 'Checked Alerts', icon: Bell },
+  predictCropSuitability: { label: 'Used Prediction Model', icon: Sparkles },
+  diagnoseDisease: { label: 'Used Diagnosis Model', icon: Microscope },
+};
+
+function ExpandableToolUsage({ toolsUsed }: { toolsUsed: string[] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const toggleExpand = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsExpanded(!isExpanded);
+  };
+
+  if (!toolsUsed || toolsUsed.length === 0) return null;
+
+  return (
+    <View
+      style={{
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(10, 114, 72, 0.1)',
+        alignSelf: 'stretch',
+      }}
+    >
+      <Pressable
+        onPress={toggleExpand}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: 4,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+          <Text
+            style={{
+              color: palette.leafDark,
+              fontFamily: typography.bodyStrong,
+              fontSize: 11,
+            }}
+          >
+            Tools used:
+          </Text>
+          {!isExpanded && (
+            <View style={{ flexDirection: 'row', gap: 4, flex: 1, overflow: 'hidden' }}>
+              {toolsUsed.map((toolName, index) => {
+                const config = TOOL_CONFIG[toolName] || { icon: Wrench };
+                const Icon = config.icon;
+                return (
+                  <Icon key={`${toolName}-${index}`} color={palette.leafDark} size={12} strokeWidth={2.5} />
+                );
+              })}
+            </View>
+          )}
+        </View>
+        {isExpanded ? (
+          <ChevronUp color={palette.leafDark} size={14} strokeWidth={2} />
+        ) : (
+          <ChevronDown color={palette.leafDark} size={14} strokeWidth={2} />
+        )}
+      </Pressable>
+
+      {isExpanded && (
+        <View style={{ marginTop: 4, gap: 4 }}>
+          {toolsUsed.map((toolName, index) => {
+            const config = TOOL_CONFIG[toolName] || { label: 'Used internal tool', icon: Wrench };
+            const Icon = config.icon;
+            return (
+              <View
+                key={`${toolName}-${index}`}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Icon color={palette.leafDark} size={12} strokeWidth={2.5} />
+                <Text
+                  style={{
+                    color: palette.leafDark,
+                    fontFamily: typography.bodyRegular,
+                    fontSize: 11,
+                  }}
+                >
+                  {config.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function ChatBubble({ message }: { message: AssistantChatMessage }) {
   const assistant = message.role === 'assistant';
   const textColor = assistant ? palette.ink : palette.white;
@@ -779,17 +916,39 @@ function ChatBubble({ message }: { message: AssistantChatMessage }) {
   return (
     <View
       style={{
-        alignItems: assistant ? 'flex-start' : 'flex-end',
+        flexDirection: assistant ? 'row' : 'row-reverse',
+        alignItems: 'flex-end',
+        gap: 8,
       }}
     >
       <View
         style={{
-          width: assistant ? '94%' : undefined,
-          maxWidth: assistant ? '94%' : '78%',
-          borderRadius: 22,
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: assistant ? '#EAF7ED' : palette.leafDark,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: screenPalette.cardBorder,
+        }}
+      >
+        {assistant ? (
+          <Sparkles color={palette.leafDark} size={14} strokeWidth={2.5} />
+        ) : (
+          <User color={palette.white} size={14} strokeWidth={2.5} />
+        )}
+      </View>
+
+      <View
+        style={{
+          maxWidth: '82%',
+          borderRadius: 20,
           borderCurve: 'continuous',
+          borderBottomLeftRadius: assistant ? 4 : 20,
+          borderBottomRightRadius: assistant ? 20 : 4,
           paddingHorizontal: 16,
-          paddingVertical: 14,
+          paddingVertical: 12,
           backgroundColor: assistant
             ? screenPalette.assistantBubble
             : screenPalette.userBubble,
@@ -797,28 +956,88 @@ function ChatBubble({ message }: { message: AssistantChatMessage }) {
           borderColor: screenPalette.assistantBorder,
           boxShadow: assistant
             ? shadow.soft
-            : '0 10px 24px rgba(10, 114, 72, 0.14)',
-          gap: 6,
+            : '0 8px 20px rgba(10, 114, 72, 0.18)',
+          gap: 4,
         }}
       >
-        <FormattedMessageText text={message.text} color={textColor} />
+        {message.pending ? (
+          <TypingIndicator />
+        ) : (
+          <FormattedMessageText text={message.text} color={textColor} />
+        )}
 
-        <Text
-          selectable
-          style={{
-            color: assistant ? screenPalette.muted : 'rgba(255,255,255,0.76)',
-            fontFamily: typography.bodyRegular,
-            fontSize: 12,
-            lineHeight: 16,
-          }}
-        >
-          {message.pending
-            ? 'Waiting for reply...'
-            : formatMessageTime(message.createdAt)}
-        </Text>
+        {assistant && message.toolsUsed && message.toolsUsed.length > 0 && (
+          <ExpandableToolUsage toolsUsed={message.toolsUsed} />
+        )}
+
+        {!message.pending && (
+          <Text
+            selectable
+            style={{
+              color: assistant ? screenPalette.muted : 'rgba(255,255,255,0.76)',
+              fontFamily: typography.bodyRegular,
+              fontSize: 11,
+              lineHeight: 14,
+              marginTop: 2,
+              textAlign: assistant ? 'left' : 'right',
+            }}
+          >
+            {formatMessageTime(message.createdAt)}
+          </Text>
+        )}
       </View>
     </View>
   );
+}
+
+function TypingIndicator() {
+  const opacities = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
+
+  useEffect(() => {
+    const animations = opacities.map((op, i) =>
+      Animated.sequence([
+        Animated.delay(i * 150),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(op, { toValue: 1, duration: 300, useNativeDriver: true }),
+            Animated.timing(op, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+            Animated.delay(300),
+          ])
+        ),
+      ])
+    );
+    Animated.parallel(animations).start();
+  }, [opacities]);
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center', height: 24, paddingHorizontal: 4 }}>
+      {opacities.map((op, i) => (
+        <Animated.View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.leafDark, opacity: op }} />
+      ))}
+    </View>
+  );
+}
+
+function renderInlineMarkdown(text: string, baseColor: string) {
+  const parts = text.split(/(\*\*.*?\*\*|\*[^*]+\*)/g);
+  
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <Text key={index} style={{ fontFamily: typography.bodyStrong, color: baseColor }}>
+          {part.slice(2, -2)}
+        </Text>
+      );
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return (
+        <Text key={index} style={{ fontStyle: 'italic', color: baseColor }}>
+          {part.slice(1, -1)}
+        </Text>
+      );
+    }
+    return <Text key={index} style={{ color: baseColor }}>{part}</Text>;
+  });
 }
 
 function FormattedMessageText({
@@ -860,7 +1079,7 @@ function FormattedMessageText({
                   lineHeight: 24,
                 }}
               >
-                {block.text}
+                {renderInlineMarkdown(block.text, color)}
               </Text>
             </View>
           );
@@ -893,7 +1112,7 @@ function FormattedMessageText({
                   lineHeight: 24,
                 }}
               >
-                {block.text}
+                {renderInlineMarkdown(block.text, color)}
               </Text>
             </View>
           );
@@ -913,7 +1132,7 @@ function FormattedMessageText({
               lineHeight: 24,
             }}
           >
-            {block.text}
+            {renderInlineMarkdown(block.text, color)}
           </Text>
         );
       })}

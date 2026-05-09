@@ -40,9 +40,13 @@ export class AssistantController {
       steps: result.steps?.length
     });
 
+    const allToolCalls = result.steps?.flatMap((step: any) => step.toolCalls?.map((tc: any) => tc.toolName) || []) || [];
+    const uniqueToolsUsed = Array.from(new Set(allToolCalls));
+
     return {
       role: 'assistant',
       content: result.text || '',
+      toolsUsed: uniqueToolsUsed,
     };
   }
 }

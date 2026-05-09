@@ -6,11 +6,13 @@ export type AssistantChatMessage = {
   text: string;
   createdAt: string;
   pending?: boolean;
+  toolsUsed?: string[];
 };
 
 type AssistantChatResponse = {
   role: string;
   content: string;
+  toolsUsed?: string[];
 };
 
 export async function sendAssistantMessage(input: {
@@ -33,5 +35,5 @@ export async function sendAssistantMessage(input: {
     input.token,
   );
 
-  return { reply: result.content || '' };
+  return { reply: result.content || '', toolsUsed: result.toolsUsed };
 }

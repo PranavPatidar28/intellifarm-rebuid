@@ -223,33 +223,42 @@ export class RulesEngineService {
       });
     }
 
-    for (const alert of alerts) {
-      const existingAlert = await this.prisma.alert.findFirst({
-        where: {
-          userId: params.userId,
-          cropSeasonId: params.cropSeasonId,
-          title: alert.title,
-          createdAt: {
-            gte: addDays(new Date(), -1),
-          },
+    if (alerts.length === 0) {
+      return;
+    }
+
+    const titles = alerts.map((a) => a.title);
+    const existingAlerts = await this.prisma.alert.findMany({
+      where: {
+        userId: params.userId,
+        cropSeasonId: params.cropSeasonId,
+        title: { in: titles },
+        createdAt: {
+          gte: addDays(new Date(), -1),
         },
-      });
+      },
+      select: { title: true },
+    });
 
-      if (existingAlert) {
-        continue;
-      }
+    const existingTitles = new Set(existingAlerts.map((a) => a.title));
+    const alertsToCreate = alerts.filter((a) => !existingTitles.has(a.title));
 
-      const created = await this.prisma.alert.create({
-        data: {
-          userId: params.userId,
-          cropSeasonId: params.cropSeasonId,
-          title: alert.title,
-          message: alert.message,
-          alertType: 'WEATHER',
-          severity: alert.severity,
-        },
-      });
+    if (alertsToCreate.length === 0) {
+      return;
+    }
 
+    const createdAlerts = await this.prisma.alert.createManyAndReturn({
+      data: alertsToCreate.map((alert) => ({
+        userId: params.userId,
+        cropSeasonId: params.cropSeasonId,
+        title: alert.title,
+        message: alert.message,
+        alertType: 'WEATHER',
+        severity: alert.severity,
+      })),
+    });
+
+    for (const created of createdAlerts) {
       this.notificationsService.publishInternalEvent('alert.created', {
         alertId: created.id,
         userId: params.userId,

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { basename, extname, join, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import type { AuthUser } from '../common/types/authenticated-request';
@@ -37,8 +37,9 @@ export class StorageService {
   async getAuthorizedFilePath(
     user: AuthUser,
     folder: string,
-    filename: string,
+    rawFilename: string,
   ) {
+    const filename = basename(rawFilename);
     const allowedFolders = new Set([
       'disease-reports',
       'voice-notes',
@@ -59,7 +60,17 @@ export class StorageService {
       }
     }
 
-    const absolutePath = join(this.getUploadRoot(), folder, filename);
+    const uploadRoot = this.getUploadRoot();
+    const absolutePath = join(uploadRoot, folder, filename);
+
+    const normalizedRoot = uploadRoot.endsWith(sep)
+      ? uploadRoot
+      : `${uploadRoot}${sep}`;
+
+    if (!absolutePath.startsWith(normalizedRoot)) {
+      throw new NotFoundException('Media file not found');
+    }
+
     await access(absolutePath, constants.R_OK).catch(() => {
       throw new NotFoundException('Media file not found');
     });
@@ -67,16 +78,25 @@ export class StorageService {
     return absolutePath;
   }
 
-  async getPublicFilePath(folder: string, filename: string) {
-    const allowedFolders = new Set([
-      'disease-reports',
-    ]);
+  async getPublicFilePath(folder: string, rawFilename: string) {
+    const allowedFolders = new Set(['disease-reports']);
 
     if (!allowedFolders.has(folder)) {
       throw new NotFoundException('Media file not found');
     }
 
-    const absolutePath = join(this.getUploadRoot(), folder, filename);
+    const filename = basename(rawFilename);
+    const uploadRoot = this.getUploadRoot();
+    const absolutePath = join(uploadRoot, folder, filename);
+
+    const normalizedRoot = uploadRoot.endsWith(sep)
+      ? uploadRoot
+      : `${uploadRoot}${sep}`;
+
+    if (!absolutePath.startsWith(normalizedRoot)) {
+      throw new NotFoundException('Media file not found');
+    }
+
     await access(absolutePath, constants.R_OK).catch(() => {
       throw new NotFoundException('Media file not found');
     });

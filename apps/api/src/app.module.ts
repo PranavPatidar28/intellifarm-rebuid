@@ -11,6 +11,7 @@ import { CropCatalogModule } from './crop-catalog/crop-catalog.module';
 import { CommunityModule } from './community/community.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DiseaseReportsModule } from './disease-reports/disease-reports.module';
+import { DevicesModule } from './devices/devices.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { FarmsModule } from './farms/farms.module';
@@ -48,6 +49,7 @@ import { AdminModule } from './admin/admin.module';
     AlertsModule,
     WeatherModule,
     DashboardModule,
+    DevicesModule,
     ExpensesModule,
     FacilitiesModule,
     DiseaseReportsModule,

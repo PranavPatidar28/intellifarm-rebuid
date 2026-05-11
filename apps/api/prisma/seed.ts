@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, type CommunityCategory } from '@prisma/client';
+import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -899,6 +900,195 @@ async function seedDemoFarmer() {
   return demoUser;
 }
 
+async function seedDemoDevices(demoUserId: string) {
+  const plots = await prisma.farmPlot.findMany({
+    where: {
+      userId: demoUserId,
+      name: {
+        in: ['North Field', 'Canal Side Plot'],
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  const plotByName = new Map(plots.map((plot) => [plot.name, plot.id]));
+  const now = Date.now();
+  const deviceSeeds = [
+    {
+      plotName: 'North Field',
+      hardwareId: 'north-field-sensor-01',
+      apiKey: 'demo-north-field-key',
+      name: 'North Field Sensor',
+      pumpState: 'OFF' as const,
+      pumpControlMode: 'AUTO' as const,
+      moistureLowThreshold: 31,
+      moistureRecoveryThreshold: 44,
+      telemetry: [
+        {
+          minutesAgo: 40,
+          temperatureC: 29.1,
+          humidityPercent: 68,
+          soilMoisturePercent: 46,
+          pumpState: 'OFF' as const,
+        },
+        {
+          minutesAgo: 25,
+          temperatureC: 29.8,
+          humidityPercent: 66,
+          soilMoisturePercent: 41,
+          pumpState: 'OFF' as const,
+        },
+        {
+          minutesAgo: 10,
+          temperatureC: 30.4,
+          humidityPercent: 64,
+          soilMoisturePercent: 37,
+          pumpState: 'OFF' as const,
+        },
+      ],
+      events: [
+        {
+          source: 'AUTO_RULE' as const,
+          previousState: 'ON' as const,
+          nextState: 'OFF' as const,
+          reason: 'Soil moisture recovered above the stop threshold.',
+          minutesAgo: 85,
+        },
+      ],
+    },
+    {
+      plotName: 'Canal Side Plot',
+      hardwareId: 'canal-side-sensor-01',
+      apiKey: 'demo-canal-side-key',
+      name: 'Canal Side Drip Controller',
+      pumpState: 'ON' as const,
+      pumpControlMode: 'AUTO' as const,
+      moistureLowThreshold: 34,
+      moistureRecoveryThreshold: 47,
+      telemetry: [
+        {
+          minutesAgo: 35,
+          temperatureC: 31.6,
+          humidityPercent: 59,
+          soilMoisturePercent: 28,
+          pumpState: 'ON' as const,
+        },
+        {
+          minutesAgo: 18,
+          temperatureC: 32.2,
+          humidityPercent: 58,
+          soilMoisturePercent: 31,
+          pumpState: 'ON' as const,
+        },
+        {
+          minutesAgo: 4,
+          temperatureC: 32.9,
+          humidityPercent: 56,
+          soilMoisturePercent: 34,
+          pumpState: 'ON' as const,
+        },
+      ],
+      events: [
+        {
+          source: 'AUTO_RULE' as const,
+          previousState: 'OFF' as const,
+          nextState: 'ON' as const,
+          reason: 'Auto irrigation started because soil moisture dropped below the low threshold.',
+          minutesAgo: 22,
+        },
+      ],
+    },
+  ];
+
+  for (const deviceSeed of deviceSeeds) {
+    const farmPlotId = plotByName.get(deviceSeed.plotName);
+    if (!farmPlotId) {
+      continue;
+    }
+
+    const lastTelemetry = deviceSeed.telemetry.at(-1);
+    if (!lastTelemetry) {
+      continue;
+    }
+
+    const device = await prisma.farmDevice.upsert({
+      where: { hardwareId: deviceSeed.hardwareId },
+      update: {
+        farmPlotId,
+        name: deviceSeed.name,
+        apiKeyHash: deviceSeed.apiKey,
+        status: 'ONLINE',
+        pumpState: deviceSeed.pumpState,
+        pumpControlMode: deviceSeed.pumpControlMode,
+        autoIrrigationEnabled: true,
+        moistureLowThreshold: deviceSeed.moistureLowThreshold,
+        moistureRecoveryThreshold: deviceSeed.moistureRecoveryThreshold,
+        lastSeenAt: new Date(now - lastTelemetry.minutesAgo * 60_000),
+        lastTelemetryAt: new Date(now - lastTelemetry.minutesAgo * 60_000),
+      },
+      create: {
+        farmPlotId,
+        hardwareId: deviceSeed.hardwareId,
+        name: deviceSeed.name,
+        apiKeyHash: deviceSeed.apiKey,
+        status: 'ONLINE',
+        pumpState: deviceSeed.pumpState,
+        pumpControlMode: deviceSeed.pumpControlMode,
+        autoIrrigationEnabled: true,
+        moistureLowThreshold: deviceSeed.moistureLowThreshold,
+        moistureRecoveryThreshold: deviceSeed.moistureRecoveryThreshold,
+        lastSeenAt: new Date(now - lastTelemetry.minutesAgo * 60_000),
+        lastTelemetryAt: new Date(now - lastTelemetry.minutesAgo * 60_000),
+      },
+    });
+
+    await prisma.deviceTelemetry.deleteMany({
+      where: { farmDeviceId: device.id },
+    });
+    await prisma.pumpEvent.deleteMany({
+      where: { farmDeviceId: device.id },
+    });
+    await prisma.pumpCommand.deleteMany({
+      where: { farmDeviceId: device.id },
+    });
+
+    await prisma.deviceTelemetry.createMany({
+      data: deviceSeed.telemetry.map((entry) => ({
+        farmDeviceId: device.id,
+        temperatureC: entry.temperatureC,
+        humidityPercent: entry.humidityPercent,
+        soilMoisturePercent: entry.soilMoisturePercent,
+        pumpState: entry.pumpState,
+        batteryPercent: 84,
+        signalStrength: -62,
+        recordedAt: new Date(now - entry.minutesAgo * 60_000),
+        rawPayload: {
+          demo: true,
+          hardwareId: deviceSeed.hardwareId,
+          temperatureC: entry.temperatureC,
+          humidityPercent: entry.humidityPercent,
+          soilMoisturePercent: entry.soilMoisturePercent,
+          pumpState: entry.pumpState,
+        },
+      })),
+    });
+
+    await prisma.pumpEvent.createMany({
+      data: deviceSeed.events.map((entry) => ({
+        farmDeviceId: device.id,
+        source: entry.source,
+        previousState: entry.previousState,
+        nextState: entry.nextState,
+        reason: entry.reason,
+        createdAt: new Date(now - entry.minutesAgo * 60_000),
+      })),
+    });
+  }
+}
+
 async function seedAdminUser() {
   await prisma.user.upsert({
     where: { phone: '9999999998' },
@@ -1147,6 +1337,7 @@ async function main() {
   await seedCrops();
   await seedSchemesAndMarkets();
   const demoUser = await seedDemoFarmer();
+  await seedDemoDevices(demoUser.id);
   await seedAdminUser();
   await seedCommunityData({
     id: demoUser.id,

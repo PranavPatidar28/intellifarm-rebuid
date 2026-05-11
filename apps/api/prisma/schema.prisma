@@ -149,6 +149,39 @@ enum DiseaseAnalysisSource {
   LIVE_PROVIDER
 }
 
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  FAULT
+}
+
+enum PumpState {
+  ON
+  OFF
+  FAULT
+}
+
+enum PumpControlMode {
+  AUTO
+  FORCE_ON
+  FORCE_OFF
+}
+
+enum PumpCommandStatus {
+  PENDING
+  ACKNOWLEDGED
+  APPLIED
+  FAILED
+  EXPIRED
+}
+
+enum PumpEventSource {
+  AUTO_RULE
+  MANUAL_COMMAND
+  DEVICE_FAILSAFE
+  DEVICE_LOCAL
+}
+
 model User {
   id                String              @id @default(uuid())
   name              String?
@@ -171,6 +204,7 @@ model User {
   communityReports  CommunityReport[]
   communityPostSaves CommunityPostSave[]
   expenseEntries    ExpenseEntry[]
+  pumpCommands      PumpCommand[]
   predictionRuns    PredictionRun[]
 }
 
@@ -217,10 +251,84 @@ model FarmPlot {
   updatedAt      DateTime          @updatedAt
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   cropSeasons    CropSeason[]
+  farmDevice     FarmDevice?
   weatherShots   WeatherSnapshot[]
   predictionRuns PredictionRun[]
 
   @@index([userId, createdAt])
+}
+
+model FarmDevice {
+  id                        String            @id @default(uuid())
+  farmPlotId                String            @unique
+  hardwareId                String            @unique
+  name                      String
+  apiKeyHash                String
+  status                    DeviceStatus      @default(OFFLINE)
+  pumpState                 PumpState         @default(OFF)
+  pumpControlMode           PumpControlMode   @default(AUTO)
+  autoIrrigationEnabled     Boolean           @default(true)
+  moistureLowThreshold      Float             @default(32)
+  moistureRecoveryThreshold Float             @default(46)
+  lastSeenAt                DateTime?
+  lastTelemetryAt           DateTime?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+  farmPlot                  FarmPlot          @relation(fields: [farmPlotId], references: [id], onDelete: Cascade)
+  telemetry                 DeviceTelemetry[]
+  pumpCommands              PumpCommand[]
+  pumpEvents                PumpEvent[]
+
+  @@index([status, lastSeenAt])
+  @@index([farmPlotId, lastTelemetryAt])
+}
+
+model DeviceTelemetry {
+  id                  String     @id @default(uuid())
+  farmDeviceId        String
+  temperatureC        Float
+  humidityPercent     Float
+  soilMoisturePercent Float
+  pumpState           PumpState
+  batteryPercent      Float?
+  signalStrength      Int?
+  recordedAt          DateTime
+  rawPayload          Json
+  createdAt           DateTime   @default(now())
+  farmDevice          FarmDevice @relation(fields: [farmDeviceId], references: [id], onDelete: Cascade)
+
+  @@index([farmDeviceId, recordedAt(sort: Desc)])
+}
+
+model PumpCommand {
+  id                String            @id @default(uuid())
+  farmDeviceId      String
+  requestedByUserId String?
+  targetMode        PumpControlMode
+  status            PumpCommandStatus @default(PENDING)
+  reason            String?
+  issuedAt          DateTime          @default(now())
+  acknowledgedAt    DateTime?
+  appliedAt         DateTime?
+  expiresAt         DateTime
+  farmDevice        FarmDevice        @relation(fields: [farmDeviceId], references: [id], onDelete: Cascade)
+  requestedByUser   User?             @relation(fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([farmDeviceId, status, issuedAt(sort: Desc)])
+  @@index([requestedByUserId, issuedAt(sort: Desc)])
+}
+
+model PumpEvent {
+  id            String          @id @default(uuid())
+  farmDeviceId  String
+  source        PumpEventSource
+  previousState PumpState?
+  nextState     PumpState
+  reason        String
+  createdAt     DateTime        @default(now())
+  farmDevice    FarmDevice      @relation(fields: [farmDeviceId], references: [id], onDelete: Cascade)
+
+  @@index([farmDeviceId, createdAt(sort: Desc)])
 }
 
 model CropDefinition {

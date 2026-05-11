@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { CropSeason, FarmPlot, Scheme } from '@prisma/client';
 
 import { diffInDays, endOfWindow, startOfToday } from '../common/utils/date.util';
+import { DevicesService } from '../devices/devices.service';
 import { haversineDistanceKm } from '../common/utils/geo.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { RulesEngineService } from '../rules-engine/rules-engine.service';
@@ -12,6 +13,7 @@ import { WeatherService } from '../weather/weather.service';
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly devicesService: DevicesService,
     private readonly rulesEngineService: RulesEngineService,
     private readonly weatherService: WeatherService,
   ) {}
@@ -44,6 +46,7 @@ export class DashboardService {
         generatedAt: startOfToday().toISOString(),
         featuredSeason: null,
         seasonSwitcher: [],
+        deviceOverview: null,
         weatherHero: null,
         taskFocus: null,
         cropHealth: null,
@@ -132,6 +135,9 @@ export class DashboardService {
     const pendingCount = tasks.filter((task) =>
       ['PENDING', 'OVERDUE'].includes(task.status),
     ).length;
+    const deviceOverview = await this.devicesService.getDashboardDeviceOverview(
+      featuredSeason.farmPlotId,
+    );
     const marketPulse = await this.buildMarketPulse(featuredSeason.farmPlot, featuredSeason);
     const schemeSpotlight = await this.buildSchemeSpotlight(
       userId,
@@ -172,6 +178,7 @@ export class DashboardService {
         ).length,
         hasWeather: true,
       })),
+      deviceOverview,
       weatherHero,
       taskFocus: {
         title: 'This week in the field',

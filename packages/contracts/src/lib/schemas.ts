@@ -11,6 +11,7 @@ import {
   communityReportReasons,
   communityReportTargets,
   cropSeasonStatuses,
+  deviceStatuses,
   expenseCategories,
   expenseScopes,
   expenseStatuses,
@@ -27,6 +28,10 @@ import {
   predictionStatuses,
   predictionTypes,
   preferredLanguages,
+  pumpCommandStatuses,
+  pumpControlModes,
+  pumpEventSources,
+  pumpStates,
   seasonClimateMethods,
   seasonKeys,
   severityLevels,
@@ -294,6 +299,49 @@ export const weatherLocationQuerySchema = z
 export const dashboardQuerySchema = weatherLocationQuerySchema.extend({
   cropSeasonId: z.string().uuid().optional(),
 });
+
+export const ingestTelemetrySchema = z.object({
+  hardwareId: z.string().trim().min(4).max(120),
+  deviceName: z.string().trim().min(2).max(80).optional(),
+  temperatureC: z.number().min(-40).max(100),
+  humidityPercent: z.number().min(0).max(100),
+  soilMoisturePercent: z.number().min(0).max(100),
+  pumpState: z.enum(pumpStates),
+  pumpControlMode: z.enum(pumpControlModes).optional(),
+  deviceStatus: z.enum(deviceStatuses).optional(),
+  batteryPercent: z.number().min(0).max(100).optional(),
+  signalStrength: z.number().int().min(-150).max(0).optional(),
+  recordedAt: z.coerce.date().optional(),
+  rawPayload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const issuePumpCommandSchema = z.object({
+  targetMode: z.enum(pumpControlModes),
+  reason: z.string().trim().max(160).optional(),
+});
+
+export const updateDeviceSettingsSchema = z
+  .object({
+    autoIrrigationEnabled: bodyBooleanSchema.optional(),
+    moistureLowThreshold: z.coerce.number().min(0).max(100).optional(),
+    moistureRecoveryThreshold: z.coerce.number().min(0).max(100).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'Provide at least one device setting to update',
+  })
+  .superRefine((value, context) => {
+    if (
+      typeof value.moistureLowThreshold === 'number' &&
+      typeof value.moistureRecoveryThreshold === 'number' &&
+      value.moistureLowThreshold >= value.moistureRecoveryThreshold
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Recovery threshold must be greater than low threshold',
+        path: ['moistureRecoveryThreshold'],
+      });
+    }
+  });
 
 export const createDiseaseReportSchema = z
   .object({
@@ -657,6 +705,67 @@ export const weatherSummarySchema = z.object({
   freshness: weatherFreshnessSchema,
 });
 
+export const pumpCommandSummarySchema = z.object({
+  id: z.string().uuid(),
+  targetMode: z.enum(pumpControlModes),
+  status: z.enum(pumpCommandStatuses),
+  reason: z.string().nullable(),
+  issuedAt: z.string(),
+  acknowledgedAt: z.string().nullable(),
+  appliedAt: z.string().nullable(),
+  expiresAt: z.string(),
+});
+
+export const pumpEventSchema = z.object({
+  id: z.string().uuid(),
+  source: z.enum(pumpEventSources),
+  previousState: z.enum(pumpStates).nullable(),
+  nextState: z.enum(pumpStates),
+  reason: z.string(),
+  createdAt: z.string(),
+});
+
+export const deviceTelemetryPointSchema = z.object({
+  id: z.string().uuid(),
+  temperatureC: z.number(),
+  humidityPercent: z.number().min(0).max(100),
+  soilMoisturePercent: z.number().min(0).max(100),
+  pumpState: z.enum(pumpStates),
+  batteryPercent: z.number().nullable(),
+  signalStrength: z.number().nullable(),
+  recordedAt: z.string(),
+});
+
+export const deviceLatestReadingSchema = z.object({
+  temperatureC: z.number(),
+  humidityPercent: z.number().min(0).max(100),
+  soilMoisturePercent: z.number().min(0).max(100),
+  pumpState: z.enum(pumpStates),
+  batteryPercent: z.number().nullable(),
+  signalStrength: z.number().nullable(),
+  recordedAt: z.string(),
+});
+
+export const deviceOverviewSchema = z.object({
+  deviceId: z.string().uuid(),
+  hardwareId: z.string(),
+  name: z.string(),
+  status: z.enum(deviceStatuses),
+  pumpState: z.enum(pumpStates),
+  pumpControlMode: z.enum(pumpControlModes),
+  autoIrrigationEnabled: z.boolean(),
+  latestReading: deviceLatestReadingSchema.nullable(),
+  thresholds: z.object({
+    lowThreshold: z.number(),
+    recoveryThreshold: z.number(),
+  }),
+  lastPumpEvent: pumpEventSchema.nullable(),
+  pendingCommand: pumpCommandSummarySchema.nullable(),
+  offlineMessage: z.string().nullable(),
+  lastSeenAt: z.string().nullable(),
+  lastTelemetryAt: z.string().nullable(),
+});
+
 export const seasonSwitcherItemSchema = z.object({
   cropSeasonId: z.string().uuid(),
   cropName: z.string(),
@@ -779,6 +888,7 @@ export const dashboardResponseSchema = z.object({
   generatedAt: z.string(),
   featuredSeason: featuredSeasonSchema.nullable(),
   seasonSwitcher: z.array(seasonSwitcherItemSchema),
+  deviceOverview: deviceOverviewSchema.nullable(),
   weatherHero: weatherSummarySchema.nullable(),
   taskFocus: taskFocusSchema.nullable(),
   cropHealth: cropHealthSummarySchema.nullable(),
@@ -786,6 +896,28 @@ export const dashboardResponseSchema = z.object({
   schemeSpotlight: schemeSpotlightSchema.nullable(),
   resourcePulse: resourcePulseSchema.nullable(),
   offlineState: dashboardOfflineStateSchema,
+});
+
+export const farmDeviceResponseSchema = z.object({
+  device: deviceOverviewSchema.nullable(),
+  telemetry: z.array(deviceTelemetryPointSchema),
+  pumpEvents: z.array(pumpEventSchema),
+});
+
+export const pumpCommandResponseSchema = z.object({
+  command: pumpCommandSummarySchema,
+  deviceOverview: deviceOverviewSchema.nullable(),
+});
+
+export const deviceSettingsResponseSchema = z.object({
+  deviceOverview: deviceOverviewSchema,
+});
+
+export const deviceIngestResponseSchema = z.object({
+  accepted: z.boolean(),
+  recordedAt: z.string(),
+  deviceOverview: deviceOverviewSchema,
+  pendingCommand: pumpCommandSummarySchema.nullable(),
 });
 
 export const diseaseResultSchema = z.object({

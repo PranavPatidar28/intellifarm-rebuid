@@ -1,28 +1,23 @@
 import {
   SeasonClimateService,
-  aggregateHistoricalClimateSamples,
+  getSeasonMonthRange,
 } from './season-climate.service';
 
-describe('aggregateHistoricalClimateSamples', () => {
-  it('averages and rounds multiple historical samples', () => {
-    const result = aggregateHistoricalClimateSamples([
-      {
-        averageTempC: 28.14,
-        averageHumidityPercent: 66.41,
-        totalRainfallMm: 102.12,
-      },
-      {
-        averageTempC: 30.62,
-        averageHumidityPercent: 70.18,
-        totalRainfallMm: 88.44,
-      },
-    ]);
+describe('getSeasonMonthRange', () => {
+  it('returns Jun–Oct for Kharif', () => {
+    expect(getSeasonMonthRange('KHARIF')).toEqual([6, 7, 8, 9, 10]);
+  });
 
-    expect(result).toEqual({
-      averageTempC: 29.4,
-      averageHumidityPercent: 68.3,
-      totalRainfallMm: 95.3,
-    });
+  it('returns Nov–Mar for Rabi', () => {
+    expect(getSeasonMonthRange('RABI')).toEqual([11, 12, 1, 2, 3]);
+  });
+
+  it('returns Mar–Jun for Zaid', () => {
+    expect(getSeasonMonthRange('ZAID')).toEqual([3, 4, 5, 6]);
+  });
+
+  it('returns all months for CUSTOM', () => {
+    expect(getSeasonMonthRange('CUSTOM')).toHaveLength(12);
   });
 });
 
@@ -47,6 +42,10 @@ describe('SeasonClimateService', () => {
           humidityPercent: 68,
           rainfallExpectedMm: 14,
         },
+        daily: [
+          { maxTemperatureC: 35, minTemperatureC: 25, rainfallMm: 10 },
+          { maxTemperatureC: 33, minTemperatureC: 24, rainfallMm: 4 },
+        ],
       }),
     };
 
@@ -71,6 +70,8 @@ describe('SeasonClimateService', () => {
     expect(result.averageTempC).toBe(31);
     expect(result.averageHumidityPercent).toBe(68);
     expect(result.totalRainfallMm).toBe(14);
+    expect(result.minTempC).toBe(24);
+    expect(result.maxTempC).toBe(35);
     expect(result.assumptions[0]).toContain('Punjab');
     expect(weatherProvider.getForecast).toHaveBeenCalledWith({
       latitude: 30.9008,

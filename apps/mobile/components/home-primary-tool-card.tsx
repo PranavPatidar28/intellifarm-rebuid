@@ -44,7 +44,7 @@ export function HomePrimaryToolCard({
         minWidth: 144,
       }}
       contentStyle={{
-          height: 108,
+          height: 120,
           overflow: 'hidden',
           paddingHorizontal: spacing.md,
           paddingVertical: 14,
@@ -93,7 +93,7 @@ export function HomePrimaryToolCard({
           <ArrowRight color={colors.accent} size={17} />
         </View>
 
-        <View style={{ minHeight: 40, justifyContent: 'flex-end' }}>
+        <View style={{ minHeight: 40, justifyContent: 'flex-end', paddingBottom: 4 }}>
           <Text
             numberOfLines={2}
             style={{

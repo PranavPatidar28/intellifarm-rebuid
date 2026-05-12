@@ -22,10 +22,24 @@ export const AssistantChatRequestSchema = z.object({
   requestId: z.string().optional(),
 });
 
+export const AssistantVoiceSessionRequestSchema = z.object({
+  focusFarmPlotId: z.string().optional(),
+  focusCropSeasonId: z.string().optional(),
+  preferredLanguage: z.enum(['en', 'hi']).optional(),
+  resumeSessionId: z.string().optional(),
+});
+
 export class AssistantChatRequest {
   messages: Array<{
     role: 'user' | 'assistant' | 'system';
     content: string | Array<any>;
   }> = [];
   requestId?: string;
+}
+
+export class AssistantVoiceSessionRequest {
+  focusFarmPlotId?: string;
+  focusCropSeasonId?: string;
+  preferredLanguage?: 'en' | 'hi';
+  resumeSessionId?: string;
 }

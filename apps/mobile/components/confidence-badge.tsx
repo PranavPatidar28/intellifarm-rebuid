@@ -2,14 +2,12 @@ import { Text, View } from 'react-native';
 
 import { palette, radii, semanticColors, spacing, typography } from '@/theme/tokens';
 
-export function ConfidenceBadge({ score }: { score: number }) {
+export function ConfidenceBadge({ score, hidePercentage }: { score: number; hidePercentage?: boolean }) {
   const percent = Math.round(score * 100);
   const tone =
-    percent >= 75
+    percent >= 45
       ? { backgroundColor: semanticColors.successSoft, color: semanticColors.success, label: 'High confidence' }
-      : percent >= 45
-        ? { backgroundColor: semanticColors.warningSoft, color: semanticColors.warning, label: 'Medium confidence' }
-        : { backgroundColor: semanticColors.dangerSoft, color: semanticColors.danger, label: 'Low confidence' };
+      : { backgroundColor: semanticColors.dangerSoft, color: semanticColors.danger, label: 'Low confidence' };
 
   return (
     <View
@@ -28,7 +26,7 @@ export function ConfidenceBadge({ score }: { score: number }) {
           fontSize: 12,
         }}
       >
-        {tone.label} • {percent}%
+        {tone.label}{!hidePercentage && ` • ${percent}%`}
       </Text>
     </View>
   );

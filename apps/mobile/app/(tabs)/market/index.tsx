@@ -7,23 +7,29 @@ import {
   type MarketCropListItem,
   type MarketMandiListItem,
 } from '@/components/mandi-market-screen';
+import { useSession } from '@/features/session/session-provider';
+import { useCachedQuery } from '@/hooks/use-cached-query';
+import { useDeviceLocation } from '@/hooks/use-device-location';
+import { apiGet } from '@/lib/api';
+import type {
+  MarketExplorerCropsResponse,
+  MarketExplorerMandisResponse,
+} from '@/lib/api-types';
 import { storageKeys } from '@/lib/constants';
 import { findSeasonContext } from '@/lib/domain';
-import { type MarketExplorerView, type MarketPinnedCrop } from '@/lib/market-explorer';
 import {
-  getMockCropSummaries,
-  getMockMandiSummaries,
-  getMockPinnedCropItems,
-  mockCropOptions,
-  type MarketTradeMode,
-} from '@/lib/mock-market-data';
+  buildMarketExplorerQueryString,
+  type MarketExplorerView,
+  type MarketPinnedCrop,
+} from '@/lib/market-explorer';
+import type { MarketTradeMode } from '@/lib/mock-market-data';
 import { useStoredValue } from '@/lib/storage';
-import { useSession } from '@/features/session/session-provider';
 
 export default function MarketRoute() {
   const router = useRouter();
-  const { profile } = useSession();
-  const [tradeMode, setTradeMode] = useState<MarketTradeMode>('buy');
+  const { profile, token } = useSession();
+  const { location } = useDeviceLocation();
+  const [tradeMode, setTradeMode] = useState<MarketTradeMode>('sell');
   const [view, setView] = useState<MarketExplorerView>('crops');
   const [searchText, setSearchText] = useState('');
   const [selectedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');
@@ -39,81 +45,111 @@ export default function MarketRoute() {
     [pinnedCrops],
   );
 
+  // ── Resolve user location for API calls ─────────────────────────────
+
+  const plotLocation =
+    selectedSeason?.farmPlot.latitude != null &&
+    selectedSeason?.farmPlot.longitude != null
+      ? {
+          latitude: selectedSeason.farmPlot.latitude,
+          longitude: selectedSeason.farmPlot.longitude,
+        }
+      : null;
+  const activeLocation = plotLocation ?? location;
+
+  const explorerQueryString = useMemo(
+    () =>
+      buildMarketExplorerQueryString({
+        scope: 'state',
+        latitude: activeLocation?.latitude,
+        longitude: activeLocation?.longitude,
+        page: 1,
+        pageSize: 50,
+        search: trimmedSearchText || undefined,
+      }),
+    [activeLocation?.latitude, activeLocation?.longitude, trimmedSearchText],
+  );
+
+  // ── Fetch crops from the live API ───────────────────────────────────
+
+  const cropsQuery = useCachedQuery({
+    cacheKey: `market-explorer-crops:${explorerQueryString}`,
+    queryKey: ['market-explorer-crops', token, explorerQueryString],
+    enabled: Boolean(token),
+    queryFn: () =>
+      apiGet<MarketExplorerCropsResponse>(
+        `/markets/explorer/crops?${explorerQueryString}`,
+        token,
+      ),
+  });
+
+  // ── Fetch mandis from the live API ──────────────────────────────────
+
+  const mandisQuery = useCachedQuery({
+    cacheKey: `market-explorer-mandis:${explorerQueryString}`,
+    queryKey: ['market-explorer-mandis', token, explorerQueryString],
+    enabled: Boolean(token),
+    queryFn: () =>
+      apiGet<MarketExplorerMandisResponse>(
+        `/markets/explorer/mandis?${explorerQueryString}`,
+        token,
+      ),
+  });
+
+  // ── Map API responses to component data shapes ──────────────────────
+
   const cropItems = useMemo<MarketCropListItem[]>(() => {
-    return getMockCropSummaries(tradeMode)
-      .map((item) => ({
-        ...item,
-        pinned: pinnedKeySet.has(item.cropKey),
-      }))
-      .filter((item) =>
-        trimmedSearchText ? item.cropName.toLowerCase().includes(trimmedSearchText) : true,
-      );
-  }, [pinnedKeySet, tradeMode, trimmedSearchText]);
+    const apiCrops = cropsQuery.data?.crops ?? [];
+
+    return apiCrops.map((crop: any) => ({
+      cropKey: crop.cropKey,
+      cropName: crop.cropName,
+      latestPrice: crop.bestRecord?.priceModal ?? crop.latestRecord?.priceModal ?? null,
+      trendLabel: crop.trendLabel ?? 'Rates steady',
+      freshnessLabel: crop.freshnessLabel ?? 'No recent update',
+      bestMandiName: crop.bestRecord?.mandiName ?? null,
+      bestPrice: crop.bestRecord?.priceModal ?? null,
+      nearestMandiName: crop.nearestRecord?.mandiName ?? null,
+      nearestDistanceKm: crop.nearestRecord?.distanceKm ?? null,
+      mandiCount: crop.mandiCount,
+      hasLiveData: crop.latestRecord != null,
+      pinned: pinnedKeySet.has(crop.cropKey),
+    }));
+  }, [cropsQuery.data, pinnedKeySet]);
 
   const mandiItems = useMemo<MarketMandiListItem[]>(() => {
-    return getMockMandiSummaries(tradeMode).filter((item) => {
-      if (!trimmedSearchText) {
-        return true;
-      }
+    const apiMandis = mandisQuery.data?.mandis ?? [];
 
-      const searchTarget = `${item.mandiName} ${item.district} ${item.state}`.toLowerCase();
-      return searchTarget.includes(trimmedSearchText);
-    });
-  }, [tradeMode, trimmedSearchText]);
+    return apiMandis.map((mandi: any) => ({
+      mandiKey: mandi.mandiKey,
+      mandiName: mandi.mandiName,
+      district: mandi.district,
+      state: mandi.state,
+      distanceKm: mandi.distanceKm,
+      cropCount: mandi.cropCount,
+      topCropName: mandi.topRecord?.cropName ?? null,
+      topPrice: mandi.topRecord?.priceModal ?? null,
+      freshnessLabel: mandi.freshestRecord?.freshnessLabel ?? 'No recent update',
+      hasLinkedFacility: mandi.hasLinkedFacility,
+    }));
+  }, [mandisQuery.data]);
 
+  // Only show actually pinned items
   const pinnedItems = useMemo<MarketCropListItem[]>(() => {
-    return getMockPinnedCropItems(pinnedCrops, tradeMode)
-      .map((item) => ({
-        ...item,
-        pinned: true,
-      }))
-      .filter((item) =>
-        trimmedSearchText ? item.cropName.toLowerCase().includes(trimmedSearchText) : true,
-      );
-  }, [pinnedCrops, tradeMode, trimmedSearchText]);
+    return cropItems
+      .filter((item) => pinnedKeySet.has(item.cropKey))
+      .map((item) => ({ ...item, pinned: true }));
+  }, [cropItems, pinnedKeySet]);
 
-  const addCropOptions = useMemo(() => {
-    return mockCropOptions.filter((item) => !pinnedKeySet.has(item.value));
-  }, [pinnedKeySet]);
-
-  const emptyState = useMemo(() => {
-    if (view === 'pinned') {
-      return {
-        title: 'No pinned crops yet',
-        description: 'Pin crops from All Crops or add one to your watchlist.',
-        actionLabel: 'Browse crops',
-        onAction: () => setView('crops'),
-      };
-    }
-
-    if (view === 'mandis') {
-      return {
-        title: 'No mandis found',
-        description: 'Try a different mandi name or clear the search.',
-      };
-    }
-
-    return {
-      title: 'No crops found',
-      description: 'Try a different crop name or clear the search.',
-    };
-  }, [view]);
+  const isLoading = cropsQuery.isLoading || mandisQuery.isLoading;
+  const isError = !isLoading && (cropsQuery.isError || mandisQuery.isError);
 
   return (
     <MandiMarketScreen
-      addCropOptions={addCropOptions}
       cropItems={cropItems}
-      emptyState={emptyState}
+      isError={isError}
+      isLoading={isLoading}
       mandiItems={mandiItems}
-      onAddPinnedCrop={(cropKey) => {
-        const cropLabel = mockCropOptions.find((item) => item.value === cropKey)?.label;
-
-        if (!cropLabel || pinnedKeySet.has(cropKey)) {
-          return;
-        }
-
-        setPinnedCrops([...pinnedCrops, { cropKey, cropName: cropLabel }]);
-      }}
       onOpenAi={() =>
         router.push({
           pathname: '/voice',
@@ -151,10 +187,7 @@ export default function MarketRoute() {
 
         setPinnedCrops([
           ...pinnedCrops,
-          {
-            cropKey: item.cropKey,
-            cropName: item.cropName,
-          },
+          { cropKey: item.cropKey, cropName: item.cropName },
         ]);
       }}
       onTradeModeChange={setTradeMode}

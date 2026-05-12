@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import {
+  Cpu,
   Droplets,
-  Power,
   ShieldAlert,
   Thermometer,
   Wind,
@@ -144,7 +144,7 @@ export function IrrigationDeviceCard({
                 {device.status === 'FAULT' ? (
                   <ShieldAlert color={semanticColors.danger} size={20} />
                 ) : (
-                  <Power
+                  <Cpu
                     color={
                       device.pumpState === 'ON'
                         ? semanticColors.warning
@@ -239,6 +239,7 @@ export function IrrigationDeviceCard({
           <View
             style={{
               flexDirection: 'row',
+              alignItems: 'center',
               gap: spacing.xxs,
               padding: spacing.xxs,
               borderRadius: radii.pill,
@@ -248,6 +249,34 @@ export function IrrigationDeviceCard({
               backgroundColor: 'rgba(255,255,255,0.6)',
             }}
           >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.xxs,
+                paddingLeft: spacing.sm,
+                paddingRight: spacing.xxs,
+              }}
+            >
+              <Droplets color={palette.sky} size={14} />
+              <Text
+                style={{
+                  color: palette.ink,
+                  fontFamily: typography.bodyStrong,
+                  fontSize: 12,
+                }}
+              >
+                Pump
+              </Text>
+              <View
+                style={{
+                  width: 1,
+                  height: 22,
+                  backgroundColor: 'rgba(30,42,34,0.15)',
+                  marginLeft: spacing.xxs,
+                }}
+              />
+            </View>
             {(['AUTO', 'FORCE_ON', 'FORCE_OFF'] as const).map((mode) => (
               <SegmentedModeButton
                 key={mode}

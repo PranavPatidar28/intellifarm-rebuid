@@ -349,15 +349,6 @@ export const createDiseaseReportSchema = z
     placeLabel: z.string().trim().min(2).max(80).optional(),
     userNote: z.string().trim().max(500).optional(),
     captureMode: z.enum(diseaseCaptureModes).default('CAMERA_DUAL_ANGLE'),
-  })
-  .superRefine((value, context) => {
-    if (!value.cropSeasonId && !value.placeLabel) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Choose a saved crop season or enter a new place label',
-        path: ['cropSeasonId'],
-      });
-    }
   });
 
 export const soilMetricsSchema = z
@@ -380,12 +371,20 @@ export const seasonProfileSchema = z.object({
   sowingMonth: z.number().int().min(1).max(12),
 });
 
+export const waterSupplyLevels = [
+  'PLENTY',
+  'MODERATE',
+  'LIMITED',
+  'SCARCE',
+] as const;
+
 export const explorerContextSchema = z
   .object({
     state: z.string().trim().min(2).max(80),
     district: z.string().trim().min(2).max(80).optional(),
     village: z.string().trim().min(2).max(80).optional(),
     irrigationType: z.enum(irrigationTypes),
+    farmSizeAcre: z.number().positive().max(500).optional(),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
   })
@@ -426,6 +425,7 @@ export const cropSuggestionPredictionSchema = z.object({
   seasonProfile: seasonProfileSchema,
   soilType: z.enum(soilTypes).optional(),
   soilMetrics: soilMetricsSchema.optional(),
+  waterSupplyLevel: z.enum(waterSupplyLevels).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   weatherOverride: z
@@ -953,14 +953,33 @@ export const cropSuggestionSchema = z.object({
   rationale: z.string(),
 });
 
+export const ragExplanationSectionSchema = z.object({
+  heading: z.string(),
+  text: z.string(),
+});
+
+export const cropRecommendationSchema = z.object({
+  cropName: z.string(),
+  averageYieldTonnePerHectare: z.number(),
+  bestCaseYieldTonnePerHectare: z.number(),
+  worstCaseYieldTonnePerHectare: z.number(),
+  averageProfitRs: z.number(),
+  averageRevenueRs: z.number(),
+  estimatedCostRs: z.number(),
+  failureRiskPct: z.number(),
+  finalScore: z.number(),
+  ragExplanation: z.array(ragExplanationSectionSchema),
+  suggestion: z.string(),
+});
+
 export const cropPredictionSoilProfileSchema = z.object({
   soilType: z.enum(soilTypes).nullable().optional(),
-  source: z.enum(soilProfileSources),
+  source: z.string(),
   summary: z.string(),
 });
 
 export const cropPredictionSeasonClimateSchema = z.object({
-  method: z.enum(seasonClimateMethods),
+  method: z.string(),
   averageTempC: z.number(),
   averageHumidityPercent: z.number(),
   totalRainfallMm: z.number(),
@@ -970,7 +989,8 @@ export const cropPredictionSeasonClimateSchema = z.object({
 
 export const cropSuggestionPredictionResponseSchema = z.object({
   prediction: predictionSummarySchema.omit({ outputJson: true }),
-  suggestions: z.array(cropSuggestionSchema),
+  topCrops: z.array(cropRecommendationSchema),
+  cropMustNotBeGrown: z.string().nullable(),
   inputConfidence: z.enum(predictionInputConfidenceLevels),
   soilProfile: cropPredictionSoilProfileSchema,
   seasonClimate: cropPredictionSeasonClimateSchema,

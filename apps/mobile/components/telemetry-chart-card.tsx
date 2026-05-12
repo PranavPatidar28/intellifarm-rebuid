@@ -23,17 +23,39 @@ export function TelemetryChartCard({
 
     const recent = telemetry.slice(-18);
 
+    const labels = recent.map((_, i) => {
+      if (i === 0) return 'Earlier';
+      if (i === recent.length - 1) return 'Now';
+      return '';
+    });
+
+    const datasets: any[] = [
+      {
+        data: recent.map((point) => point.soilMoisturePercent),
+        color: (opacity = 1) => `rgba(30, 94, 59, ${opacity})`,
+        strokeWidth: 2.5,
+      },
+    ];
+
+    if (thresholds) {
+      datasets.push({
+        data: recent.map(() => thresholds.lowThreshold),
+        color: (opacity = 1) => `rgba(200, 50, 50, ${opacity * 0.4})`, // subtle red line
+        strokeWidth: 1.5,
+        withDots: false,
+      });
+    }
+
     return {
-      labels: recent.map(() => ''),
-      datasets: [
-        {
-          data: recent.map((point) => point.soilMoisturePercent),
-          color: (opacity = 1) => `rgba(30, 94, 59, ${opacity})`,
-          strokeWidth: 2.5,
-        },
-      ],
+      labels,
+      datasets,
     };
-  }, [telemetry]);
+  }, [telemetry, thresholds]);
+
+  const hiddenIndices = useMemo(() => {
+    if (!chartData || chartData.datasets[0].data.length <= 1) return [];
+    return Array.from({ length: chartData.datasets[0].data.length - 1 }, (_, i) => i);
+  }, [chartData]);
 
   if (!chartData) {
     return (
@@ -131,7 +153,9 @@ export function TelemetryChartCard({
               labelColor: (opacity = 1) => `rgba(137, 147, 138, ${opacity})`,
               strokeWidth: 2.5,
               propsForDots: {
-                r: '0',
+                r: '4',
+                strokeWidth: '2',
+                stroke: palette.white,
               },
               propsForBackgroundLines: {
                 strokeWidth: 0,
@@ -143,9 +167,11 @@ export function TelemetryChartCard({
             withHorizontalLines={false}
             withInnerLines={false}
             withOuterLines={false}
-            withVerticalLabels={false}
-            withHorizontalLabels={false}
+            withVerticalLabels={true}
+            withHorizontalLabels={true}
+            yAxisSuffix="%"
             fromZero
+            hidePointsAtIndex={hiddenIndices}
           />
         </View>
       </View>

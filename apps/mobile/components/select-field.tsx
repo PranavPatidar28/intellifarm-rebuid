@@ -1,241 +1,201 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  Modal,
+  LayoutAnimation,
+  Platform,
   Pressable,
   Text,
+  UIManager,
   View,
-  useWindowDimensions,
-  type View as ViewInstance,
 } from 'react-native';
 
-import { Check, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Check, ChevronDown } from 'lucide-react-native';
 
-import { InsetCard } from '@/components/inset-card';
-import { MotionPressable } from '@/components/motion-pressable';
-import { palette, radii, shadow, spacing, typography } from '@/theme/tokens';
+import { palette, radii, spacing, typography } from '@/theme/tokens';
 
-export function SelectField<T extends string>({
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+type SelectOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+type SelectFieldProps = {
+  label: string;
+  value: string;
+  options: ReadonlyArray<SelectOption>;
+  onChange: (value: string) => void;
+  placeholder?: string;
+};
+
+export function SelectField({
   label,
   value,
   options,
   onChange,
-  placeholder,
-  helper,
-  open,
-  onOpenChange,
-}: {
-  label: string;
-  value: T;
-  options: ReadonlyArray<{ value: T; label: string }>;
-  onChange: (value: T) => void;
-  placeholder?: string;
-  helper?: string;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const [menuLayout, setMenuLayout] = useState({
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-  });
-  const triggerRef = useRef<ViewInstance | null>(null);
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const selectedOption = useMemo(
-    () => options.find((option) => option.value === value) ?? null,
-    [options, value],
-  );
-  const expanded = open ?? internalOpen;
-  const setExpanded = onOpenChange ?? setInternalOpen;
-  const menuWidth = Math.min(
-    Math.max(menuLayout.width, 180),
-    windowWidth - spacing.lg * 2,
-  );
-  const optionRowHeight = 46;
-  const menuChromeHeight = 16;
-  const desiredMenuHeight = options.length * optionRowHeight + menuChromeHeight;
+  placeholder = 'Select…',
+}: SelectFieldProps) {
+  const [expanded, setExpanded] = useState(false);
 
-  const updateMenuLayout = useCallback(() => {
-    triggerRef.current?.measureInWindow((x, y, width, height) => {
-      setMenuLayout({ x, y, width, height });
-    });
+  const selectedOption = options.find((o) => o.value === value);
+  const displayLabel = selectedOption?.label ?? placeholder;
+
+  const toggle = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((v) => !v);
   }, []);
 
-  useEffect(() => {
-    if (!expanded) {
-      return;
-    }
-
-    updateMenuLayout();
-  }, [expanded, updateMenuLayout, windowHeight, windowWidth]);
-
-  const closeMenu = () => setExpanded(false);
-  const availableBelow = windowHeight - (menuLayout.y + menuLayout.height) - spacing.lg;
-  const availableAbove = menuLayout.y - spacing.lg;
-  const shouldOpenAbove =
-    availableBelow < desiredMenuHeight && availableAbove > availableBelow;
-  const menuTop = shouldOpenAbove
-    ? Math.max(spacing.lg, menuLayout.y - Math.min(desiredMenuHeight, availableAbove) - spacing.xs)
-    : menuLayout.y + menuLayout.height + spacing.xs;
-  const menuLeft = Math.min(
-    Math.max(spacing.lg, menuLayout.x),
-    windowWidth - menuWidth - spacing.lg,
-  );
-  const menuMaxHeight = Math.max(
-    120,
-    shouldOpenAbove ? availableAbove : availableBelow,
+  const handleSelect = useCallback(
+    (optionValue: string) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      onChange(optionValue);
+      setExpanded(false);
+    },
+    [onChange],
   );
 
   return (
-    <View
-      style={{
-        gap: spacing.xs,
-        position: 'relative',
-        zIndex: expanded ? 60 : 1,
-      }}
-    >
+    <View style={{ gap: spacing.xs }}>
       <Text
         style={{
-          color: palette.inkMuted,
+          color: palette.ink,
           fontFamily: typography.bodyStrong,
-          fontSize: 11,
-          textTransform: 'uppercase',
+          fontSize: 14,
         }}
       >
         {label}
       </Text>
 
-      <View
-        ref={triggerRef}
-        collapsable={false}
-        style={{ position: 'relative', zIndex: expanded ? 60 : 1 }}
+      <Pressable
+        onPress={toggle}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.md,
+          paddingVertical: 14,
+          borderRadius: radii.lg,
+          borderCurve: 'continuous',
+          backgroundColor: palette.white,
+          borderWidth: 1,
+          borderColor: expanded ? palette.leaf : palette.outline,
+          boxShadow: expanded
+            ? '0 6px 16px rgba(47, 125, 78, 0.10)'
+            : '0 4px 12px rgba(31, 46, 36, 0.04)',
+        }}
       >
-        <MotionPressable
-          onPress={() => {
-            if (!expanded) {
-              updateMenuLayout();
-            }
-            setExpanded(!expanded);
-          }}
-          contentStyle={{
-            minHeight: 50,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: spacing.sm,
-            paddingHorizontal: spacing.md,
-            borderRadius: radii.xl,
-            borderCurve: 'continuous',
-            borderWidth: 1,
-            borderColor: expanded ? palette.leaf : palette.outline,
-            backgroundColor: expanded ? palette.white : palette.parchmentSoft,
-            boxShadow: expanded ? '0 10px 22px rgba(31, 46, 36, 0.08)' : shadow.soft,
-          }}
-        >
-          <Text
-            style={{
-              flex: 1,
-              color: selectedOption ? palette.ink : palette.inkMuted,
-              fontFamily: selectedOption ? typography.bodyStrong : typography.bodyRegular,
-              fontSize: 14,
-            }}
-          >
-            {selectedOption?.label ?? placeholder ?? 'Select'}
-          </Text>
-          {expanded ? (
-            <ChevronUp color={palette.inkSoft} size={18} />
-          ) : (
-            <ChevronDown color={palette.inkSoft} size={18} />
-          )}
-        </MotionPressable>
-      </View>
-
-      <Modal
-        animationType="fade"
-        transparent
-        visible={expanded}
-        onRequestClose={closeMenu}
-      >
-        <Pressable
-          onPress={closeMenu}
-          style={{
-            flex: 1,
-            backgroundColor: 'transparent',
-          }}
-        >
-          <View
-            pointerEvents="box-none"
-            style={{
-              flex: 1,
-            }}
-          >
-            <View
-              style={{
-                position: 'absolute',
-                top: menuTop,
-                left: menuLeft,
-                width: menuWidth,
-                maxHeight: menuMaxHeight,
-              }}
-            >
-              <InsetCard padding={8}>
-                <View style={{ gap: 4 }}>
-                  {options.map((option) => {
-                    const active = option.value === value;
-
-                    return (
-                      <MotionPressable
-                        key={option.value}
-                        onPress={() => {
-                          onChange(option.value);
-                          closeMenu();
-                        }}
-                        contentStyle={{
-                          minHeight: 42,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: spacing.sm,
-                          paddingHorizontal: spacing.md,
-                          paddingVertical: 10,
-                          borderRadius: radii.md,
-                          borderCurve: 'continuous',
-                          backgroundColor: active ? palette.leafMist : palette.white,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            flex: 1,
-                            color: active ? palette.leafDark : palette.inkSoft,
-                            fontFamily: active ? typography.bodyStrong : typography.bodyRegular,
-                            fontSize: 13,
-                          }}
-                        >
-                          {option.label}
-                        </Text>
-                        {active ? <Check color={palette.leafDark} size={16} /> : null}
-                      </MotionPressable>
-                    );
-                  })}
-                </View>
-              </InsetCard>
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {helper ? (
         <Text
           style={{
-            color: palette.inkMuted,
-            fontFamily: typography.bodyRegular,
-            fontSize: 11,
+            flex: 1,
+            color: selectedOption ? palette.ink : palette.inkMuted,
+            fontFamily: selectedOption
+              ? typography.bodyStrong
+              : typography.bodyRegular,
+            fontSize: 15,
           }}
         >
-          {helper}
+          {displayLabel}
         </Text>
-      ) : null}
+
+        <View
+          style={{
+            transform: [{ rotate: expanded ? '180deg' : '0deg' }],
+          }}
+        >
+          <ChevronDown
+            color={expanded ? palette.leaf : palette.inkSoft}
+            size={18}
+            strokeWidth={2.2}
+          />
+        </View>
+      </Pressable>
+
+      {expanded && (
+        <View
+          style={{
+            borderRadius: radii.lg,
+            borderCurve: 'continuous',
+            backgroundColor: palette.white,
+            borderWidth: 1,
+            borderColor: palette.outline,
+            overflow: 'hidden',
+            boxShadow: '0 8px 20px rgba(31, 46, 36, 0.08)',
+          }}
+        >
+          {options.map((option, index) => {
+            const isSelected = option.value === value;
+            const isLast = index === options.length - 1;
+
+            return (
+              <Pressable
+                key={option.value}
+                onPress={() => handleSelect(option.value)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 14,
+                  backgroundColor: pressed
+                    ? palette.leafMist
+                    : isSelected
+                      ? 'rgba(47, 125, 78, 0.05)'
+                      : 'transparent',
+                  borderBottomWidth: isLast ? 0 : 1,
+                  borderBottomColor: palette.outline,
+                })}
+              >
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text
+                    style={{
+                      color: isSelected ? palette.leafDark : palette.ink,
+                      fontFamily: isSelected
+                        ? typography.bodyStrong
+                        : typography.bodyRegular,
+                      fontSize: 15,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                  {option.description ? (
+                    <Text
+                      style={{
+                        color: palette.inkSoft,
+                        fontFamily: typography.bodyRegular,
+                        fontSize: 12,
+                        lineHeight: 17,
+                      }}
+                    >
+                      {option.description}
+                    </Text>
+                  ) : null}
+                </View>
+
+                {isSelected && (
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: palette.leaf,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Check color={palette.white} size={13} strokeWidth={3} />
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }

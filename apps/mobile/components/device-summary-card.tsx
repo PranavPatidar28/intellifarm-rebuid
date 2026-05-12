@@ -1,7 +1,7 @@
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
-import { ChevronRight, Cpu, Droplets, Power, WifiOff } from 'lucide-react-native';
+import { ChevronRight, Cpu, Droplets, WifiOff } from 'lucide-react-native';
 
 import { Button } from '@/components/button';
 import { InsetCard } from '@/components/inset-card';
@@ -119,7 +119,7 @@ export function DeviceSummaryCard({ plot }: { plot: FarmPlot }) {
 
         <View style={{ flex: 1, backgroundColor: palette.parchment, borderRadius: radii.md, padding: spacing.sm, gap: 4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Power size={14} color={device.pumpState === 'ON' ? palette.leafDark : palette.inkSoft} />
+            <Cpu size={14} color={device.pumpState === 'ON' ? palette.leafDark : palette.inkSoft} />
             <Text style={{ fontFamily: typography.bodyRegular, fontSize: 12, color: palette.inkSoft }}>Pump State</Text>
           </View>
           <Text

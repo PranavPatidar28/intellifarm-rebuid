@@ -4,6 +4,7 @@ import type { Facility, MarketRecord as PrismaMarketRecord } from '@prisma/clien
 import { diffInDays } from '../common/utils/date.util';
 import { haversineDistanceKm } from '../common/utils/geo.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { MandiLocationEngine } from './mandi-location.engine';
 import {
   MARKET_PROVIDER,
   type MarketProvider,
@@ -53,6 +54,7 @@ export class MarketsService {
     private readonly prisma: PrismaService,
     @Inject(MARKET_PROVIDER)
     private readonly marketProvider: MarketProvider,
+    private readonly mandiLocationEngine: MandiLocationEngine,
   ) {}
 
   async listMarkets(userId: string, query: MarketQuery) {
@@ -426,24 +428,26 @@ export class MarketsService {
 
     const historyByKey = groupMarketHistory(historyRecords);
 
-    return records
-      .map((record) => {
+    const enriched = await Promise.all(
+      records.map(async (record) => {
         const mandiKey = createMandiKey(record.mandiName, record.district, record.state);
         const linkedFacility =
           (record.facilityId ? facilityById.get(record.facilityId) : undefined) ??
           facilityByKey.get(mandiKey) ??
           null;
+        const mandiLocation =
+          linkedFacility
+            ? { latitude: linkedFacility.latitude, longitude: linkedFacility.longitude }
+            : await this.mandiLocationEngine.getCoordinates(record.mandiName, record.district, record.state);
+
         const distanceKm =
           includeDistance &&
           latitude != null &&
           longitude != null &&
-          linkedFacility
+          mandiLocation
             ? haversineDistanceKm(
                 { latitude, longitude },
-                {
-                  latitude: linkedFacility.latitude,
-                  longitude: linkedFacility.longitude,
-                },
+                mandiLocation,
               )
             : null;
 
@@ -478,7 +482,9 @@ export class MarketsService {
                 : 'Stable',
         } satisfies EnrichedMarketRecord;
       })
-      .sort((left, right) => {
+    );
+
+    return enriched.sort((left, right) => {
         if (includeDistance && left.distanceKm != null && right.distanceKm != null) {
           return left.distanceKm - right.distanceKm;
         }

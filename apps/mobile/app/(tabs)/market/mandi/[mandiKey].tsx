@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react-native';
 
 import { Button } from '@/components/button';
 import { GradientFeatureCard } from '@/components/gradient-feature-card';
@@ -22,7 +23,9 @@ import {
   type MarketExplorerScope,
 } from '@/lib/market-explorer';
 import { useStoredValue } from '@/lib/storage';
-import { gradients, palette, spacing, typography } from '@/theme/tokens';
+import { gradients, palette, radii, spacing, typography } from '@/theme/tokens';
+
+const INITIAL_CROPS = 5;
 
 export default function MandiDetailRoute() {
   const params = useLocalSearchParams<{ mandiKey: string; scope?: string }>();
@@ -30,6 +33,8 @@ export default function MandiDetailRoute() {
   const { profile, token } = useSession();
   const { location } = useDeviceLocation();
   const [selectedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');
+  const [showAllCrops, setShowAllCrops] = useState(false);
+  const [cropSortMode, setCropSortMode] = useState<'price_high' | 'price_low'>('price_high');
 
   const mandiKey = params.mandiKey ?? '';
   const scope =
@@ -101,6 +106,19 @@ export default function MandiDetailRoute() {
     );
   }
 
+  // ── Sort + progressive disclosure ─────────────────────────────────
+
+  const sortedCrops = useMemo(() => {
+    return [...mandi.records].sort((a: any, b: any) =>
+      cropSortMode === 'price_high'
+        ? (b.priceModal ?? 0) - (a.priceModal ?? 0)
+        : (a.priceModal ?? 0) - (b.priceModal ?? 0),
+    );
+  }, [mandi.records, cropSortMode]);
+
+  const displayedCrops = showAllCrops ? sortedCrops : sortedCrops.slice(0, INITIAL_CROPS);
+  const hasMoreCrops = sortedCrops.length > INITIAL_CROPS;
+
   return (
     <>
       <Stack.Screen options={{ title: mandi.mandiName }} />
@@ -110,6 +128,7 @@ export default function MandiDetailRoute() {
         subtitle={`${mandi.district}, ${mandi.state}`}
         heroTone="market"
       >
+        {/* ── Hero card ────────────────────────────────────────── */}
         <GradientFeatureCard colors={gradients.marketGold} padding={16}>
           <View style={{ gap: spacing.sm }}>
             <Text
@@ -145,6 +164,7 @@ export default function MandiDetailRoute() {
           </View>
         </GradientFeatureCard>
 
+        {/* ── Action buttons ───────────────────────────────────── */}
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <Button
             label="Ask Assistant"
@@ -161,48 +181,21 @@ export default function MandiDetailRoute() {
               } as never)
             }
           />
-          {mandi.linkedFacility ? (
-            <Button
-              label="Nearby facility"
-              fullWidth={false}
-              variant="soft"
-              onPress={() => router.push('/facilities')}
-            />
-          ) : null}
         </View>
 
+        {/* ── Linked facility ──────────────────────────────────── */}
         {mandi.linkedFacility ? (
           <View style={{ gap: spacing.sm }}>
             <SectionHeaderRow eyebrow="Linked service" title="Facility context" />
             <GradientFeatureCard padding={16}>
               <View style={{ gap: spacing.sm }}>
-                <Text
-                  style={{
-                    color: palette.ink,
-                    fontFamily: typography.bodyStrong,
-                    fontSize: 15,
-                  }}
-                >
+                <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 15 }}>
                   {mandi.linkedFacility.primaryServiceLabel}
                 </Text>
-                <Text
-                  style={{
-                    color: palette.inkSoft,
-                    fontFamily: typography.bodyRegular,
-                    fontSize: 13,
-                    lineHeight: 20,
-                  }}
-                >
+                <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 13, lineHeight: 20 }}>
                   {mandi.linkedFacility.travelHint}
                 </Text>
-                <Text
-                  style={{
-                    color: palette.inkMuted,
-                    fontFamily: typography.bodyRegular,
-                    fontSize: 12,
-                    lineHeight: 18,
-                  }}
-                >
+                <Text style={{ color: palette.inkMuted, fontFamily: typography.bodyRegular, fontSize: 12, lineHeight: 18 }}>
                   Services: {mandi.linkedFacility.services.join(', ')}
                 </Text>
               </View>
@@ -210,6 +203,7 @@ export default function MandiDetailRoute() {
           </View>
         ) : null}
 
+        {/* ── Top crop ─────────────────────────────────────────── */}
         {mandi.topRecord ? (
           <View style={{ gap: spacing.sm }}>
             <SectionHeaderRow eyebrow="Top quote" title="Strongest current crop" />
@@ -220,20 +214,39 @@ export default function MandiDetailRoute() {
               helper={`Range ${formatCurrency(mandi.topRecord.priceMin)} - ${formatCurrency(mandi.topRecord.priceMax)}`}
               badgeLabel={mandi.topRecord.trendLabel}
               badgeTone={trendTone(mandi.topRecord.trendDirection)}
-              distanceLabel={
-                mandi.distanceKm != null ? formatDistance(mandi.distanceKm) : null
-              }
+              distanceLabel={mandi.distanceKm != null ? formatDistance(mandi.distanceKm) : null}
             />
           </View>
         ) : null}
 
+        {/* ── All crops with sort filters ──────────────────────── */}
         <View style={{ gap: spacing.sm }}>
           <SectionHeaderRow
             eyebrow={`${mandi.records.length} quotes`}
-            title={`All crops at this mandi`}
+            title="All crops at this mandi"
           />
-          {mandi.records.length ? (
-            mandi.records.map((record) => (
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8 }}
+          >
+            <SortPill
+              label="Price: High"
+              icon={ArrowDownWideNarrow}
+              active={cropSortMode === 'price_high'}
+              onPress={() => setCropSortMode('price_high')}
+            />
+            <SortPill
+              label="Price: Low"
+              icon={ArrowUpNarrowWide}
+              active={cropSortMode === 'price_low'}
+              onPress={() => setCropSortMode('price_low')}
+            />
+          </ScrollView>
+
+          {displayedCrops.length ? (
+            displayedCrops.map((record: any) => (
               <MarketQuoteCard
                 key={`${record.id}-${record.cropName}`}
                 title={record.cropName}
@@ -242,37 +255,78 @@ export default function MandiDetailRoute() {
                 helper={`Range ${formatCurrency(record.priceMin)} - ${formatCurrency(record.priceMax)}`}
                 badgeLabel={record.trendLabel}
                 badgeTone={trendTone(record.trendDirection)}
-                distanceLabel={
-                  mandi.distanceKm != null ? formatDistance(mandi.distanceKm) : null
-                }
+                distanceLabel={mandi.distanceKm != null ? formatDistance(mandi.distanceKm) : null}
               />
             ))
           ) : (
-            <Text
-              style={{
-                color: palette.inkSoft,
-                fontFamily: typography.bodyRegular,
-                fontSize: 14,
-                lineHeight: 21,
-              }}
-            >
+            <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 14, lineHeight: 21 }}>
               No crop quotes are visible for this mandi in {scopeLabel}.
             </Text>
           )}
+
+          {hasMoreCrops && !showAllCrops ? (
+            <Pressable
+              onPress={() => setShowAllCrops(true)}
+              style={{
+                alignItems: 'center',
+                paddingVertical: 14,
+                borderRadius: radii.xl,
+                borderCurve: 'continuous',
+                backgroundColor: palette.leafMist,
+                borderWidth: 1,
+                borderColor: 'rgba(30, 94, 59, 0.12)',
+              }}
+            >
+              <Text style={{ color: palette.leafDark, fontFamily: typography.bodyStrong, fontSize: 14 }}>
+                View all {sortedCrops.length} crops
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </PageShell>
     </>
   );
 }
 
-function trendTone(direction: 'UP' | 'DOWN' | 'STABLE') {
-  if (direction === 'UP') {
-    return 'success' as const;
-  }
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-  if (direction === 'DOWN') {
-    return 'danger' as const;
-  }
-
+function trendTone(direction: string) {
+  if (direction === 'UP') return 'success' as const;
+  if (direction === 'DOWN') return 'danger' as const;
   return 'neutral' as const;
+}
+
+function SortPill({
+  label,
+  icon: Icon,
+  active,
+  onPress,
+}: {
+  label: string;
+  icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        borderRadius: radii.pill,
+        borderCurve: 'continuous',
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        backgroundColor: active ? palette.leafMist : '#F5F4F1',
+        borderWidth: 1,
+        borderColor: active ? 'rgba(30, 94, 59, 0.16)' : 'rgba(30, 42, 34, 0.08)',
+      }}
+    >
+      <Icon color={active ? palette.leafDark : palette.ink} size={13} strokeWidth={2.1} />
+      <Text style={{ color: active ? palette.leafDark : palette.ink, fontFamily: typography.bodyStrong, fontSize: 13 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }

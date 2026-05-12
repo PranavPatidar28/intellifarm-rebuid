@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,9 +8,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Camera, ImagePlus, Sparkles, TriangleAlert } from 'lucide-react-native';
 
 import { Button } from '@/components/button';
-import { CompactListCard } from '@/components/compact-list-card';
 import { ConfidenceBadge } from '@/components/confidence-badge';
 import { EmptyState } from '@/components/empty-state';
+import { InsetCard } from '@/components/inset-card';
 import { OfflineBanner } from '@/components/offline-banner';
 import { PageShell } from '@/components/page-shell';
 import { SectionTitle } from '@/components/section-title';
@@ -22,32 +22,25 @@ import { useCachedQuery } from '@/hooks/use-cached-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { apiGet, ApiError } from '@/lib/api';
 import type { DiseaseReportsResponse } from '@/lib/api-types';
-import { getAllSeasons } from '@/lib/domain';
+import { API_BASE_URL } from '@/lib/env';
 import { submitDiseaseReport } from '@/lib/disease-upload';
 import { formatLongDate } from '@/lib/format';
 import { queueDiseaseUpload } from '@/lib/pending-disease-uploads';
 import { storageKeys } from '@/lib/constants';
 import { useStoredValue } from '@/lib/storage';
-import { palette, radii, semanticColors, spacing, typography } from '@/theme/tokens';
+import { palette, radii, semanticColors, spacing, surfaces, typography } from '@/theme/tokens';
 
 export default function DiagnoseRoute() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const network = useNetworkStatus();
-  const { profile, token } = useSession();
-  const [storedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');
+  const { token } = useSession();
   const [pendingUploads] = useStoredValue(storageKeys.pendingDiseaseReports, []);
-  const [cropSeasonId, setCropSeasonId] = useState(storedSeasonId);
-  const [placeLabel, setPlaceLabel] = useState('');
   const [symptoms, setSymptoms] = useState('');
-  const [daysVisible, setDaysVisible] = useState('');
-  const [spreadStatus, setSpreadStatus] = useState<'YES' | 'NO' | 'NOT_SURE'>('NOT_SURE');
   const [diseasedImageUri, setDiseasedImageUri] = useState('');
   const [cropImageUri, setCropImageUri] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const seasons = useMemo(() => getAllSeasons(profile), [profile]);
 
   const reportsQuery = useCachedQuery({
     cacheKey: 'disease-reports',
@@ -56,21 +49,45 @@ export default function DiagnoseRoute() {
     queryFn: () => apiGet<DiseaseReportsResponse>('/disease-reports', token),
   });
 
+  const resolveImageSource = (uri?: string | null) => {
+    if (!uri) return null;
+    const normalizedUri = uri.trim();
+    if (!normalizedUri) return null;
+
+    const uploadsMatch = normalizedUri.match(/\/(?:v1\/)?uploads\/([^/]+)\/([^/?#]+)/i);
+    if (uploadsMatch) {
+      const [, folder, filename] = uploadsMatch;
+      const nextUri = `${API_BASE_URL}/v1/uploads/${folder}/${filename}`;
+
+      return token
+        ? {
+            uri: nextUri,
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : nextUri;
+    }
+
+    const mediaMatch = normalizedUri.match(/\/(?:v1\/)?media\/([^/]+)\/([^/?#]+)/i);
+    if (mediaMatch) {
+      const [, folder, filename] = mediaMatch;
+      const nextUri = `${API_BASE_URL}/v1/media/${folder}/${filename}`;
+
+      return token
+        ? {
+            uri: nextUri,
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : nextUri;
+    }
+
+    return normalizedUri;
+  };
+
   const latestReports = reportsQuery.data?.reports.slice(0, 3) ?? [];
-
-  const composedNote = useMemo(() => {
-    const segments = [
-      symptoms.trim(),
-      daysVisible.trim() ? `Visible for ${daysVisible.trim()} day(s).` : '',
-      spreadStatus === 'YES'
-        ? 'Farmer says the issue is spreading.'
-        : spreadStatus === 'NO'
-          ? 'Farmer says the issue is not spreading.'
-          : 'Spread is not yet confirmed.',
-    ].filter(Boolean);
-
-    return segments.join(' ');
-  }, [daysVisible, spreadStatus, symptoms]);
 
   const pickImage = async (kind: 'diseased' | 'crop') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -108,17 +125,10 @@ export default function DiagnoseRoute() {
       return;
     }
 
-    if (!cropSeasonId && !placeLabel.trim()) {
-      setMessage('Choose a saved crop season or enter a place label.');
-      return;
-    }
-
-    const userNote = composedNote || undefined;
+    const userNote = symptoms.trim() || undefined;
 
     if (!token || network.isOffline) {
       await queueDiseaseUpload({
-        cropSeasonId: cropSeasonId || undefined,
-        placeLabel: cropSeasonId ? undefined : placeLabel.trim(),
         userNote,
         cropImageUri,
         diseasedImageUri,
@@ -134,8 +144,6 @@ export default function DiagnoseRoute() {
     try {
       const response = await submitDiseaseReport({
         token,
-        cropSeasonId: cropSeasonId || undefined,
-        placeLabel: cropSeasonId ? undefined : placeLabel.trim(),
         userNote,
         cropImageUri,
         diseasedImageUri,
@@ -164,23 +172,9 @@ export default function DiagnoseRoute() {
   return (
     <PageShell
       eyebrow="Diagnose crop problem"
-      title="Dual-photo crop check"
-      subtitle="Use one close-up photo and one full crop photo for a safer AI triage."
+      title="Crop Disease Check"
+      subtitle="Upload a close-up and a full crop photo for accurate AI triage."
       heroTone="assistant"
-      hero={
-        <SunriseCard accent="soft" title="Safer diagnosis">
-          <Text
-            style={{
-              color: palette.inkSoft,
-              fontFamily: typography.bodyRegular,
-              fontSize: 12,
-              lineHeight: 18,
-            }}
-          >
-            IntelliFarm keeps confidence visible and does not treat one blurry image as final proof.
-          </Text>
-        </SunriseCard>
-      }
     >
       {network.isOffline || pendingUploads.length ? (
         <OfflineBanner
@@ -193,7 +187,7 @@ export default function DiagnoseRoute() {
         />
       ) : null}
 
-      <SectionTitle eyebrow="Step 1" title="Attach two photos" />
+      <SectionTitle eyebrow="Step 1" title="Photos" />
       <View style={{ gap: spacing.sm }}>
         <PhotoTile
           title="Affected part photo"
@@ -215,64 +209,14 @@ export default function DiagnoseRoute() {
         />
       </View>
 
-      <SectionTitle eyebrow="Step 2" title="Add field context" />
-      {seasons.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {seasons.map((season) => (
-            <Button
-              key={season.id}
-              label={`${season.cropName} - ${season.farmPlot.name}`}
-              fullWidth={false}
-              variant={cropSeasonId === season.id ? 'primary' : 'soft'}
-              onPress={() => {
-                setCropSeasonId(cropSeasonId === season.id ? '' : season.id);
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
-
-      {!cropSeasonId ? (
-        <TextField
-          label="Place label"
-          value={placeLabel}
-          onChangeText={setPlaceLabel}
-          placeholder="Village or field nickname"
-          helper="Only needed if the issue is not tied to one saved crop season."
-        />
-      ) : null}
-
+      <SectionTitle eyebrow="Step 2" title="Symptoms (Optional)" />
       <TextField
         label="What do you notice?"
         value={symptoms}
         onChangeText={setSymptoms}
-        placeholder="Brown spots, yellow edges, wilting..."
+        placeholder="e.g. Brown spots, yellow edges, wilting..."
         multiline
       />
-      <TextField
-        label="How many days has it been visible?"
-        value={daysVisible}
-        onChangeText={setDaysVisible}
-        keyboardType="numeric"
-      />
-
-      <SunriseCard accent="soft" title="Is it spreading?">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {[
-            { value: 'YES', label: 'Yes' },
-            { value: 'NO', label: 'No' },
-            { value: 'NOT_SURE', label: 'Not sure' },
-          ].map((option) => (
-            <Button
-              key={option.value}
-              label={option.label}
-              fullWidth={false}
-              variant={spreadStatus === option.value ? 'primary' : 'soft'}
-              onPress={() => setSpreadStatus(option.value as typeof spreadStatus)}
-            />
-          ))}
-        </View>
-      </SunriseCard>
 
       {message ? (
         <SunriseCard accent="warning" title="Upload note">
@@ -308,7 +252,6 @@ export default function DiagnoseRoute() {
                   ? `Help me think through this crop-health issue before I act: ${symptoms.trim()}`
                   : 'Help me think through a crop-health issue before I act.',
               originRoute: 'diagnose',
-              focusCropSeasonId: cropSeasonId || undefined,
             },
           } as never)
         }
@@ -317,13 +260,9 @@ export default function DiagnoseRoute() {
       <SectionTitle eyebrow="Recent checks" title="Crop health history" />
       <View style={{ gap: spacing.sm }}>
         {latestReports.length ? (
-          latestReports.map((report) => (
-            <CompactListCard
+          latestReports.map((report: any) => (
+            <Pressable
               key={report.id}
-              title={report.predictedIssue ?? 'Unclear issue'}
-              subtitle={report.recommendation}
-              meta={formatLongDate(report.createdAt)}
-              trailing={<ConfidenceBadge score={report.confidenceScore} />}
               onPress={() =>
                 router.push({
                   pathname: '/disease-report/[id]',
@@ -331,21 +270,76 @@ export default function DiagnoseRoute() {
                 })
               }
             >
-              {report.escalationRequired ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <TriangleAlert color={semanticColors.danger} size={16} />
-                  <Text
-                    style={{
-                      color: semanticColors.danger,
-                      fontFamily: typography.bodyStrong,
-                      fontSize: 12,
-                    }}
-                  >
-                    Expert review recommended
-                  </Text>
+              <InsetCard padding={12}>
+                <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+                  {report.image1Url ? (
+                    <Image
+                      source={resolveImageSource(report.image1Url)}
+                      style={{ width: 64, height: 64, borderRadius: radii.md }}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={{ width: 64, height: 64, borderRadius: radii.md, backgroundColor: surfaces.soft.backgroundColor, alignItems: 'center', justifyContent: 'center' }}>
+                      <Camera color={palette.inkMuted} size={24} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, gap: spacing.xs }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Text
+                        style={{
+                          color: palette.ink,
+                          fontFamily: typography.bodyStrong,
+                          fontSize: 15,
+                          flex: 1,
+                          marginRight: spacing.sm,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {report.predictedIssue ?? 'Unclear issue'}
+                      </Text>
+                      <Text
+                        style={{
+                          color: palette.inkMuted,
+                          fontFamily: typography.bodyRegular,
+                          fontSize: 11,
+                        }}
+                      >
+                        {formatLongDate(report.createdAt)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: palette.inkSoft,
+                        fontFamily: typography.bodyRegular,
+                        fontSize: 13,
+                        lineHeight: 18,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {report.recommendation}
+                    </Text>
+                    
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs, flexWrap: 'wrap' }}>
+                      <ConfidenceBadge score={report.confidenceScore} hidePercentage />
+                      {report.escalationRequired ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <TriangleAlert color={semanticColors.danger} size={14} />
+                          <Text
+                            style={{
+                              color: semanticColors.danger,
+                              fontFamily: typography.bodyStrong,
+                              fontSize: 11,
+                            }}
+                          >
+                            Expert review
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
-              ) : null}
-            </CompactListCard>
+              </InsetCard>
+            </Pressable>
           ))
         ) : (
           <EmptyState

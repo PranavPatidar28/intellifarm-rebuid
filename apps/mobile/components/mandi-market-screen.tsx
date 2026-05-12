@@ -1,26 +1,32 @@
-import { memo, useMemo, useState, type ComponentType, type ReactNode } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { type ComponentType, memo, type ReactNode, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
-import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowUpDown,
-  Bell,
+  BarChart3,
   MapPin,
   MapPinned,
   Mic,
   Pin,
   Search,
   Sparkles,
-  Sprout,
-  Wheat,
+  Store,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react-native';
 
 import { AppHeroHeader } from '@/components/app-hero-header';
+import { InsetCard } from '@/components/inset-card';
+import { MetricBadge } from '@/components/metric-badge';
 import { MotionPressable } from '@/components/motion-pressable';
+import { SectionHeaderRow } from '@/components/section-header-row';
 import type { MarketExplorerView } from '@/lib/market-explorer';
 import type { MarketTradeMode } from '@/lib/mock-market-data';
 import { formatCurrency, formatDistance } from '@/lib/format';
 import { palette, radii, semanticColors, spacing, typography } from '@/theme/tokens';
+
+// ── Public types ────────────────────────────────────────────────────────────
 
 export type MarketCropListItem = {
   cropKey: string;
@@ -50,19 +56,11 @@ export type MarketMandiListItem = {
   hasLinkedFacility: boolean;
 };
 
-type EmptyState = {
-  title: string;
-  description: string;
-  actionLabel?: string;
-  onAction?: () => void;
-};
-
 type Props = {
-  addCropOptions: Array<{ value: string; label: string }>;
   cropItems: MarketCropListItem[];
-  emptyState: EmptyState;
+  isError: boolean;
+  isLoading: boolean;
   mandiItems: MarketMandiListItem[];
-  onAddPinnedCrop: (cropKey: string) => void;
   onOpenAi: () => void;
   onOpenCrop: (item: MarketCropListItem) => void;
   onOpenMandi: (item: MarketMandiListItem) => void;
@@ -81,52 +79,12 @@ const tradeModeOptions: Array<{ value: MarketTradeMode; label: string }> = [
   { value: 'sell', label: 'Sell' },
 ];
 
-const FEATURED_MANDI_ART = [
-  {
-    title: 'Krishi Mandi Nashik',
-    distanceLabel: '4.2 km away',
-    statusLabel: 'Open now',
-    statusColor: semanticColors.danger,
-    pinned: true,
-    imageSource: require('../assets/images/market/krishi-mandi.png'),
-  },
-  {
-    title: 'Krishi Mandi Nashik',
-    distanceLabel: '4.2 km away',
-    statusLabel: 'Open now',
-    statusColor: semanticColors.danger,
-    pinned: true,
-    imageSource: require('../assets/images/market/krishi-mandi.png'),
-  },
-  {
-    title: 'Royal Agro Warehouse',
-    distanceLabel: '6.8 km away',
-    statusLabel: 'Closes at 6 PM',
-    statusColor: palette.ink,
-    pinned: false,
-    imageSource: require('../assets/images/market/royal-agro-warehouse.png'),
-  },
-  {
-    title: 'Royal Agro Warehouse',
-    distanceLabel: '6.8 km away',
-    statusLabel: 'Closes at 6 PM',
-    statusColor: palette.ink,
-    pinned: false,
-    imageSource: require('../assets/images/market/royal-agro-warehouse.png'),
-  },
-  {
-    title: 'Pimpalgaon APMC',
-    distanceLabel: '12.5 km away',
-    statusLabel: 'Verified',
-    statusColor: semanticColors.danger,
-    pinned: false,
-    imageSource: require('../assets/images/market/pimpalgaon-apmc.png'),
-  },
-] as const;
+// ── Main component ──────────────────────────────────────────────────────────
 
 export const MandiMarketScreen = memo(function MandiMarketScreen({
   cropItems,
-  emptyState,
+  isError,
+  isLoading,
   mandiItems,
   onOpenAi,
   onOpenCrop,
@@ -134,76 +92,47 @@ export const MandiMarketScreen = memo(function MandiMarketScreen({
   onSearchTextChange,
   onTogglePinnedCrop,
   onTradeModeChange,
-  onViewChange,
   pinnedItems,
   searchText,
   tradeMode,
-  view: _view,
 }: Props) {
   const [showNearbyOnly, setShowNearbyOnly] = useState(false);
   const [showVerifiedOnly, setShowVerifiedOnly] = useState(false);
-  const trimmedSearchText = searchText.trim();
+  const [showAllCrops, setShowAllCrops] = useState(false);
+  const [showAllMandis, setShowAllMandis] = useState(false);
 
-  const featuredPinnedItems = useMemo(() => {
-    if (pinnedItems.length) {
-      return pinnedItems;
-    }
-
-    const preferredOrder = ['Wheat', 'Paddy'];
-    const prioritized = preferredOrder
-      .map((cropName) => cropItems.find((item) => item.cropName === cropName))
-      .filter((item): item is MarketCropListItem => Boolean(item));
-
-    const seen = new Set(prioritized.map((item) => item.cropKey));
-    const fallback = cropItems.filter((item) => !seen.has(item.cropKey));
-    return [...prioritized, ...fallback];
-  }, [cropItems, pinnedItems]);
+  const INITIAL_CROPS = 5;
+  const INITIAL_MANDIS = 4;
 
   const visibleMandiItems = useMemo(() => {
     return mandiItems.filter((item) => {
-      if (showNearbyOnly && (item.distanceKm == null || item.distanceKm > 10)) {
-        return false;
-      }
-
-      if (showVerifiedOnly && !item.hasLinkedFacility) {
-        return false;
-      }
-
+      if (showNearbyOnly && (item.distanceKm == null || item.distanceKm > 10)) return false;
+      if (showVerifiedOnly && !item.hasLinkedFacility) return false;
       return true;
     });
   }, [mandiItems, showNearbyOnly, showVerifiedOnly]);
 
-  const hasSearchResults = Boolean(trimmedSearchText.length);
-  const marketCards = useMemo(() => {
-    return visibleMandiItems.slice(0, 5).map((item, index) => {
-      const seed = FEATURED_MANDI_ART[index] ?? FEATURED_MANDI_ART[FEATURED_MANDI_ART.length - 1];
-
-      return {
-        item,
-        title: hasSearchResults ? item.mandiName : seed.title,
-        distanceLabel:
-          hasSearchResults && item.distanceKm != null
-            ? `${formatDistance(item.distanceKm)} away`
-            : seed.distanceLabel,
-        statusLabel: hasSearchResults
-          ? item.hasLinkedFacility
-            ? 'Verified'
-            : 'Closes at 6 PM'
-          : seed.statusLabel,
-        statusColor: hasSearchResults
-          ? item.hasLinkedFacility
-            ? semanticColors.danger
-            : palette.ink
-          : seed.statusColor,
-        pinned: hasSearchResults ? item.hasLinkedFacility : seed.pinned,
-        imageSource: seed.imageSource,
-      };
+  // Sort crops by trade mode
+  const sortedCropItems = useMemo(() => {
+    return [...cropItems].sort((a, b) => {
+      const priceA = a.bestPrice ?? a.latestPrice ?? 0;
+      const priceB = b.bestPrice ?? b.latestPrice ?? 0;
+      return tradeMode === 'sell' ? priceB - priceA : priceA - priceB;
     });
-  }, [hasSearchResults, visibleMandiItems]);
+  }, [cropItems, tradeMode]);
 
-  const headerAction = (
-    <HeaderActionButton icon={<Bell color={palette.leafDark} size={18} />} onPress={() => {}} />
-  );
+  // Slice for progressive disclosure
+  const displayedCrops = showAllCrops ? sortedCropItems : sortedCropItems.slice(0, INITIAL_CROPS);
+  const displayedMandis = showAllMandis ? visibleMandiItems : visibleMandiItems.slice(0, INITIAL_MANDIS);
+  const hasMoreCrops = sortedCropItems.length > INITIAL_CROPS;
+  const hasMoreMandis = visibleMandiItems.length > INITIAL_MANDIS;
+
+  // Snapshot stats
+  const totalCrops = cropItems.length;
+  const totalMandis = mandiItems.length;
+  const topCrop = sortedCropItems[0] ?? null;
+
+  // ── Hero header ─────────────────────────────────────────────────────
 
   const heroContent = (
     <View style={{ gap: spacing.md }}>
@@ -241,11 +170,7 @@ export const MandiMarketScreen = memo(function MandiMarketScreen({
         </MotionPressable>
       </View>
 
-      <SegmentedControl
-        value={tradeMode}
-        options={tradeModeOptions}
-        onChange={onTradeModeChange}
-      />
+      <SegmentedControl value={tradeMode} options={tradeModeOptions} onChange={onTradeModeChange} />
 
       <ScrollView
         horizontal
@@ -262,17 +187,19 @@ export const MandiMarketScreen = memo(function MandiMarketScreen({
           active={showNearbyOnly}
           icon={MapPin}
           label="Under 10km"
-          onPress={() => setShowNearbyOnly((value) => !value)}
+          onPress={() => setShowNearbyOnly((v) => !v)}
         />
         <FilterPill
           active={showVerifiedOnly}
           icon={MapPinned}
           label="Verified"
-          onPress={() => setShowVerifiedOnly((value) => !value)}
+          onPress={() => setShowVerifiedOnly((v) => !v)}
         />
       </ScrollView>
     </View>
   );
+
+  // ── Body ────────────────────────────────────────────────────────────
 
   return (
     <ScrollView
@@ -280,168 +207,413 @@ export const MandiMarketScreen = memo(function MandiMarketScreen({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       style={{ flex: 1, backgroundColor: palette.canvas }}
-      contentContainerStyle={{
-        paddingBottom: 132,
-        backgroundColor: palette.canvas,
-      }}
+      contentContainerStyle={{ paddingBottom: 132, backgroundColor: palette.canvas }}
     >
       <AppHeroHeader
         title="Mandi"
         subtitle="Compare crops, nearby mandis, and storage options."
         hero={heroContent}
-        action={headerAction}
         tone="market"
       />
 
-      <View
-        style={{
-          gap: spacing.lg,
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.md,
-        }}
-      >
-          <View
-            style={{
-              borderRadius: 22,
-              borderCurve: 'continuous',
-              backgroundColor: palette.leafDark,
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.lg,
-              boxShadow: '0 16px 28px rgba(30, 94, 59, 0.18)',
-            }}
-          >
-            <View style={{ gap: spacing.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                <Sparkles color={palette.mintStrong} size={16} strokeWidth={2.2} />
-                <Text
-                  style={{
-                    color: palette.mintStrong,
-                    fontFamily: typography.bodyStrong,
-                    fontSize: 12,
-                    letterSpacing: 0.8,
-                  }}
-                >
-                  AI MARKET INSIGHT
-                </Text>
-              </View>
-              <Text
-                style={{
-                  color: palette.white,
-                  fontFamily: typography.bodyStrong,
-                  fontSize: 16,
-                  lineHeight: 26,
-                }}
-              >
-                Wheat prices in Nashik expected to rise by 8% next week.
-              </Text>
-              <Text
-                style={{
-                  color: 'rgba(255,255,255,0.86)',
-                  fontFamily: typography.bodyRegular,
-                  fontSize: 13,
-                  lineHeight: 21,
-                }}
-              >
-                Recommendation: Hold current stock for 5-7 days for better margins.
-              </Text>
-            </View>
+      <View style={{ gap: spacing.xl, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        {/* ── Loading / Error states ──────────────────────────────── */}
+        {isLoading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <ActivityIndicator color={palette.leafDark} size="large" />
+            <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 14, marginTop: spacing.md }}>
+              Fetching latest mandi prices…
+            </Text>
           </View>
-
-          <View style={{ gap: spacing.md }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <SectionEyebrow label="YOUR PINNED CROPS" />
-              <MotionPressable onPress={() => onViewChange('pinned')} hitSlop={8}>
-                <Text
-                  style={{
-                    color: palette.leafDark,
-                    fontFamily: typography.bodyStrong,
-                    fontSize: 14,
-                  }}
-                >
-                  View All
-                </Text>
-              </MotionPressable>
+        ) : isError ? (
+          <InsetCard tone="alert" padding={20}>
+            <View style={{ gap: spacing.sm }}>
+              <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 16 }}>
+                Could not load market data
+              </Text>
+              <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 13, lineHeight: 20 }}>
+                Please check your internet connection and try again.
+              </Text>
             </View>
+          </InsetCard>
+        ) : (
+          <>
+            {/* ── 1. TODAY'S MARKET SNAPSHOT ────────────────────── */}
+            <MarketSnapshotCard totalCrops={totalCrops} totalMandis={totalMandis} topCrop={topCrop} />
 
-            {featuredPinnedItems.length ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: spacing.md, paddingRight: spacing.lg }}
-              >
-                {featuredPinnedItems.slice(0, 4).map((item, index) => (
-                  <PinnedCropCard
+            {/* ── 2. PINNED CROPS (only when actually pinned) ──── */}
+            {pinnedItems.length > 0 ? (
+              <View style={{ gap: spacing.md }}>
+                <SectionHeaderRow eyebrow="Watchlist" title="Pinned Crops" />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.lg }}
+                >
+                  {pinnedItems.map((item) => (
+                    <PinnedCropCard
+                      key={item.cropKey}
+                      item={item}
+                      onPress={() => onOpenCrop(item)}
+                      onTogglePin={() => onTogglePinnedCrop(item)}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            {/* ── 3. TOP CROPS TODAY ────────────────────────────── */}
+            <View style={{ gap: spacing.md }}>
+              <SectionHeaderRow
+                eyebrow={`${totalCrops} commodities`}
+                title={tradeMode === 'sell' ? 'Best Selling Prices' : 'Best Buying Prices'}
+              />
+              {displayedCrops.length ? (
+                displayedCrops.map((item) => (
+                  <CropPriceCard
                     key={item.cropKey}
                     item={item}
-                    index={index}
-                    useReferenceCopy={!hasSearchResults}
                     onPress={() => onOpenCrop(item)}
-                    onTogglePinned={() => onTogglePinnedCrop(item)}
+                    onTogglePin={() => onTogglePinnedCrop(item)}
                   />
-                ))}
-              </ScrollView>
-            ) : (
-              <EmptyStateCard emptyState={emptyState} />
-            )}
-          </View>
+                ))
+              ) : (
+                <EmptyCard title="No crops found" description="Try a different search term." />
+              )}
+              {hasMoreCrops && !showAllCrops ? (
+                <ViewAllButton
+                  label={`View all ${totalCrops} crops`}
+                  onPress={() => setShowAllCrops(true)}
+                />
+              ) : null}
+            </View>
 
-          <View style={{ gap: spacing.md }}>
-            <SectionEyebrow label="NEARBY MARKETS & STORES" />
+            {/* ── 4. NEARBY MANDIS ─────────────────────────────── */}
+            <View style={{ gap: spacing.md }}>
+              <SectionHeaderRow eyebrow={`${visibleMandiItems.length} markets`} title="Nearby Mandis" />
+              {displayedMandis.length ? (
+                displayedMandis.map((item) => (
+                  <MandiCard key={item.mandiKey} item={item} onPress={() => onOpenMandi(item)} />
+                ))
+              ) : (
+                <EmptyCard title="No mandis found" description="Adjust filters or try a different search." />
+              )}
+              {hasMoreMandis && !showAllMandis ? (
+                <ViewAllButton
+                  label={`View all ${visibleMandiItems.length} mandis`}
+                  onPress={() => setShowAllMandis(true)}
+                />
+              ) : null}
+            </View>
 
-            {marketCards.length ? (
-              <View style={{ gap: spacing.md }}>
-                {marketCards.map((card) => (
-                  <NearbyMarketCard
-                    key={card.item.mandiKey}
-                    item={card.item}
-                    title={card.title}
-                    distanceLabel={card.distanceLabel}
-                    statusLabel={card.statusLabel}
-                    statusColor={card.statusColor}
-                    imageSource={card.imageSource}
-                    pinned={card.pinned}
-                    onPress={() => onOpenMandi(card.item)}
-                  />
-                ))}
-              </View>
-            ) : (
-              <EmptyStateCard emptyState={emptyState} />
-            )}
-          </View>
+            {/* ── 5. ASK AI CTA ────────────────────────────────── */}
+            <MotionPressable onPress={onOpenAi}>
+              <LinearGradient
+                colors={['#429461', palette.leaf]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  borderRadius: 22,
+                  borderCurve: 'continuous',
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.lg,
+                  boxShadow: '0 16px 28px rgba(30, 94, 59, 0.18)',
+                }}
+              >
+                <View style={{ gap: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                    <Sparkles color={palette.mintStrong} size={16} strokeWidth={2.2} />
+                    <Text style={{ color: palette.mintStrong, fontFamily: typography.bodyStrong, fontSize: 12, letterSpacing: 0.8 }}>
+                      AI MARKET ADVISOR
+                    </Text>
+                  </View>
+                  <Text style={{ color: palette.white, fontFamily: typography.bodyStrong, fontSize: 16, lineHeight: 24 }}>
+                    Should I sell now, store, or wait?
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.86)', fontFamily: typography.bodyRegular, fontSize: 13, lineHeight: 21 }}>
+                    Ask the AI assistant for personalised advice based on current mandi prices and trends.
+                  </Text>
+                </View>
+              </LinearGradient>
+            </MotionPressable>
+          </>
+        )}
       </View>
     </ScrollView>
   );
 });
 
-function HeaderActionButton({
-  icon,
-  onPress,
+// ── Section: Market Snapshot ─────────────────────────────────────────────────
+
+function MarketSnapshotCard({
+  totalCrops,
+  totalMandis,
+  topCrop,
 }: {
-  icon: ReactNode;
-  onPress: () => void;
+  totalCrops: number;
+  totalMandis: number;
+  topCrop: MarketCropListItem | null;
 }) {
+  return (
+    <InsetCard tone="feature" padding={16}>
+      <View style={{ gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <BarChart3 color={palette.leafDark} size={16} strokeWidth={2.2} />
+          <Text style={{ color: palette.leafDark, fontFamily: typography.bodyStrong, fontSize: 12, letterSpacing: 0.8 }}>
+            TODAY'S SNAPSHOT
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+          <MetricBadge label={`${totalCrops} crops`} tone="info" />
+          <MetricBadge label={`${totalMandis} mandis`} tone="success" />
+          {topCrop?.bestPrice != null ? (
+            <MetricBadge label={`Top: ${topCrop.cropName} ${formatCurrency(topCrop.bestPrice)}`} tone="warning" />
+          ) : null}
+        </View>
+        {topCrop?.bestMandiName ? (
+          <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 13, lineHeight: 20 }}>
+            Best price at {topCrop.bestMandiName} • {topCrop.freshnessLabel}
+          </Text>
+        ) : null}
+      </View>
+    </InsetCard>
+  );
+}
+
+// ── Section: Pinned Crop Card ────────────────────────────────────────────────
+
+function PinnedCropCard({
+  item,
+  onPress,
+  onTogglePin,
+}: {
+  item: MarketCropListItem;
+  onPress: () => void;
+  onTogglePin: () => void;
+}) {
+  const trendColor = item.trendLabel.toLowerCase().includes('up')
+    ? palette.leafDark
+    : item.trendLabel.toLowerCase().includes('down')
+      ? semanticColors.danger
+      : palette.inkSoft;
+
   return (
     <MotionPressable
       onPress={onPress}
       contentStyle={{
-        width: 44,
-        height: 44,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: radii.xl,
-        backgroundColor: palette.white,
+        width: 160,
+        borderRadius: 22,
+        borderCurve: 'continuous',
         borderWidth: 1,
-        borderColor: palette.outline,
+        borderColor: 'rgba(30, 42, 34, 0.08)',
+        backgroundColor: palette.white,
+        padding: 16,
+        boxShadow: '0 12px 20px rgba(31, 46, 36, 0.10)',
       }}
     >
-      {icon}
+      <View style={{ gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 14, flex: 1 }} numberOfLines={1}>
+            {item.cropName}
+          </Text>
+          <MotionPressable onPress={(e) => { e.stopPropagation(); onTogglePin(); }} hitSlop={8}>
+            <Pin color={palette.leafDark} size={14} fill={palette.leafDark} />
+          </MotionPressable>
+        </View>
+        <Text style={{ color: palette.leafDark, fontFamily: typography.display, fontSize: 17 }}>
+          {item.bestPrice != null ? formatCurrency(item.bestPrice) : 'No price'}
+          <Text style={{ color: palette.ink, fontFamily: typography.bodyRegular, fontSize: 11 }}> /qtl</Text>
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {item.trendLabel.toLowerCase().includes('up') ? (
+            <TrendingUp color={trendColor} size={12} strokeWidth={2.2} />
+          ) : item.trendLabel.toLowerCase().includes('down') ? (
+            <TrendingDown color={trendColor} size={12} strokeWidth={2.2} />
+          ) : null}
+          <Text style={{ color: trendColor, fontFamily: typography.bodyRegular, fontSize: 11 }}>
+            {item.trendLabel}
+          </Text>
+        </View>
+      </View>
     </MotionPressable>
+  );
+}
+
+// ── Section: Crop Price Card ─────────────────────────────────────────────────
+
+const CropPriceCard = memo(function CropPriceCard({
+  item,
+  onPress,
+  onTogglePin,
+}: {
+  item: MarketCropListItem;
+  onPress: () => void;
+  onTogglePin: () => void;
+}) {
+  const trendTone = item.trendLabel.toLowerCase().includes('up')
+    ? ('success' as const)
+    : item.trendLabel.toLowerCase().includes('down')
+      ? ('danger' as const)
+      : ('neutral' as const);
+
+  return (
+    <Pressable onPress={onPress}>
+      <LightCard>
+        <View style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 16, lineHeight: 21 }}>
+                {item.cropName}
+              </Text>
+              {item.bestMandiName ? (
+                <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 12 }}>
+                  Best at {item.bestMandiName}
+                </Text>
+              ) : null}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <MetricBadge label={item.trendLabel} tone={trendTone} />
+              <Pressable onPress={onTogglePin} hitSlop={8}>
+                <Pin
+                  color={item.pinned ? palette.leafDark : palette.inkMuted}
+                  size={16}
+                  strokeWidth={2.1}
+                  fill={item.pinned ? palette.leafDark : 'transparent'}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <View style={{ alignItems: 'baseline', flexDirection: 'row', gap: 4 }}>
+              <Text style={{ color: palette.leafDark, fontFamily: typography.display, fontSize: 22, fontVariant: ['tabular-nums'] }}>
+                {item.bestPrice != null ? formatCurrency(item.bestPrice) : '—'}
+              </Text>
+              <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 11 }}>/ qtl</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Store color={palette.inkMuted} size={12} strokeWidth={2.1} />
+              <Text style={{ color: palette.inkMuted, fontFamily: typography.bodyRegular, fontSize: 12 }}>
+                {item.mandiCount} {item.mandiCount === 1 ? 'mandi' : 'mandis'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={{ color: palette.inkMuted, fontFamily: typography.bodyRegular, fontSize: 11, lineHeight: 16 }}>
+            {item.freshnessLabel}
+            {item.nearestMandiName && item.nearestDistanceKm != null
+              ? ` • Nearest: ${item.nearestMandiName} (${formatDistance(item.nearestDistanceKm)})`
+              : ''}
+          </Text>
+        </View>
+      </LightCard>
+    </Pressable>
+  );
+}
+);
+
+// ── Section: Mandi Card ──────────────────────────────────────────────────────
+
+const MandiCard = memo(function MandiCard({ item, onPress }: { item: MarketMandiListItem; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress}>
+      <LightCard>
+        <View style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }}>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 15, lineHeight: 21 }}>
+                {item.mandiName}
+              </Text>
+              <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 12 }}>
+                {item.district}, {item.state}
+              </Text>
+            </View>
+            {item.hasLinkedFacility ? <MetricBadge label="Verified" tone="success" /> : null}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            {item.topCropName && item.topPrice != null ? (
+              <View style={{ gap: 2 }}>
+                <Text style={{ color: palette.leafDark, fontFamily: typography.display, fontSize: 18, fontVariant: ['tabular-nums'] }}>
+                  {formatCurrency(item.topPrice)}
+                  <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 11 }}> /qtl</Text>
+                </Text>
+                <Text style={{ color: palette.inkMuted, fontFamily: typography.bodyRegular, fontSize: 11 }}>
+                  Top: {item.topCropName} • {item.cropCount} {item.cropCount === 1 ? 'crop' : 'crops'}
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ color: palette.inkMuted, fontFamily: typography.bodyRegular, fontSize: 12 }}>
+                {item.cropCount} {item.cropCount === 1 ? 'crop' : 'crops'} reporting
+              </Text>
+            )}
+
+            {item.distanceKm != null ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <MapPin color={palette.inkMuted} size={13} strokeWidth={2.1} />
+                <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 12 }}>
+                  {formatDistance(item.distanceKm)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </LightCard>
+    </Pressable>
+  );
+}
+);
+
+// ── Lightweight card (no boxShadow for perf) ────────────────────────────────
+
+function LightCard({ children }: { children: ReactNode }) {
+  return (
+    <View
+      style={{
+        padding: 16,
+        borderRadius: radii.xl,
+        borderCurve: 'continuous',
+        borderWidth: 1,
+        borderColor: palette.outline,
+        backgroundColor: palette.white,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+// ── Shared small components ──────────────────────────────────────────────────
+
+function ViewAllButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <MotionPressable
+      onPress={onPress}
+      contentStyle={{
+        alignItems: 'center',
+        paddingVertical: 14,
+        borderRadius: radii.xl,
+        borderCurve: 'continuous',
+        backgroundColor: palette.leafMist,
+        borderWidth: 1,
+        borderColor: 'rgba(30, 94, 59, 0.12)',
+      }}
+    >
+      <Text style={{ color: palette.leafDark, fontFamily: typography.bodyStrong, fontSize: 14 }}>
+        {label}
+      </Text>
+    </MotionPressable>
+  );
+}
+
+function EmptyCard({ title, description }: { title: string; description: string }) {
+  return (
+    <InsetCard tone="soft" padding={16}>
+      <View style={{ gap: spacing.sm }}>
+        <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 16 }}>{title}</Text>
+        <Text style={{ color: palette.inkSoft, fontFamily: typography.bodyRegular, fontSize: 13, lineHeight: 20 }}>{description}</Text>
+      </View>
+    </InsetCard>
   );
 }
 
@@ -469,7 +641,6 @@ function SegmentedControl({
     >
       {options.map((option) => {
         const active = option.value === value;
-
         return (
           <MotionPressable
             key={option.value}
@@ -484,13 +655,7 @@ function SegmentedControl({
               justifyContent: 'center',
             }}
           >
-            <Text
-              style={{
-                color: active ? palette.white : palette.ink,
-                fontFamily: typography.bodyStrong,
-                fontSize: 16,
-              }}
-            >
+            <Text style={{ color: active ? palette.white : palette.ink, fontFamily: typography.bodyStrong, fontSize: 16 }}>
               {option.label}
             </Text>
           </MotionPressable>
@@ -528,403 +693,7 @@ function FilterPill({
       }}
     >
       <Icon color={active ? palette.leafDark : palette.ink} size={14} strokeWidth={2.1} />
-      <Text
-        style={{
-          color: palette.ink,
-          fontFamily: typography.bodyRegular,
-          fontSize: 14,
-        }}
-      >
-        {label}
-      </Text>
+      <Text style={{ color: palette.ink, fontFamily: typography.bodyRegular, fontSize: 14 }}>{label}</Text>
     </MotionPressable>
   );
-}
-
-function PinnedCropCard({
-  item,
-  index,
-  useReferenceCopy,
-  onPress,
-  onTogglePinned,
-}: {
-  item: MarketCropListItem;
-  index: number;
-  useReferenceCopy: boolean;
-  onPress: () => void;
-  onTogglePinned: () => void;
-}) {
-  const cropVisual = getPinnedCropVisual(item, index, useReferenceCopy);
-
-  return (
-    <MotionPressable
-      onPress={onPress}
-      contentStyle={{
-        width: 160,
-        borderRadius: 24,
-        borderCurve: 'continuous',
-        borderWidth: 1,
-        borderColor: 'rgba(30, 42, 34, 0.08)',
-        backgroundColor: palette.white,
-        padding: 16,
-        boxShadow: '0 12px 20px rgba(31, 46, 36, 0.10)',
-      }}
-    >
-      <View style={{ gap: spacing.md }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <View
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 21,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#F2F3EF',
-            }}
-          >
-            <cropVisual.Icon color={palette.leafDark} size={18} strokeWidth={2.1} />
-          </View>
-
-          <View
-            style={{
-              borderRadius: radii.pill,
-              backgroundColor: cropVisual.badgeBackground,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-            }}
-          >
-            <Text
-              style={{
-                color: cropVisual.badgeColor,
-                fontFamily: typography.bodyStrong,
-                fontSize: 11,
-              }}
-            >
-              {cropVisual.badgeLabel}
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ gap: 4 }}>
-          <Text
-            style={{
-              color: palette.ink,
-              fontFamily: typography.bodyStrong,
-              fontSize: 14,
-              lineHeight: 20,
-            }}
-          >
-            {cropVisual.title}
-          </Text>
-          <Text
-            style={{
-              color: palette.leafDark,
-              fontFamily: typography.display,
-              fontSize: 17,
-              lineHeight: 24,
-            }}
-          >
-            {item.bestPrice != null ? formatCurrency(item.bestPrice) : 'No price'}
-            <Text
-              style={{
-                color: palette.ink,
-                fontFamily: typography.bodyRegular,
-                fontSize: 12,
-              }}
-            >
-              {' '}
-              / quintal
-            </Text>
-          </Text>
-          <Text
-            style={{
-              color: cropVisual.footerColor,
-              fontFamily: typography.bodyRegular,
-              fontSize: 12,
-            }}
-          >
-            {cropVisual.footerLabel}
-          </Text>
-        </View>
-
-        {item.pinned ? (
-          <MotionPressable
-            onPress={(event) => {
-              event.stopPropagation();
-              onTogglePinned();
-            }}
-            hitSlop={8}
-            contentStyle={{
-              position: 'absolute',
-              right: 14,
-              bottom: 14,
-            }}
-          >
-            <Pin color={palette.leafDark} size={16} fill={palette.leafDark} />
-          </MotionPressable>
-        ) : null}
-      </View>
-    </MotionPressable>
-  );
-}
-
-function NearbyMarketCard({
-  item,
-  title,
-  distanceLabel,
-  statusLabel,
-  statusColor,
-  imageSource,
-  pinned,
-  onPress,
-}: {
-  item: MarketMandiListItem;
-  title: string;
-  distanceLabel: string;
-  statusLabel: string;
-  statusColor: string;
-  imageSource: number;
-  pinned: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <MotionPressable
-      onPress={onPress}
-      contentStyle={{
-        borderRadius: 24,
-        borderCurve: 'continuous',
-        borderWidth: 1,
-        borderColor: 'rgba(30, 42, 34, 0.08)',
-        backgroundColor: '#F6F5F2',
-        padding: 14,
-      }}
-    >
-      <View style={{ gap: spacing.sm }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Image
-            source={imageSource}
-            contentFit="cover"
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 14,
-              backgroundColor: palette.white,
-            }}
-          />
-
-          <View style={{ flex: 1, gap: 3 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                gap: spacing.sm,
-              }}
-            >
-              <Text
-                style={{
-                  flex: 1,
-                  color: palette.ink,
-                  fontFamily: typography.bodyStrong,
-                  fontSize: 15,
-                  lineHeight: 21,
-                }}
-              >
-                {title}
-              </Text>
-
-              <Pin
-                color={pinned ? palette.leafDark : palette.inkMuted}
-                size={16}
-                strokeWidth={2.1}
-                fill={pinned ? palette.leafDark : 'transparent'}
-              />
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <MapPin color={palette.ink} size={12} strokeWidth={2.2} />
-              <Text
-                style={{
-                  color: palette.ink,
-                  fontFamily: typography.bodyRegular,
-                  fontSize: 12,
-                }}
-              >
-                {distanceLabel}
-              </Text>
-              <Text style={{ color: palette.leafDark, fontSize: 10 }}>|</Text>
-              <Text
-                style={{
-                  color: statusColor,
-                  fontFamily: typography.bodyRegular,
-                  fontSize: 12,
-                }}
-              >
-                {statusLabel}
-              </Text>
-            </View>
-
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: spacing.sm,
-                paddingTop: 2,
-              }}
-            >
-              <Text
-                style={{
-                  color: palette.leafDark,
-                  fontFamily: typography.display,
-                  fontSize: 16,
-                }}
-              >
-                {item.topPrice != null ? formatCurrency(item.topPrice) : 'No price'}
-                <Text
-                  style={{
-                    color: palette.ink,
-                    fontFamily: typography.bodyRegular,
-                    fontSize: 12,
-                  }}
-                >
-                  {' '}
-                  / quintal
-                </Text>
-              </Text>
-
-              <View
-                style={{
-                  borderRadius: radii.pill,
-                  backgroundColor: palette.white,
-                  paddingHorizontal: 14,
-                  paddingVertical: 7,
-                }}
-              >
-                <Text
-                  style={{
-                    color: palette.leafDark,
-                    fontFamily: typography.bodyStrong,
-                    fontSize: 11,
-                  }}
-                >
-                  DETAILS
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      </View>
-    </MotionPressable>
-  );
-}
-
-function EmptyStateCard({ emptyState }: { emptyState: EmptyState }) {
-  return (
-    <View
-      style={{
-        borderRadius: 22,
-        borderCurve: 'continuous',
-        borderWidth: 1,
-        borderColor: 'rgba(30, 42, 34, 0.08)',
-        backgroundColor: '#F6F5F2',
-        padding: 16,
-      }}
-    >
-      <View style={{ gap: spacing.sm }}>
-        <Text
-          style={{
-            color: palette.ink,
-            fontFamily: typography.bodyStrong,
-            fontSize: 16,
-          }}
-        >
-          {emptyState.title}
-        </Text>
-        <Text
-          style={{
-            color: palette.inkSoft,
-            fontFamily: typography.bodyRegular,
-            fontSize: 13,
-            lineHeight: 20,
-          }}
-        >
-          {emptyState.description}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function SectionEyebrow({ label }: { label: string }) {
-  return (
-    <Text
-      style={{
-        color: palette.ink,
-        fontFamily: typography.bodyStrong,
-        fontSize: 12,
-        letterSpacing: 1.4,
-      }}
-    >
-      {label}
-    </Text>
-  );
-}
-
-function getPinnedCropVisual(
-  item: MarketCropListItem,
-  index: number,
-  useReferenceCopy: boolean,
-) {
-  const lowerName = item.cropName.toLowerCase();
-  const looksLikeWheat = lowerName.includes('wheat');
-  const looksLikeRice = lowerName.includes('paddy') || lowerName.includes('rice');
-
-  const title = useReferenceCopy
-    ? looksLikeWheat
-      ? 'Wheat (Sonalika)'
-      : looksLikeRice
-        ? 'Basmati Rice'
-        : item.cropName
-    : item.cropName;
-
-  if (looksLikeWheat) {
-    return {
-      title,
-      badgeLabel: '+1.2%',
-      badgeBackground: '#DDF1E5',
-      badgeColor: palette.leafDark,
-      footerLabel: 'Trending Up',
-      footerColor: palette.leafDark,
-      Icon: Wheat,
-    };
-  }
-
-  if (looksLikeRice || index === 1) {
-    return {
-      title,
-      badgeLabel: '-0.8%',
-      badgeBackground: '#FDE8E4',
-      badgeColor: semanticColors.danger,
-      footerLabel: 'Minor Dip',
-      footerColor: semanticColors.danger,
-      Icon: Sprout,
-    };
-  }
-
-  return {
-    title,
-    badgeLabel: '+0.6%',
-    badgeBackground: '#EEF2F8',
-    badgeColor: palette.storm,
-    footerLabel: item.trendLabel,
-    footerColor: palette.inkSoft,
-    Icon: Sprout,
-  };
 }

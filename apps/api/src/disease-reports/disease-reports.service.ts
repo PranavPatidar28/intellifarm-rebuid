@@ -79,11 +79,6 @@ export class DiseaseReportsService {
     }
 
     const placeLabel = payload.placeLabel?.trim();
-    if (!season && !placeLabel) {
-      throw new BadRequestException(
-        'Choose a saved crop season or enter a new place label.',
-      );
-    }
 
     if (payload.captureMode !== 'CAMERA_DUAL_ANGLE') {
       throw new BadRequestException(

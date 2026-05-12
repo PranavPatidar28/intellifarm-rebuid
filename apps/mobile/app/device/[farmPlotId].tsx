@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Text,
   View,
   useWindowDimensions,
@@ -13,6 +12,7 @@ import {
   BatteryLow,
   BatteryMedium,
   Clock3,
+  Droplets,
   SignalHigh,
   SignalLow,
   SignalMedium,
@@ -222,21 +222,6 @@ export default function DeviceDetailRoute() {
                       />
                     </View>
                   </View>
-
-                  {deviceQuery.isFetching ? (
-                    <View
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: radii.pill,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: 'rgba(255,255,255,0.72)',
-                      }}
-                    >
-                      <ActivityIndicator size="small" color={palette.leafDark} />
-                    </View>
-                  ) : null}
                 </View>
 
                 <View
@@ -340,6 +325,7 @@ export default function DeviceDetailRoute() {
                 <View
                   style={{
                     flexDirection: 'row',
+                    alignItems: 'center',
                     gap: spacing.xxs,
                     padding: spacing.xxs,
                     borderRadius: radii.pill,
@@ -349,6 +335,34 @@ export default function DeviceDetailRoute() {
                     backgroundColor: 'rgba(255,255,255,0.68)',
                   }}
                 >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.xxs,
+                      paddingLeft: spacing.sm,
+                      paddingRight: spacing.xxs,
+                    }}
+                  >
+                    <Droplets color={palette.sky} size={14} />
+                    <Text
+                      style={{
+                        color: palette.ink,
+                        fontFamily: typography.bodyStrong,
+                        fontSize: 12,
+                      }}
+                    >
+                      Pump
+                    </Text>
+                    <View
+                      style={{
+                        width: 1,
+                        height: 22,
+                        backgroundColor: 'rgba(30,42,34,0.15)',
+                        marginLeft: spacing.xxs,
+                      }}
+                    />
+                  </View>
                   {(['AUTO', 'FORCE_ON', 'FORCE_OFF'] as const).map((mode) => (
                     <SegmentedChoiceButton
                       key={mode}

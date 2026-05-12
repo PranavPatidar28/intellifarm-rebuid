@@ -245,6 +245,7 @@ export type ResourcePredictionResponse = {
 };
 
 export type CropSuggestionResponse = CropSuggestionPredictionResponse;
+export type CropRecommendation = CropSuggestionResponse['topCrops'][number];
 
 export type MarketRecord = MarketsResponse['records'][number];
 

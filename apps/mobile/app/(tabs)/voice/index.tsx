@@ -15,18 +15,25 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Bell,
+  Calendar,
+  CheckCircle,
   ChevronDown,
   ChevronUp,
   CloudSun,
   Database,
+  Droplets,
+  FileText,
+  Gauge,
   History,
   ImagePlus,
+  Landmark,
   LineChart,
   ListTodo,
   Loader,
@@ -35,17 +42,22 @@ import {
   Plus,
   Send,
   ShieldAlert,
+  Mic,
+  MicOff,
+  Square,
   Sparkles,
   TreeDeciduous,
   User,
   Wrench,
   X,
   XCircle,
+  PhoneOff,
 } from 'lucide-react-native';
 
 import { MotionPressable } from '@/components/motion-pressable';
 import { useSession } from '@/features/session/session-provider';
 import { useNetworkStatus } from '@/hooks/use-network-status';
+import { useVoiceSession, type VoiceTurnSummary } from '@/hooks/use-voice-session';
 import { sendAssistantMessage, getAssistantStatus, generateAssistantTitle, type AssistantChatMessage } from '@/lib/assistant';
 import { ApiError } from '@/lib/api';
 import { storageKeys } from '@/lib/constants';
@@ -126,6 +138,8 @@ export default function VoiceAssistantRoute() {
   const [pendingAssistantMessage, setPendingAssistantMessage] =
     useState<AssistantChatMessage | null>(null);
   const [stagingImages, setStagingImages] = useState<string[]>([]);
+
+  const voice = useVoiceSession({ token });
 
   const pickImage = async () => {
     try {
@@ -746,7 +760,7 @@ export default function VoiceAssistantRoute() {
                 multiline
                 maxLength={4000}
                 placeholder={
-                  network.isOffline ? 'Offline' : 'Ask IntelliFarm something...'
+                  network.isOffline ? 'Offline' : 'Ask IntelliFarm...'
                 }
                 placeholderTextColor={palette.inkMuted}
                 textAlignVertical="center"
@@ -763,27 +777,440 @@ export default function VoiceAssistantRoute() {
                 }}
               />
 
-              <MotionPressable
-                onPress={() => {
-                  void sendCurrentMessage();
-                }}
-                disabled={(!composer.trim() && stagingImages.length === 0) || network.isOffline || busy}
-                contentStyle={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: radii.pill,
-                  borderCurve: 'continuous',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: palette.leaf,
-                  boxShadow: shadow.glow,
-                }}
-              >
-                <Send color={palette.white} size={18} strokeWidth={2.3} />
-              </MotionPressable>
+              {composer.trim().length > 0 || stagingImages.length > 0 ? (
+                <MotionPressable
+                  onPress={() => {
+                    void sendCurrentMessage();
+                  }}
+                  disabled={network.isOffline || busy}
+                  contentStyle={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: radii.pill,
+                    borderCurve: 'continuous',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: palette.leaf,
+                    boxShadow: shadow.glow,
+                  }}
+                >
+                  <Send color={palette.white} size={18} strokeWidth={2.3} />
+                </MotionPressable>
+              ) : (
+                <MotionPressable
+                  onPress={voice.startRecording}
+                  disabled={
+                    network.isOffline ||
+                    busy ||
+                    !token ||
+                    !voice.isVoiceSupported
+                  }
+                  contentStyle={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: radii.pill,
+                    borderCurve: 'continuous',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: palette.leaf,
+                    boxShadow: shadow.glow,
+                    opacity:
+                      network.isOffline || busy || !token || !voice.isVoiceSupported
+                        ? 0.45
+                        : 1,
+                  }}
+                >
+                  <Mic color={palette.white} size={18} strokeWidth={2.3} />
+                </MotionPressable>
+              )}
             </View>
           </BlurView>
         </View>
+
+        {voice.state !== 'idle' && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              zIndex: 15,
+              backgroundColor: '#F5F9F5',
+            }}
+          >
+            {/* ── Header ── */}
+            <View
+              style={{
+                paddingTop: insets.top + 8,
+                paddingBottom: 12,
+                paddingHorizontal: 20,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#FFFFFF',
+                borderBottomWidth: 1,
+                borderBottomColor: screenPalette.cardBorder,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: palette.leaf,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Sparkles color={palette.white} size={18} strokeWidth={2.2} />
+                </View>
+                <View>
+                  <Text
+                    style={{
+                      color: palette.ink,
+                      fontFamily: typography.displayBold,
+                      fontSize: 17,
+                      lineHeight: 22,
+                    }}
+                  >
+                    Voice Assistant
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <View
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 4,
+                        backgroundColor:
+                          voice.state === 'listening' ? '#22C55E'
+                          : voice.state === 'speaking' ? '#3B82F6'
+                          : voice.state === 'error' ? '#EF4444'
+                          : palette.mustard,
+                      }}
+                    />
+                    <Text
+                      style={{
+                        color: palette.inkSoft,
+                        fontFamily: typography.bodyRegular,
+                        fontSize: 12,
+                        lineHeight: 16,
+                      }}
+                    >
+                      {getVoiceStateLabel(voice.state, voice.toolsInUse)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <MotionPressable
+                onPress={voice.stopRecording}
+                contentStyle={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#FEE2E2',
+                  borderWidth: 1,
+                  borderColor: '#FECACA',
+                }}
+              >
+                <PhoneOff color="#DC2626" size={16} strokeWidth={2.3} />
+              </MotionPressable>
+            </View>
+
+            {/* ── Conversation Log ── */}
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingHorizontal: 20,
+                paddingTop: 20,
+                paddingBottom: 24,
+                gap: 12,
+              }}
+              showsVerticalScrollIndicator={false}
+            >
+              {voice.conversationLog.length === 0 && !voice.inputTranscript && !voice.outputTranscript && (
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingVertical: 48,
+                    gap: 14,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 36,
+                      backgroundColor: '#E3F0E5',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Mic color={palette.leafDark} size={30} strokeWidth={1.8} />
+                  </View>
+                  <Text
+                    style={{
+                      color: palette.ink,
+                      fontFamily: typography.displayBold,
+                      fontSize: 20,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Hi, I'm listening!
+                  </Text>
+                  <Text
+                    style={{
+                      color: palette.inkSoft,
+                      fontFamily: typography.bodyRegular,
+                      fontSize: 14,
+                      lineHeight: 21,
+                      textAlign: 'center',
+                      maxWidth: 280,
+                    }}
+                  >
+                    Ask about weather, crop health, market prices, government schemes, or anything about your farm.
+                  </Text>
+                </View>
+              )}
+
+              {voice.conversationLog.map((entry, i) => (
+                entry.role === 'user' ? (
+                  <LinearGradient
+                    key={i}
+                    colors={['#43A06D', '#2F7D4E']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      alignSelf: 'flex-end',
+                      maxWidth: '82%',
+                      borderRadius: 18,
+                      borderTopRightRadius: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: palette.white,
+                        fontFamily: typography.bodyRegular,
+                        fontSize: 15,
+                        lineHeight: 22,
+                      }}
+                    >
+                      {entry.text}
+                    </Text>
+                  </LinearGradient>
+                ) : (
+                  <View
+                    key={i}
+                    style={{
+                      alignSelf: 'flex-start',
+                      maxWidth: '82%',
+                      borderRadius: 18,
+                      borderTopLeftRadius: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      backgroundColor: '#FFFFFF',
+                      borderWidth: 1,
+                      borderColor: screenPalette.cardBorder,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: palette.ink,
+                        fontFamily: typography.bodyRegular,
+                        fontSize: 15,
+                        lineHeight: 22,
+                      }}
+                    >
+                      {entry.text}
+                    </Text>
+                  </View>
+                )
+              ))}
+
+              {/* Live input (what user is saying now) */}
+              {voice.inputTranscript ? (
+                <LinearGradient
+                  colors={['#43A06D', '#2F7D4E']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    alignSelf: 'flex-end',
+                    maxWidth: '82%',
+                    borderRadius: 18,
+                    borderTopRightRadius: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontFamily: typography.bodyRegular, fontSize: 15, lineHeight: 22 }}>
+                    {voice.inputTranscript}
+                  </Text>
+                </LinearGradient>
+              ) : null}
+
+              {/* Live output (what AI is saying now) */}
+              {voice.outputTranscript ? (
+                <View
+                  style={{
+                    alignSelf: 'flex-start',
+                    maxWidth: '82%',
+                    borderRadius: 18,
+                    borderTopLeftRadius: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: screenPalette.cardBorder,
+                  }}
+                >
+                  <Text style={{ color: palette.ink, fontFamily: typography.bodyRegular, fontSize: 15, lineHeight: 22 }}>
+                    {voice.outputTranscript}
+                  </Text>
+                </View>
+              ) : null}
+            </ScrollView>
+
+            {/* ── Pending Action Card ── */}
+            {voice.pendingAction ? (
+              <View
+                style={{
+                  marginHorizontal: 20,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: screenPalette.cardBorder,
+                  backgroundColor: '#FFFFFF',
+                  padding: 16,
+                  gap: 12,
+                  marginBottom: 8,
+                }}
+              >
+                <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 14, lineHeight: 20 }}>
+                  {voice.pendingAction.confirmationMessage}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <MotionPressable
+                    onPress={voice.confirmAction}
+                    contentStyle={{
+                      flex: 1,
+                      borderRadius: radii.pill,
+                      backgroundColor: palette.leaf,
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                    }}
+                  >
+                    <Text style={{ color: palette.white, fontFamily: typography.bodyStrong, fontSize: 14 }}>Confirm</Text>
+                  </MotionPressable>
+                  <MotionPressable
+                    onPress={voice.cancelAction}
+                    contentStyle={{
+                      flex: 1,
+                      borderRadius: radii.pill,
+                      backgroundColor: '#FFFFFF',
+                      borderWidth: 1,
+                      borderColor: screenPalette.cardBorder,
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                    }}
+                  >
+                    <Text style={{ color: palette.leafDark, fontFamily: typography.bodyStrong, fontSize: 14 }}>Cancel</Text>
+                  </MotionPressable>
+                </View>
+              </View>
+            ) : null}
+
+            {/* ── Bottom Status Bar ── */}
+            <View
+              style={{
+                paddingBottom: tabBarHeight + 16,
+                paddingTop: 14,
+                paddingHorizontal: 24,
+                backgroundColor: '#FFFFFF',
+                borderTopWidth: 1,
+                borderTopColor: screenPalette.cardBorder,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      width: 50 + Math.round(Math.min(1, Math.max(0, voice.audioLevel)) * 16),
+                      height: 50 + Math.round(Math.min(1, Math.max(0, voice.audioLevel)) * 16),
+                      borderRadius: 40,
+                      backgroundColor:
+                        voice.state === 'listening' ? 'rgba(10, 114, 72, 0.12)'
+                        : voice.state === 'speaking' ? 'rgba(59, 130, 246, 0.12)'
+                        : 'rgba(10, 114, 72, 0.06)',
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor:
+                        voice.state === 'speaking' ? '#3B82F6'
+                        : voice.state === 'error' ? '#EF4444'
+                        : palette.leaf,
+                    }}
+                  >
+                    {voice.state === 'speaking' ? (
+                      <Sparkles color={palette.white} size={20} strokeWidth={2} />
+                    ) : voice.state === 'processing' || voice.state === 'connecting' || voice.state === 'reconnecting' ? (
+                      <Loader color={palette.white} size={20} strokeWidth={2} />
+                    ) : voice.state === 'error' ? (
+                      <MicOff color={palette.white} size={20} strokeWidth={2} />
+                    ) : (
+                      <Mic color={palette.white} size={20} strokeWidth={2} />
+                    )}
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: palette.ink,
+                      fontFamily: typography.bodyStrong,
+                      fontSize: 14,
+                      lineHeight: 18,
+                    }}
+                  >
+                    {voice.state === 'speaking' ? 'Assistant is speaking'
+                      : voice.state === 'listening' ? 'Listening...'
+                      : voice.state === 'processing' ? 'Thinking...'
+                      : voice.state === 'tool' ? 'Fetching data...'
+                      : voice.state === 'error' ? 'Connection issue'
+                      : 'Connecting...'}
+                  </Text>
+                  <Text
+                    style={{
+                      color: palette.inkMuted,
+                      fontFamily: typography.bodyRegular,
+                      fontSize: 12,
+                      lineHeight: 16,
+                      marginTop: 1,
+                    }}
+                  >
+                    {voice.state === 'speaking' ? 'Please wait for the response'
+                      : voice.state === 'listening' ? 'Speak your question clearly'
+                      : voice.state === 'error' ? (voice.errorMessage || 'Trying to reconnect')
+                      : 'IntelliFarm Voice'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
 
         {historyOpen ? (
           <View
@@ -927,17 +1354,24 @@ export default function VoiceAssistantRoute() {
 }
 
 const TOOL_CONFIG: Record<string, { label: string; icon: any }> = {
-  getUserFarms: { label: 'Accessed Farm Data', icon: TreeDeciduous },
-  getActiveCropSeasons: { label: 'Accessed Active Seasons', icon: Sprout },
+  getFarmerProfile: { label: 'Fetched Profile', icon: User },
+  getFarmDetails: { label: 'Accessed Farm Data', icon: TreeDeciduous },
   getWeather: { label: 'Checked Weather', icon: CloudSun },
-  getMarketPrices: { label: 'Checked Market Prices', icon: LineChart },
-  getTasks: { label: 'Checked Tasks', icon: ListTodo },
-  getWeatherAdvisories: { label: 'Generated Advisory', icon: ShieldAlert },
-  getExpenses: { label: 'Accessed Financials', icon: Database },
-  getBudgets: { label: 'Accessed Budgets', icon: Database },
-  getAlerts: { label: 'Checked Alerts', icon: Bell },
-  predictCropSuitability: { label: 'Used Prediction Model', icon: Sparkles },
-  diagnoseDisease: { label: 'Used Diagnosis Model', icon: Microscope },
+  getSoilSensorData: { label: 'Read Soil Sensors', icon: Gauge },
+  getCropRecommendation: { label: 'Crop Recommendation', icon: Sparkles },
+  detectCropDisease: { label: 'Disease Analysis', icon: Microscope },
+  getMarketRates: { label: 'Checked Market Rates', icon: LineChart },
+  turnPumpOn: { label: 'Turned Pump On', icon: Droplets },
+  turnPumpOff: { label: 'Turned Pump Off', icon: Droplets },
+  setPumpAuto: { label: 'Set Pump to Auto', icon: Droplets },
+  getIrrigationStatus: { label: 'Irrigation Status', icon: Droplets },
+  getPreviousAlerts: { label: 'Checked Alerts', icon: Bell },
+  logFarmerQuery: { label: 'Logged Interaction', icon: FileText },
+  getGovernmentSchemes: { label: 'Govt Schemes', icon: Landmark },
+  getFarmTasks: { label: 'Checked Tasks', icon: ListTodo },
+  updateTaskStatus: { label: 'Updated Task', icon: CheckCircle },
+  getExpenseSummary: { label: 'Expense Summary', icon: Database },
+  getCropTimeline: { label: 'Crop Timeline', icon: Calendar },
 };
 
 function ExpandableToolUsage({ toolsUsed }: { toolsUsed: string[] }) {
@@ -1619,4 +2053,32 @@ function sortConversations(conversations: StoredConversation[]) {
     (left, right) =>
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
   );
+}
+
+function getVoiceStateLabel(
+  state: ReturnType<typeof useVoiceSession>['state'],
+  toolsInUse: string[],
+) {
+  if (toolsInUse.length > 0) {
+    return `Checking farm data...`;
+  }
+
+  switch (state) {
+    case 'connecting':
+      return 'Connecting...';
+    case 'listening':
+      return 'Listening';
+    case 'processing':
+      return 'Thinking...';
+    case 'tool':
+      return 'Checking farm data';
+    case 'speaking':
+      return 'Speaking';
+    case 'reconnecting':
+      return 'Reconnecting...';
+    case 'error':
+      return 'Something went wrong';
+    default:
+      return 'Voice assistant';
+  }
 }

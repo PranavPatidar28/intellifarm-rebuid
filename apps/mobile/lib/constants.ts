@@ -33,10 +33,16 @@ export const soilOptions = [
 ] as const;
 
 export const seasonKeyOptions = [
-  { value: 'KHARIF', label: 'Kharif' },
-  { value: 'RABI', label: 'Rabi' },
-  { value: 'ZAID', label: 'Zaid' },
-  { value: 'CUSTOM', label: 'Custom' },
+  { value: 'KHARIF', label: 'Kharif (Jun–Oct)', description: 'Monsoon crop season' },
+  { value: 'RABI', label: 'Rabi (Nov–Mar)', description: 'Winter crop season' },
+  { value: 'ZAID', label: 'Zaid (Mar–Jun)', description: 'Summer crop season' },
+] as const;
+
+export const waterSupplyOptions = [
+  { value: 'PLENTY', label: 'Plenty', description: 'Canal, well, or bore — reliable year-round' },
+  { value: 'MODERATE', label: 'Moderate', description: 'Available but seasonal gaps possible' },
+  { value: 'LIMITED', label: 'Limited', description: 'Depends on monsoon, manual sometimes' },
+  { value: 'SCARCE', label: 'Scarce', description: 'Mostly rain-fed, limited irrigation' },
 ] as const;
 
 export const assistantPrompts = [

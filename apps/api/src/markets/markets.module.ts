@@ -1,18 +1,22 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { PrismaModule } from '../prisma/prisma.module';
 import {
   DataGovMarketProvider,
   MARKET_PROVIDER,
   SeededMarketProvider,
 } from './market-provider';
+import { MandiLocationEngine } from './mandi-location.engine';
 import { MarketsController } from './markets.controller';
 import { MarketsService } from './markets.service';
 
 @Module({
+  imports: [PrismaModule],
   controllers: [MarketsController],
   providers: [
     MarketsService,
+    MandiLocationEngine,
     SeededMarketProvider,
     DataGovMarketProvider,
     {

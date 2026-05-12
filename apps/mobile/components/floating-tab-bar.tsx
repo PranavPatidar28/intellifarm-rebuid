@@ -1,4 +1,5 @@
-import { StyleSheet, View, type ViewStyle } from "react-native";
+import { useEffect, useState } from "react";
+import { Keyboard, Platform, StyleSheet, View, type ViewStyle, useWindowDimensions, Dimensions } from "react-native";
 
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import {
@@ -24,13 +25,31 @@ export function FloatingTabBar({
   descriptors,
   navigation,
 }: BottomTabBarProps) {
+  const { height: windowHeight } = useWindowDimensions();
+  const screenHeight = Dimensions.get('screen').height;
+  const isAndroidKeyboardOpen = Platform.OS === 'android' && (screenHeight - windowHeight > 150);
+
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const isKeyboardOpen = Platform.OS === 'android' ? isAndroidKeyboardOpen : keyboardVisible;
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      const showSubscription = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+      const hideSubscription = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+      return () => {
+        showSubscription.remove();
+        hideSubscription.remove();
+      };
+    }
+  }, []);
+
   const activeOptions = descriptors[state.routes[state.index]?.key]?.options;
   const flattenedStyle = StyleSheet.flatten(activeOptions?.tabBarStyle) as
     | ViewStyle
     | undefined;
   const activeRouteName = state.routes[state.index]?.name;
 
-  if (flattenedStyle?.display === "none") {
+  if (flattenedStyle?.display === "none" || isKeyboardOpen) {
     return null;
   }
 

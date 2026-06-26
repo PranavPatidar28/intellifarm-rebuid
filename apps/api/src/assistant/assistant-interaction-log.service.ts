@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
-import type { AssistantChannel, AssistantFinalizedTurn, AssistantSessionContext } from './assistant.types';
+import type {
+  AssistantFinalizedTurn,
+  AssistantSessionContext,
+} from './assistant.types';
 
 type CreateInteractionLogInput = {
   userQuery: string;
@@ -17,7 +20,7 @@ type CreateInteractionLogInput = {
 export class AssistantInteractionLogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createLog(
+  createLog(
     session: Pick<
       AssistantSessionContext,
       | 'userId'
@@ -52,7 +55,7 @@ export class AssistantInteractionLogService {
     });
   }
 
-  async finalizeTurn(session: AssistantSessionContext, turn: AssistantFinalizedTurn) {
+  finalizeTurn(session: AssistantSessionContext, turn: AssistantFinalizedTurn) {
     return this.createLog(session, {
       userQuery: turn.userTranscript,
       assistantSummary: turn.assistantTranscript ?? null,

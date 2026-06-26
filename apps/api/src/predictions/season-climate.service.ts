@@ -213,9 +213,7 @@ export class SeasonClimateService {
             // Handle cross-year seasons (e.g., Rabi: Nov-Dec of year, Jan-Mar of year+1)
             const effectiveYear =
               seasonMonths[0] > 6 && month <= 3 ? year + 1 : year;
-            const firstDay = new Date(
-              Date.UTC(effectiveYear, month - 1, 1),
-            );
+            const firstDay = new Date(Date.UTC(effectiveYear, month - 1, 1));
             const lastDay = new Date(Date.UTC(effectiveYear, month, 0));
 
             // Don't fetch future dates
@@ -229,14 +227,11 @@ export class SeasonClimateService {
               start_date: firstDay.toISOString().slice(0, 10),
               end_date: lastDay.toISOString().slice(0, 10),
               hourly: 'temperature_2m,relative_humidity_2m,precipitation',
-              daily:
-                'temperature_2m_max,temperature_2m_min,precipitation_sum',
+              daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum',
               timezone: 'auto',
             });
 
-            const response = await fetch(
-              `${baseUrl}?${query.toString()}`,
-            );
+            const response = await fetch(`${baseUrl}?${query.toString()}`);
 
             if (!response.ok) {
               this.logger.warn(
@@ -329,16 +324,11 @@ function mergeMonthPayloadsIntoSample(
 /**
  * Averages multiple yearly season samples into a single result.
  */
-function aggregateSeasonSamples(
-  samples: HistoricalClimateSample[],
-) {
+function aggregateSeasonSamples(samples: HistoricalClimateSample[]) {
   const n = samples.length;
-  const averageTempC =
-    samples.reduce((s, v) => s + v.averageTempC, 0) / n;
-  const minTempC =
-    Math.min(...samples.map((s) => s.minTempC));
-  const maxTempC =
-    Math.max(...samples.map((s) => s.maxTempC));
+  const averageTempC = samples.reduce((s, v) => s + v.averageTempC, 0) / n;
+  const minTempC = Math.min(...samples.map((s) => s.minTempC));
+  const maxTempC = Math.max(...samples.map((s) => s.maxTempC));
   const averageHumidityPercent =
     samples.reduce((s, v) => s + v.averageHumidityPercent, 0) / n;
   const totalRainfallMm =

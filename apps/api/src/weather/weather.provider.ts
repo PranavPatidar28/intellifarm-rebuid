@@ -107,7 +107,10 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
     }
 
     const payload = (await response.json()) as WeatherPayload;
-    const currentIndex = findCurrentIndex(payload.hourly.time, payload.current.time);
+    const currentIndex = findCurrentIndex(
+      payload.hourly.time,
+      payload.current.time,
+    );
     const hourly = payload.hourly.time
       .slice(currentIndex, currentIndex + 8)
       .map((time, index) => {
@@ -136,9 +139,11 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
 
     const daily = payload.daily.time.map((date, index) => {
       const maxTemperatureC =
-        payload.daily.temperature_2m_max[index] ?? payload.current.temperature_2m;
+        payload.daily.temperature_2m_max[index] ??
+        payload.current.temperature_2m;
       const minTemperatureC =
-        payload.daily.temperature_2m_min[index] ?? payload.current.temperature_2m;
+        payload.daily.temperature_2m_min[index] ??
+        payload.current.temperature_2m;
       const rainfallMm = payload.daily.precipitation_sum[index] ?? 0;
       const condition = mapConditionCode(
         payload.daily.weather_code[index],
@@ -181,7 +186,8 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
         conditionCode: currentCondition.code,
         conditionLabel: currentCondition.label,
         feelsLikeC:
-          payload.current.apparent_temperature ?? payload.current.temperature_2m,
+          payload.current.apparent_temperature ??
+          payload.current.temperature_2m,
         windSpeedKph: payload.current.wind_speed_10m ?? 12,
         updatedAt: new Date(payload.current.time).toISOString(),
       },

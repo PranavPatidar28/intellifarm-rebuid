@@ -1,7 +1,4 @@
-import {
-  isCorsOriginAllowed,
-  resolveAllowedCorsOrigins,
-} from './cors.util';
+import { isCorsOriginAllowed, resolveAllowedCorsOrigins } from './cors.util';
 
 describe('resolveAllowedCorsOrigins', () => {
   it('uses APP_URLS when provided', () => {
@@ -11,10 +8,7 @@ describe('resolveAllowedCorsOrigins', () => {
         appUrl: 'https://fallback.example.com',
         nodeEnv: 'production',
       }),
-    ).toEqual([
-      'https://app.example.com',
-      'https://preview.example.com',
-    ]);
+    ).toEqual(['https://app.example.com', 'https://preview.example.com']);
   });
 
   it('falls back to APP_URL when APP_URLS is not provided', () => {
@@ -51,9 +45,9 @@ describe('isCorsOriginAllowed', () => {
   });
 
   it('allows configured origins', () => {
-    expect(
-      isCorsOriginAllowed('http://localhost:3001', allowedOrigins),
-    ).toBe(true);
+    expect(isCorsOriginAllowed('http://localhost:3001', allowedOrigins)).toBe(
+      true,
+    );
   });
 
   it('rejects unrelated origins', () => {

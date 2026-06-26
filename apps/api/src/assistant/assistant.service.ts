@@ -18,7 +18,10 @@ import type { AssistantChatRequest } from './assistant.schemas';
 @Injectable()
 export class AssistantService {
   private readonly logger = new Logger(AssistantService.name);
-  private readonly statusMap = new Map<string, { text: string; timestamp: number }>();
+  private readonly statusMap = new Map<
+    string,
+    { text: string; timestamp: number }
+  >();
 
   constructor(
     private readonly configService: ConfigService,
@@ -57,7 +60,8 @@ export class AssistantService {
     }
 
     const modelName =
-      this.configService.get<string>('AI_ASSISTANT_MODEL') || 'gemini-1.5-flash';
+      this.configService.get<string>('AI_ASSISTANT_MODEL') ||
+      'gemini-1.5-flash';
     const google = createGoogleGenerativeAI({ apiKey });
     const session: AssistantSessionContext = {
       userId,
@@ -108,7 +112,9 @@ export class AssistantService {
         .reverse()
         .find((message) => message.role === 'user');
 
-      this.logger.debug(`Gemini output text: "${result.text}" | Tools: ${Array.from(toolsUsed).join(', ')}`);
+      this.logger.debug(
+        `Gemini output text: "${result.text}" | Tools: ${Array.from(toolsUsed).join(', ')}`,
+      );
 
       await this.interactionLogService.createLog(session, {
         userQuery: extractText(lastUserMessage?.content) || '(text request)',
@@ -126,7 +132,8 @@ export class AssistantService {
         `Gemini chat failed. ${error instanceof Error ? error.message : String(error)}`,
       );
       await this.interactionLogService.createLog(session, {
-        userQuery: extractText(payload.messages.at(-1)?.content) || '(text request)',
+        userQuery:
+          extractText(payload.messages.at(-1)?.content) || '(text request)',
         toolsUsed: [...toolsUsed],
         errorCode: 'gemini_text_failed',
         errorMessage: error instanceof Error ? error.message : String(error),
@@ -145,7 +152,8 @@ export class AssistantService {
     }
 
     const modelName =
-      this.configService.get<string>('AI_ASSISTANT_MODEL') || 'gemini-1.5-flash';
+      this.configService.get<string>('AI_ASSISTANT_MODEL') ||
+      'gemini-1.5-flash';
     const google = createGoogleGenerativeAI({ apiKey });
 
     try {
@@ -176,9 +184,20 @@ function extractText(content: unknown): string {
   return content
     .map((part) => {
       if (part && typeof part === 'object' && 'text' in part) {
-        return String((part as { text?: unknown }).text ?? '');
+        const value = (part as { text?: unknown }).text;
+        if (typeof value === 'string') return value;
+        // Coerce non-string primitives (e.g. 0, false) so they aren't dropped;
+        // ignore objects/null to avoid "[object Object]".
+        if (typeof value === 'number' || typeof value === 'boolean') {
+          return String(value);
+        }
+        return '';
       }
-      if (part && typeof part === 'object' && (part as { type?: string }).type === 'image') {
+      if (
+        part &&
+        typeof part === 'object' &&
+        (part as { type?: string }).type === 'image'
+      ) {
         return '[image]';
       }
       return '';

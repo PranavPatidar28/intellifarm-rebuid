@@ -13,7 +13,6 @@ import {
   type PumpEventSource,
   type PumpState,
 } from '@prisma/client';
-import { compare } from 'bcryptjs';
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -59,7 +58,10 @@ export class DevicesService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async ingestTelemetry(deviceApiKey: string | undefined, payload: IngestTelemetryInput) {
+  async ingestTelemetry(
+    deviceApiKey: string | undefined,
+    payload: IngestTelemetryInput,
+  ) {
     const farmDevice = await this.prisma.farmDevice.findUnique({
       where: { hardwareId: payload.hardwareId },
       include: {
@@ -75,11 +77,11 @@ export class DevicesService {
             status: 'PENDING',
             expiresAt: {
               gt: new Date(),
-            }
+            },
           },
           orderBy: { issuedAt: 'desc' },
           take: 1,
-        }
+        },
       },
     });
 
@@ -87,14 +89,16 @@ export class DevicesService {
       throw new NotFoundException('Farm device is not registered');
     }
 
-    // Optimization: API keys for devices should use simple string comparison 
+    // Optimization: API keys for devices should use simple string comparison
     // instead of bcrypt to avoid 100ms+ CPU lag per 1-second ingest.
     if (!deviceApiKey || deviceApiKey !== farmDevice.apiKeyHash) {
       throw new UnauthorizedException('Invalid device key');
     }
 
     // Fire and forget command expiration to prevent blocking the fast-path
-    this.expirePendingCommands(farmDevice.id).catch(err => console.error(err));
+    this.expirePendingCommands(farmDevice.id).catch((err) =>
+      console.error(err),
+    );
 
     const recordedAt = payload.recordedAt ?? new Date();
     const nextPumpState = payload.pumpState;
@@ -111,7 +115,10 @@ export class DevicesService {
       ? (recordedAt.getTime() - farmDevice.lastSeenAt.getTime()) / 1000
       : Infinity;
 
-    const stateChanged = farmDevice.pumpState !== nextPumpState || farmDevice.pumpControlMode !== nextMode || commandWasApplied;
+    const stateChanged =
+      farmDevice.pumpState !== nextPumpState ||
+      farmDevice.pumpControlMode !== nextMode ||
+      commandWasApplied;
 
     // Cache the live reading instantly for the dashboard
     this.liveTelemetryCache.set(farmDevice.id, {
@@ -127,13 +134,15 @@ export class DevicesService {
     const activePendingCommand = commandWasApplied ? null : pendingCommand;
 
     if (timeSinceLastWrite < 5 && !stateChanged) {
-        // Skip database write entirely if less than 5 seconds have passed
-        return {
-          accepted: true,
-          recordedAt: recordedAt.toISOString(),
-          deviceOverview: null,
-          pendingCommand: activePendingCommand ? this.presentCommand(activePendingCommand) : null,
-        };
+      // Skip database write entirely if less than 5 seconds have passed
+      return {
+        accepted: true,
+        recordedAt: recordedAt.toISOString(),
+        deviceOverview: null,
+        pendingCommand: activePendingCommand
+          ? this.presentCommand(activePendingCommand)
+          : null,
+      };
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -207,7 +216,9 @@ export class DevicesService {
       accepted: true,
       recordedAt: recordedAt.toISOString(),
       deviceOverview: null, // Optimization: Omitted from ingest to save 4 DB queries. The ESP32 doesn't use this payload.
-      pendingCommand: activePendingCommand ? this.presentCommand(activePendingCommand) : null,
+      pendingCommand: activePendingCommand
+        ? this.presentCommand(activePendingCommand)
+        : null,
     };
   }
 
@@ -243,20 +254,26 @@ export class DevicesService {
 
     const cachedTelemetry = this.liveTelemetryCache.get(farmDevice.id);
     const telemetry = [...dbTelemetry];
-    if (cachedTelemetry && (!telemetry.length || cachedTelemetry.recordedAt > telemetry[0].recordedAt)) {
-      telemetry.unshift({ 
-        id: 'live-cache', 
-        farmDeviceId: farmDevice.id, 
-        rawPayload: {}, 
-        createdAt: cachedTelemetry.recordedAt, 
-        ...cachedTelemetry 
+    if (
+      cachedTelemetry &&
+      (!telemetry.length ||
+        cachedTelemetry.recordedAt > telemetry[0].recordedAt)
+    ) {
+      telemetry.unshift({
+        id: 'live-cache',
+        farmDeviceId: farmDevice.id,
+        rawPayload: {},
+        createdAt: cachedTelemetry.recordedAt,
+        ...cachedTelemetry,
       });
       if (telemetry.length > 24) telemetry.pop();
     }
 
     return {
       device: deviceOverview,
-      telemetry: telemetry.reverse().map((entry) => this.presentTelemetry(entry)),
+      telemetry: telemetry
+        .reverse()
+        .map((entry) => this.presentTelemetry(entry)),
       pumpEvents: pumpEvents.map((entry) => this.presentPumpEvent(entry)),
     };
   }
@@ -273,14 +290,17 @@ export class DevicesService {
     });
 
     if (!farmDevice) {
-      throw new NotFoundException('Smart irrigation device not found for this plot');
+      throw new NotFoundException(
+        'Smart irrigation device not found for this plot',
+      );
     }
 
     await this.expirePendingCommands(farmDevice.id);
 
     const currentStatus = this.resolveDeviceStatus(farmDevice);
     const commandStatus: PumpCommandStatus =
-      currentStatus !== 'OFFLINE' && farmDevice.pumpControlMode === payload.targetMode
+      currentStatus !== 'OFFLINE' &&
+      farmDevice.pumpControlMode === payload.targetMode
         ? 'APPLIED'
         : 'PENDING';
     const issuedAt = new Date();
@@ -339,7 +359,9 @@ export class DevicesService {
     });
 
     if (!farmDevice) {
-      throw new NotFoundException('Smart irrigation device not found for this plot');
+      throw new NotFoundException(
+        'Smart irrigation device not found for this plot',
+      );
     }
 
     const nextLowThreshold =
@@ -365,7 +387,9 @@ export class DevicesService {
 
     const deviceOverview = await this.getDeviceOverviewById(farmDevice.id);
     if (!deviceOverview) {
-      throw new NotFoundException('Smart irrigation device not found for this plot');
+      throw new NotFoundException(
+        'Smart irrigation device not found for this plot',
+      );
     }
 
     return {
@@ -408,9 +432,12 @@ export class DevicesService {
     }
 
     const cachedTelemetry = this.liveTelemetryCache.get(farmDeviceId);
-    const latestTelemetry = cachedTelemetry && latestDbTelemetry 
-      ? (cachedTelemetry.recordedAt > latestDbTelemetry.recordedAt ? cachedTelemetry : latestDbTelemetry)
-      : (cachedTelemetry || latestDbTelemetry);
+    const latestTelemetry =
+      cachedTelemetry && latestDbTelemetry
+        ? cachedTelemetry.recordedAt > latestDbTelemetry.recordedAt
+          ? cachedTelemetry
+          : latestDbTelemetry
+        : cachedTelemetry || latestDbTelemetry;
 
     const status = this.resolveDeviceStatus(farmDevice);
 
@@ -422,13 +449,19 @@ export class DevicesService {
       pumpState: farmDevice.pumpState,
       pumpControlMode: farmDevice.pumpControlMode,
       autoIrrigationEnabled: farmDevice.autoIrrigationEnabled,
-      latestReading: latestTelemetry ? this.presentLatestReading(latestTelemetry) : null,
+      latestReading: latestTelemetry
+        ? this.presentLatestReading(latestTelemetry)
+        : null,
       thresholds: {
         lowThreshold: farmDevice.moistureLowThreshold,
         recoveryThreshold: farmDevice.moistureRecoveryThreshold,
       },
-      lastPumpEvent: latestPumpEvent ? this.presentPumpEvent(latestPumpEvent) : null,
-      pendingCommand: pendingCommand ? this.presentCommand(pendingCommand) : null,
+      lastPumpEvent: latestPumpEvent
+        ? this.presentPumpEvent(latestPumpEvent)
+        : null,
+      pendingCommand: pendingCommand
+        ? this.presentCommand(pendingCommand)
+        : null,
       offlineMessage:
         status === 'OFFLINE'
           ? buildOfflineMessage(farmDevice.lastSeenAt)
@@ -769,10 +802,6 @@ function addSeconds(date: Date, seconds: number) {
   return new Date(date.getTime() + seconds * 1000);
 }
 
-function minutesSince(date: Date) {
-  return Math.floor((Date.now() - date.getTime()) / 60_000);
-}
-
 function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60_000);
 }
@@ -790,7 +819,7 @@ function buildOfflineMessage(lastSeenAt: Date | null) {
   if (idleSeconds < 60) {
     return `No device update received for ${idleSeconds} seconds.`;
   }
-  
+
   const idleMinutes = Math.floor(idleSeconds / 60);
   return `No device update received for ${idleMinutes} minute${idleMinutes === 1 ? '' : 's'}.`;
 }

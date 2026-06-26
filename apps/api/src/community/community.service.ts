@@ -152,7 +152,10 @@ export class CommunityService {
       },
     });
 
-    if (!post || (post.hidden && viewer.role !== 'ADMIN' && post.authorId !== viewer.sub)) {
+    if (
+      !post ||
+      (post.hidden && viewer.role !== 'ADMIN' && post.authorId !== viewer.sub)
+    ) {
       throw new NotFoundException('Community post not found');
     }
 
@@ -246,7 +249,11 @@ export class CommunityService {
     };
   }
 
-  async createReply(viewer: AuthUser, postId: string, payload: CreateReplyInput) {
+  async createReply(
+    viewer: AuthUser,
+    postId: string,
+    payload: CreateReplyInput,
+  ) {
     const author = await this.prisma.user.findUnique({
       where: { id: viewer.sub },
       select: {
@@ -327,11 +334,14 @@ export class CommunityService {
     });
 
     if (result.postAuthorId !== viewer.sub) {
-      this.notificationsService.publishInternalEvent('community.reply.created', {
-        postId: result.postId,
-        repliedBy: viewer.sub,
-        targetUserId: result.postAuthorId,
-      });
+      this.notificationsService.publishInternalEvent(
+        'community.reply.created',
+        {
+          postId: result.postId,
+          repliedBy: viewer.sub,
+          targetUserId: result.postAuthorId,
+        },
+      );
     }
 
     return {
@@ -422,7 +432,8 @@ export class CommunityService {
     viewerContext: ViewerContext,
   ) {
     const scoreDelta =
-      this.scorePost(right, scope, viewerContext) - this.scorePost(left, scope, viewerContext);
+      this.scorePost(right, scope, viewerContext) -
+      this.scorePost(left, scope, viewerContext);
 
     if (scoreDelta !== 0) {
       return scoreDelta;
@@ -431,7 +442,11 @@ export class CommunityService {
     return right.createdAt.getTime() - left.createdAt.getTime();
   }
 
-  private scorePost(post: CommunityPostRecord, scope: FeedScope, viewerContext: ViewerContext) {
+  private scorePost(
+    post: CommunityPostRecord,
+    scope: FeedScope,
+    viewerContext: ViewerContext,
+  ) {
     const ageHours = Math.max(
       1,
       (Date.now() - post.createdAt.getTime()) / (1000 * 60 * 60),
@@ -521,15 +536,20 @@ export class CommunityService {
       farm.cropSeasons.filter((season) => isOperationalSeason(season.status)),
     );
     const scopedSeasons =
-      operationalSeasons.filter((season) => season.status === 'ACTIVE').length > 0
+      operationalSeasons.filter((season) => season.status === 'ACTIVE').length >
+      0
         ? operationalSeasons.filter((season) => season.status === 'ACTIVE')
         : operationalSeasons.filter((season) => season.status === 'PLANNED');
     const fallbackFarm = user.farmPlots[0];
 
     return {
       defaultScope: scopedSeasons.length > 0 ? 'FOR_YOU' : 'NEARBY',
-      cropNames: new Set(scopedSeasons.map((season) => normalize(season.cropName))),
-      stages: new Set(scopedSeasons.map((season) => normalize(season.currentStage))),
+      cropNames: new Set(
+        scopedSeasons.map((season) => normalize(season.cropName)),
+      ),
+      stages: new Set(
+        scopedSeasons.map((season) => normalize(season.currentStage)),
+      ),
       village: user.village ?? fallbackFarm?.village ?? null,
       district: user.district ?? fallbackFarm?.district ?? null,
       state: user.state ?? fallbackFarm?.state ?? null,
@@ -547,7 +567,10 @@ export class CommunityService {
         include: buildViewerPostInclude(viewer.sub),
       });
 
-      if (!post || (post.hidden && viewer.role !== 'ADMIN' && post.authorId !== viewer.sub)) {
+      if (
+        !post ||
+        (post.hidden && viewer.role !== 'ADMIN' && post.authorId !== viewer.sub)
+      ) {
         throw new NotFoundException('Community post not found');
       }
 

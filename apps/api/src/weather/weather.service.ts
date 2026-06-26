@@ -144,7 +144,8 @@ export class WeatherService {
             farmPlotId: farmPlot.id,
             source: forecast.provider,
             forecastDate: new Date(forecast.current.updatedAt),
-            summary: weather.advisories[0]?.message ?? weather.current.conditionLabel,
+            summary:
+              weather.advisories[0]?.message ?? weather.current.conditionLabel,
             rawPayload: weather as never,
           },
         });
@@ -210,8 +211,13 @@ export class WeatherService {
     forceCached: boolean;
     providerOverride?: string;
   }): WeatherSummary | null {
-    const { rawPayload, coordinates, capturedAt, forceCached, providerOverride } =
-      params;
+    const {
+      rawPayload,
+      coordinates,
+      capturedAt,
+      forceCached,
+      providerOverride,
+    } = params;
 
     if (!rawPayload || typeof rawPayload !== 'object') {
       return null;
@@ -268,7 +274,11 @@ export class WeatherService {
       params;
     const riskSignals = buildRiskSignals(forecast);
     const fieldWindows = buildFieldWindows(forecast, riskSignals);
-    const advisories = buildWeatherAdvisories(forecast, riskSignals, fieldWindows);
+    const advisories = buildWeatherAdvisories(
+      forecast,
+      riskSignals,
+      fieldWindows,
+    );
 
     return {
       current: forecast.current,
@@ -342,7 +352,9 @@ export class WeatherService {
   }
 }
 
-function parseLegacyWeatherPayload(payload: Record<string, unknown>): WeatherForecast | null {
+function parseLegacyWeatherPayload(
+  payload: Record<string, unknown>,
+): WeatherForecast | null {
   if (
     typeof payload.currentTemperatureC === 'number' &&
     typeof payload.rainfallExpectedMm === 'number' &&
@@ -354,10 +366,12 @@ function parseLegacyWeatherPayload(payload: Record<string, unknown>): WeatherFor
     );
     const daily = payload.forecastDays
       .filter(
-        (day): day is Record<string, unknown> => !!day && typeof day === 'object',
+        (day): day is Record<string, unknown> =>
+          !!day && typeof day === 'object',
       )
       .map((day) => {
-        const rainfallMm = typeof day.rainfallMm === 'number' ? day.rainfallMm : 0;
+        const rainfallMm =
+          typeof day.rainfallMm === 'number' ? day.rainfallMm : 0;
         const dayCondition = deriveConditionFromLegacy(
           typeof day.maxTemperatureC === 'number' ? day.maxTemperatureC : 30,
           rainfallMm,
@@ -365,7 +379,9 @@ function parseLegacyWeatherPayload(payload: Record<string, unknown>): WeatherFor
 
         return {
           date:
-            typeof day.date === 'string' ? day.date : new Date().toISOString().slice(0, 10),
+            typeof day.date === 'string'
+              ? day.date
+              : new Date().toISOString().slice(0, 10),
           maxTemperatureC:
             typeof day.maxTemperatureC === 'number' ? day.maxTemperatureC : 30,
           minTemperatureC:
@@ -404,7 +420,8 @@ function parseLegacyWeatherPayload(payload: Record<string, unknown>): WeatherFor
         rainfallExpectedMm: payload.rainfallExpectedMm,
       }),
       daily,
-      provider: typeof payload.source === 'string' ? payload.source : 'Saved snapshot',
+      provider:
+        typeof payload.source === 'string' ? payload.source : 'Saved snapshot',
     };
   }
 
@@ -443,7 +460,11 @@ function buildRiskSignals(forecast: WeatherForecast) {
     },
     heatStressRisk: {
       level:
-        temperature >= 37 ? 'HIGH' : temperature >= 33 || humidity <= 35 ? 'MEDIUM' : 'LOW',
+        temperature >= 37
+          ? 'HIGH'
+          : temperature >= 33 || humidity <= 35
+            ? 'MEDIUM'
+            : 'LOW',
       reason:
         temperature >= 37
           ? 'High daytime heat can stress the crop canopy quickly.'
@@ -481,18 +502,21 @@ function buildFieldWindows(
       : riskSignals.sprayRisk.level === 'MEDIUM'
         ? {
             status: 'CAUTION' as const,
-            summary: 'Spray only if needed and watch the next rain spell closely.',
+            summary:
+              'Spray only if needed and watch the next rain spell closely.',
           }
         : {
             status: 'GOOD' as const,
-            summary: 'The current spray window looks workable for short field tasks.',
+            summary:
+              'The current spray window looks workable for short field tasks.',
           };
 
   const irrigationWindow =
     riskSignals.irrigationNeed.level === 'HIGH'
       ? {
           status: 'GOOD' as const,
-          summary: 'Plan a moisture check and be ready for irrigation if soil is dry.',
+          summary:
+            'Plan a moisture check and be ready for irrigation if soil is dry.',
         }
       : forecast.current.rainfallExpectedMm >= 10
         ? {
@@ -501,14 +525,16 @@ function buildFieldWindows(
           }
         : {
             status: 'CAUTION' as const,
-            summary: 'Check root-zone moisture before applying another irrigation turn.',
+            summary:
+              'Check root-zone moisture before applying another irrigation turn.',
           };
 
   const harvestWindow =
     riskSignals.floodRisk.level === 'HIGH'
       ? {
           status: 'AVOID' as const,
-          summary: 'Wet field conditions may delay harvest movement and transport.',
+          summary:
+            'Wet field conditions may delay harvest movement and transport.',
         }
       : forecast.current.humidityPercent >= 80
         ? {
@@ -517,7 +543,8 @@ function buildFieldWindows(
           }
         : {
             status: 'GOOD' as const,
-            summary: 'Field movement conditions look reasonably steady right now.',
+            summary:
+              'Field movement conditions look reasonably steady right now.',
           };
 
   return {
@@ -542,8 +569,7 @@ function buildWeatherAdvisories(
       severity: 'HIGH',
       recommendedAction:
         'Delay non-urgent spray work and review the next clear window before mixing inputs.',
-      audioSummary:
-        'Rain or wind risk is high. Hold spray plans for now.',
+      audioSummary: 'Rain or wind risk is high. Hold spray plans for now.',
     });
   }
 
@@ -628,7 +654,10 @@ function isFallbackSource(locationSource: WeatherLocationSource) {
 function buildFallbackForecast(): WeatherForecast {
   const currentTemperatureC = 31;
   const rainfallExpectedMm = 6;
-  const condition = deriveConditionFromLegacy(currentTemperatureC, rainfallExpectedMm);
+  const condition = deriveConditionFromLegacy(
+    currentTemperatureC,
+    rainfallExpectedMm,
+  );
 
   return {
     current: {
@@ -657,7 +686,11 @@ function buildFallbackHourlyForecast(params: {
 }) {
   const base = new Date();
   const rainProbabilityPercent =
-    params.rainfallExpectedMm >= 12 ? 78 : params.rainfallExpectedMm >= 5 ? 52 : 20;
+    params.rainfallExpectedMm >= 12
+      ? 78
+      : params.rainfallExpectedMm >= 5
+        ? 52
+        : 20;
   const condition = deriveConditionFromLegacy(
     params.temperatureC,
     params.rainfallExpectedMm,
@@ -667,7 +700,11 @@ function buildFallbackHourlyForecast(params: {
     time: new Date(base.getTime() + index * 3_600_000).toISOString(),
     temperatureC: params.temperatureC + (index % 3 === 0 ? 1 : 0),
     rainMm:
-      params.rainfallExpectedMm >= 12 ? 2.4 : params.rainfallExpectedMm >= 5 ? 1.1 : 0.1,
+      params.rainfallExpectedMm >= 12
+        ? 2.4
+        : params.rainfallExpectedMm >= 5
+          ? 1.1
+          : 0.1,
     rainProbabilityPercent,
     conditionCode: condition.code,
     conditionLabel: condition.label,

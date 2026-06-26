@@ -34,7 +34,6 @@ export class MandiLocationEngine {
       const result = await geocodePromise;
       if (!result) {
         // If exact mandi fails, fallback to District center
-        this.logger.debug(`Exact mandi failed for ${mandiName}, falling back to district ${district}`);
         return await this.fetchFromNominatim('', district, state);
       }
       return result;
@@ -52,7 +51,9 @@ export class MandiLocationEngine {
     // Throttle to avoid aggressive rate limiting
     const now = Date.now();
     if (now - this.lastRequestTime < 1100) {
-      await new Promise((resolve) => setTimeout(resolve, 1100 - (now - this.lastRequestTime)));
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1100 - (now - this.lastRequestTime)),
+      );
     }
     this.lastRequestTime = Date.now();
 
@@ -85,7 +86,10 @@ export class MandiLocationEngine {
         return null;
       }
 
-      const data = (await response.json()) as Array<{ lat: string; lon: string }>;
+      const data = (await response.json()) as Array<{
+        lat: string;
+        lon: string;
+      }>;
       if (data && data.length > 0) {
         return {
           latitude: Number.parseFloat(data[0].lat),

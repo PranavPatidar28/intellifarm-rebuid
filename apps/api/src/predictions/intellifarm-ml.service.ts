@@ -1,4 +1,9 @@
-import { BadGatewayException, BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 // ─── ML API request/response types ───────────────────────────────────────────
@@ -67,12 +72,7 @@ type AppSoilType =
 
 type AppSeasonKey = 'KHARIF' | 'RABI' | 'ZAID' | 'CUSTOM';
 
-type AppIrrigationType =
-  | 'RAIN_FED'
-  | 'DRIP'
-  | 'SPRINKLER'
-  | 'FLOOD'
-  | 'MANUAL';
+type AppIrrigationType = 'RAIN_FED' | 'DRIP' | 'SPRINKLER' | 'FLOOD' | 'MANUAL';
 
 const SOIL_TYPE_MAP: Record<AppSoilType, FarmerProfileRequest['soil_type']> = {
   ALLUVIAL: 'Loamy Soil',
@@ -102,17 +102,61 @@ const WATER_SCORE_MAP: Record<AppIrrigationType, number> = {
 
 /** Districts accepted by the IntelliFarm ML API (Madhya Pradesh only). */
 const ALLOWED_DISTRICTS = new Set([
-  'Aalirajpur', 'Agar Malwa', 'Anuppur', 'AshokNagar', 'Balaghat',
-  'Barwani', 'Betul', 'Bhind', 'Bhopal', 'Burhanpur',
-  'Chhatarpur', 'Chhindwara', 'Damoh', 'Datia', 'Dewas',
-  'Dhar', 'Dindori', 'Guna', 'Gwalior', 'Harda',
-  'Indore', 'Jabalpur', 'Jhabua', 'KHANDWA', 'Katni',
-  'Khargone', 'Maihar', 'Mandla', 'Mandsaur', 'Mauganj',
-  'Morena', 'Narmadapuram', 'Narsinghpur', 'Neemuch', 'Niwari',
-  'Pandhurna', 'Panna', 'Raisen', 'Rajgarh', 'Ratlam',
-  'Rewa', 'Sagar', 'Satna', 'Sehore', 'Seoni',
-  'Shahdol', 'Shajapur', 'Sheopur', 'Shivpuri', 'Sidhi',
-  'Singrauli', 'Tikamgarh', 'Ujjain', 'Umaria', 'Vidisha',
+  'Aalirajpur',
+  'Agar Malwa',
+  'Anuppur',
+  'AshokNagar',
+  'Balaghat',
+  'Barwani',
+  'Betul',
+  'Bhind',
+  'Bhopal',
+  'Burhanpur',
+  'Chhatarpur',
+  'Chhindwara',
+  'Damoh',
+  'Datia',
+  'Dewas',
+  'Dhar',
+  'Dindori',
+  'Guna',
+  'Gwalior',
+  'Harda',
+  'Indore',
+  'Jabalpur',
+  'Jhabua',
+  'KHANDWA',
+  'Katni',
+  'Khargone',
+  'Maihar',
+  'Mandla',
+  'Mandsaur',
+  'Mauganj',
+  'Morena',
+  'Narmadapuram',
+  'Narsinghpur',
+  'Neemuch',
+  'Niwari',
+  'Pandhurna',
+  'Panna',
+  'Raisen',
+  'Rajgarh',
+  'Ratlam',
+  'Rewa',
+  'Sagar',
+  'Satna',
+  'Sehore',
+  'Seoni',
+  'Shahdol',
+  'Shajapur',
+  'Sheopur',
+  'Shivpuri',
+  'Sidhi',
+  'Singrauli',
+  'Tikamgarh',
+  'Ujjain',
+  'Umaria',
+  'Vidisha',
 ]);
 
 /** Case-insensitive lookup map for districts. */
@@ -212,7 +256,9 @@ export class IntelliFarmMLService {
       );
 
       if (response.status === 422) {
-        this.logger.error(`ML API 422 rejection. Request was: ${JSON.stringify(request)}`);
+        this.logger.error(
+          `ML API 422 rejection. Request was: ${JSON.stringify(request)}`,
+        );
         throw new BadRequestException(
           `The prediction request was rejected by the ML model. Detail: ${errorBody.slice(0, 300)}`,
         );
@@ -229,11 +275,15 @@ export class IntelliFarmMLService {
   }
 }
 
-function normalizeMLResponse(raw: Record<string, unknown>): IntelliFarmMLResponse {
+function normalizeMLResponse(
+  raw: Record<string, unknown>,
+): IntelliFarmMLResponse {
   const topCrops = Array.isArray(raw.top_3_crops) ? raw.top_3_crops : [];
 
   return {
-    top_3_crops: topCrops.map(normalizeCropRecommendation).filter(Boolean) as MLCropRecommendation[],
+    top_3_crops: topCrops
+      .map(normalizeCropRecommendation)
+      .filter(Boolean) as MLCropRecommendation[],
     crop_must_not_be_grown:
       typeof raw.crop_must_not_be_grown === 'string'
         ? raw.crop_must_not_be_grown
@@ -256,9 +306,18 @@ function normalizeCropRecommendation(
 
   return {
     crop_name: cropName,
-    average_yield_tonne_per_hectare: safeNumber(record.average_yield_tonne_per_hectare, 0),
-    best_case_yield_tonne_per_hectare: safeNumber(record.best_case_yield_tonne_per_hectare, 0),
-    worst_case_yield_tonne_per_hectare: safeNumber(record.worst_case_yield_tonne_per_hectare, 0),
+    average_yield_tonne_per_hectare: safeNumber(
+      record.average_yield_tonne_per_hectare,
+      0,
+    ),
+    best_case_yield_tonne_per_hectare: safeNumber(
+      record.best_case_yield_tonne_per_hectare,
+      0,
+    ),
+    worst_case_yield_tonne_per_hectare: safeNumber(
+      record.worst_case_yield_tonne_per_hectare,
+      0,
+    ),
     average_profit_rs: safeNumber(record.average_profit_rs, 0),
     average_revenue_rs: safeNumber(record.average_revenue_rs, 0),
     estimated_cost_rs: safeNumber(record.estimated_cost_rs, 0),
@@ -272,9 +331,7 @@ function normalizeCropRecommendation(
   };
 }
 
-function normalizeRagExplanation(
-  value: unknown,
-): RagExplanationSection[] {
+function normalizeRagExplanation(value: unknown): RagExplanationSection[] {
   if (!value || typeof value !== 'object') return [];
 
   const record = value as Record<string, unknown>;
@@ -284,8 +341,7 @@ function normalizeRagExplanation(
     .map((entry) => {
       if (!entry || typeof entry !== 'object') return null;
       const e = entry as Record<string, unknown>;
-      const heading =
-        typeof e.heading === 'string' ? e.heading : 'Analysis';
+      const heading = typeof e.heading === 'string' ? e.heading : 'Analysis';
       const text = typeof e.text === 'string' ? e.text : '';
       if (!text) return null;
       return { heading, text };

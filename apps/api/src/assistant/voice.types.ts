@@ -84,7 +84,12 @@ export type VoiceServerEvent =
       event: 'tool.status';
       data: {
         toolName: string;
-        status: 'started' | 'completed' | 'failed' | 'cancelled' | 'requires_confirmation';
+        status:
+          | 'started'
+          | 'completed'
+          | 'failed'
+          | 'cancelled'
+          | 'requires_confirmation';
         message?: string;
       };
     }

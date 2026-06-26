@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   GoogleGenAI,
@@ -11,7 +15,10 @@ import {
 
 import { buildAssistantSystemPrompt } from './assistant-prompt.config';
 import { AssistantToolRegistryService } from './assistant-tool-registry.service';
-import type { AssistantSessionContext, AssistantToolResult } from './assistant.types';
+import type {
+  AssistantSessionContext,
+  AssistantToolResult,
+} from './assistant.types';
 
 export type GeminiLiveSession = {
   sendAudio: (base64Audio: string) => void;
@@ -23,20 +30,34 @@ export type GeminiLiveSession = {
 
 export type GeminiLiveCallbacks = {
   onReady: () => void;
-  onState: (state: 'listening' | 'processing' | 'tool' | 'speaking', message?: string) => void;
-  onAudio: (base64Audio: string, options?: { interrupt?: boolean; sampleRate?: number }) => void;
+  onState: (
+    state: 'listening' | 'processing' | 'tool' | 'speaking',
+    message?: string,
+  ) => void;
+  onAudio: (
+    base64Audio: string,
+    options?: { interrupt?: boolean; sampleRate?: number },
+  ) => void;
   onInputTranscript: (text: string, final: boolean) => void;
   onOutputTranscript: (text: string, final: boolean) => void;
   onToolStatus: (
     toolName: string,
-    status: 'started' | 'completed' | 'failed' | 'cancelled' | 'requires_confirmation',
+    status:
+      | 'started'
+      | 'completed'
+      | 'failed'
+      | 'cancelled'
+      | 'requires_confirmation',
     message?: string,
   ) => void;
   onToolResult: (toolName: string, result: AssistantToolResult) => void;
   onTurnComplete: () => void;
   onError: (code: string, message: string) => void;
   onClose: () => void;
-  onResumptionUpdate: (handle: string | null, lastConsumedClientMessageIndex?: string | null) => void;
+  onResumptionUpdate: (
+    handle: string | null,
+    lastConsumedClientMessageIndex?: string | null,
+  ) => void;
 };
 
 @Injectable()
@@ -60,16 +81,25 @@ export class GeminiLiveService {
 
     const ai = new GoogleGenAI({
       apiKey,
-      apiVersion: this.configService.get<string>('GEMINI_API_VERSION', 'v1alpha'),
+      apiVersion: this.configService.get<string>(
+        'GEMINI_API_VERSION',
+        'v1alpha',
+      ),
     });
     const model = this.configService.get<string>(
       'GEMINI_LIVE_MODEL',
       'gemini-3.1-flash-live-preview',
     );
-    const voiceName = this.configService.get<string>('GEMINI_LIVE_VOICE_NAME', 'Aoede');
+    const voiceName = this.configService.get<string>(
+      'GEMINI_LIVE_VOICE_NAME',
+      'Aoede',
+    );
     let liveSession: Session | null = null;
 
-    const sendFunctionResponse = (functionCall: FunctionCall, result: unknown) => {
+    const sendFunctionResponse = (
+      functionCall: FunctionCall,
+      result: unknown,
+    ) => {
       if (!liveSession) {
         return;
       }
@@ -90,7 +120,8 @@ export class GeminiLiveService {
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-          languageCode: params.session.preferredLanguage === 'hi' ? 'hi-IN' : 'en-IN',
+          languageCode:
+            params.session.preferredLanguage === 'hi' ? 'hi-IN' : 'en-IN',
           voiceConfig: {
             prebuiltVoiceConfig: {
               voiceName,
@@ -121,14 +152,33 @@ export class GeminiLiveService {
       },
       callbacks: {
         onopen: () => {
-          this.logger.log(`Gemini Live socket open for voice session ${params.session.voiceSessionId}`);
+          this.logger.log(
+            `Gemini Live socket open for voice session ${params.session.voiceSessionId}`,
+          );
         },
-        onmessage: async (message) => {
-          await this.handleMessage(message, params.session, params.callbacks, sendFunctionResponse);
+        onmessage: (message) => {
+          void this.handleMessage(
+            message,
+            params.session,
+            params.callbacks,
+            sendFunctionResponse,
+          ).catch((error) => {
+            this.logger.error(
+              `Failed to handle Gemini Live message: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          });
         },
         onerror: (event) => {
           const message = 'Gemini Live connection error';
-          this.logger.warn(`${message}: ${String(event)}`);
+          const detail =
+            event instanceof Error
+              ? event.message
+              : typeof event === 'object' && event && 'message' in event
+                ? String((event as { message?: unknown }).message)
+                : JSON.stringify(event);
+          this.logger.warn(`${message}: ${detail}`);
           params.callbacks.onError('gemini_connection_error', message);
         },
         onclose: () => {
@@ -184,7 +234,7 @@ export class GeminiLiveService {
     if (message.sessionResumptionUpdate) {
       callbacks.onResumptionUpdate(
         message.sessionResumptionUpdate.resumable
-          ? message.sessionResumptionUpdate.newHandle ?? null
+          ? (message.sessionResumptionUpdate.newHandle ?? null)
           : null,
         message.sessionResumptionUpdate.lastConsumedClientMessageIndex ?? null,
       );
@@ -197,12 +247,19 @@ export class GeminiLiveService {
 
     const inputTranscription = message.serverContent?.inputTranscription?.text;
     if (inputTranscription) {
-      callbacks.onInputTranscript(inputTranscription, Boolean(message.serverContent?.turnComplete));
+      callbacks.onInputTranscript(
+        inputTranscription,
+        Boolean(message.serverContent?.turnComplete),
+      );
     }
 
-    const outputTranscription = message.serverContent?.outputTranscription?.text;
+    const outputTranscription =
+      message.serverContent?.outputTranscription?.text;
     if (outputTranscription) {
-      callbacks.onOutputTranscript(outputTranscription, Boolean(message.serverContent?.turnComplete));
+      callbacks.onOutputTranscript(
+        outputTranscription,
+        Boolean(message.serverContent?.turnComplete),
+      );
     }
 
     const parts = message.serverContent?.modelTurn?.parts ?? [];
@@ -235,7 +292,9 @@ export class GeminiLiveService {
             callbacks.onToolResult(toolName, result);
             callbacks.onToolStatus(
               toolName,
-              result.requiresConfirmation ? 'requires_confirmation' : 'completed',
+              result.requiresConfirmation
+                ? 'requires_confirmation'
+                : 'completed',
               result.requiresConfirmation?.message,
             );
             sendFunctionResponse(functionCall, result);

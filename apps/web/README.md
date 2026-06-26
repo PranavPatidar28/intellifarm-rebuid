@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# @intellifarm/web
 
-## Getting Started
+The Intellifarm farmer dashboard: a Next.js 16 App Router web app that runs as a thin client over the backend `/v1` REST API. All auth, business logic, and data live in `@intellifarm/api`.
 
-First, run the development server:
+For monorepo-wide setup and shared conventions see the [root README](../../README.md) and [CLAUDE.md](../../CLAUDE.md).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+> **Read [`AGENTS.md`](./AGENTS.md) before writing web code.** This repo uses a Next.js version with breaking changes from older training data — consult `node_modules/next/dist/docs/` for current APIs and heed deprecation notices.
+
+## Tech stack
+
+- Next.js 16 (App Router)
+- React 19
+- Tailwind CSS 4
+- SWR for data fetching
+
+## Running
+
+From the repo root (so `@intellifarm/contracts` builds first):
+
+```powershell
+pnpm install
+pnpm --filter @intellifarm/web dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app runs on **http://localhost:3000** and expects the API on port 4000. Dev login after seeding: farmer `9876543210` / OTP `123456`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API clients
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+There are two clients, chosen by where the code runs:
 
-## Learn More
+- **`src/lib/api.ts`** — for client components (`"use client"`). Sends cookies (`credentials: "include"`) and transparently retries once after refreshing the access token on a 401.
+- **`src/lib/api.server.ts`** — for server components. Forwards the incoming request cookies and `redirect("/login")`s on a 401.
 
-To learn more about Next.js, take a look at the following resources:
+## Component structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+UI is composed bottom-up:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `src/components/ui/` — primitives
+- `src/components/templates/` — page templates built from primitives
+- `src/components/` — the app shell
 
-## Deploy on Vercel
+## Tests
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+There are no automated web tests yet (`pnpm --filter @intellifarm/web test` is a stub).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy
+
+A `Dockerfile` (standalone output) is present in this directory.

@@ -24,12 +24,6 @@ type SchemesResponse = {
   }>;
 };
 
-type ThreadsResponse = {
-  threads: Array<{
-    id: string;
-  }>;
-};
-
 export default function SupportPage() {
   return (
     <AuthGate>
@@ -45,9 +39,6 @@ function SupportContent() {
   const { data: schemesData } = useSWR("/schemes", () =>
     apiGet<SchemesResponse>("/schemes"),
   );
-  const { data: threadsData } = useSWR("/assistant/threads", () =>
-    apiGet<ThreadsResponse>("/assistant/threads"),
-  );
 
   return (
     <AppShell
@@ -59,9 +50,9 @@ function SupportContent() {
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="grid gap-4 md:grid-cols-3">
             <MetricTile
-              label="Assistant threads"
-              value={threadsData?.threads.length ?? 0}
-              hint="Continue grounded conversations."
+              label="Grounded assistant"
+              value="Ready"
+              hint="Ask about weather, crops, markets, and schemes."
               tone="brand"
             />
             <MetricTile

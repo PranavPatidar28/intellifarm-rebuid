@@ -4,13 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Intellifarm is an India-first farmer platform: a `pnpm` + Turborepo monorepo with a NestJS backend, a Next.js web app, an Expo mobile app, and shared contracts. The backend is the single source of truth for auth, business logic, and data — the web and mobile apps are thin clients over the same `/v1` REST API.
+Intellifarm is an India-first farmer platform: a `pnpm` + Turborepo monorepo with a NestJS backend, an Expo mobile app, and shared contracts. The backend is the single source of truth for auth, business logic, and data — the mobile app is a thin client over the `/v1` REST API.
 
 ## Workspace layout
 
 - `apps/api` — NestJS REST API (`@intellifarm/api`), Prisma + PostgreSQL, Swagger at `/docs`
-- `apps/web` — Next.js 16 App Router web app (`@intellifarm/web`), React 19, Tailwind 4
-- `apps/mobile` — Expo / React Native app (`@intellifarm/mobile`), Expo Router, EAS Build. Consumes `@intellifarm/contracts` and the same `/v1` API over HTTP. See `apps/mobile/CLAUDE.md`.
+- `apps/mobile` — Expo / React Native app (`@intellifarm/mobile`), Expo Router, EAS Build. Consumes `@intellifarm/contracts` and the `/v1` API over HTTP. See `apps/mobile/CLAUDE.md`.
 - `packages/contracts` — shared Zod schemas + enums (`@intellifarm/contracts`), the contract between API and clients
 - `packages/config` — shared TypeScript/Prettier config
 - `iot/esp32` — Arduino firmware for the sensor/pump node (not part of the JS build)
@@ -20,7 +19,7 @@ Intellifarm is an India-first farmer platform: a `pnpm` + Turborepo monorepo wit
 Run from the repo root (Turborepo fans out to workspaces):
 
 ```powershell
-pnpm dev          # web + api + contracts watcher, all in parallel
+pnpm dev          # api + contracts watcher, in parallel
 pnpm build        # build all workspaces
 pnpm lint         # eslint across workspaces
 pnpm typecheck    # tsc --noEmit across workspaces
@@ -43,11 +42,9 @@ pnpm --filter @intellifarm/api test -- devices.service.spec
 pnpm --filter @intellifarm/api test:watch
 ```
 
-Single web page during dev: `pnpm --filter @intellifarm/web dev` (port 3000).
-
 ## Critical build ordering
 
-`@intellifarm/contracts` compiles with `tsup` to `dist/`, and both the API and web import from `@intellifarm/contracts` → `dist`. Contracts **must be built before** the API/web typecheck, build, or test.
+`@intellifarm/contracts` compiles with `tsup` to `dist/`, and the API imports from `@intellifarm/contracts` → `dist`. Contracts **must be built before** the API typecheck, build, or test.
 
 - `postinstall` and `predev` already build contracts, so `pnpm install` and `pnpm dev` are safe.
 - API jest maps `@intellifarm/contracts` → `packages/contracts/dist/index.cjs` (see `apps/api/package.json` jest config). If tests fail with a missing-module error for contracts, run `pnpm --filter @intellifarm/contracts build` first.
@@ -64,16 +61,6 @@ Single web page during dev: `pnpm --filter @intellifarm/web dev` (port 3000).
 ## Pluggable provider pattern
 
 Several domains have swappable data sources selected at runtime by `MARKET_PROVIDER_MODE`-style env vars, wired with a DI token + `useFactory` reading `ConfigService`. Example: `markets.module.ts` picks between `ScraperMarketProvider` (default `scraper`), `SeededMarketProvider` (`seeded`), and `DataGovMarketProvider` (`live`) for the `MARKET_PROVIDER` token. The same pattern applies to disease analysis, predictions, and the assistant. When adding a provider, implement the shared interface, register it in the module's providers, and extend the factory's `switch` — callers depend only on the token.
-
-## Web app conventions (Next.js)
-
-**Read `apps/web/AGENTS.md` before writing web code.** This repo uses a Next.js version with breaking changes from older training data; consult `node_modules/next/dist/docs/` for current APIs and heed deprecation notices.
-
-Two API clients, used by context:
-- `src/lib/api.ts` — client components (`"use client"`). Sends cookies (`credentials: "include"`) and transparently retries once after refreshing the access token on a 401.
-- `src/lib/api.server.ts` — server components. Forwards the incoming request cookies and `redirect("/login")`s on 401.
-
-UI is composed from primitives in `src/components/ui/`, page templates in `src/components/templates/`, and the app shell in `src/components/`. There are no automated web tests yet (`pnpm --filter @intellifarm/web test` is a stub).
 
 ## IoT / devices
 

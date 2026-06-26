@@ -11,11 +11,11 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
 
-<sub>NestJS API · Next.js web · Expo mobile · PostgreSQL · shared Zod contracts</sub>
+<sub>NestJS API · Expo mobile · PostgreSQL · shared Zod contracts</sub>
 
 <br/>
 
-<img src="./docs/screenshots/login-desktop.png" alt="Intellifarm" width="80%"/>
+<img src="./docs/screenshots/login-mobile.png" alt="Intellifarm" width="280"/>
 
 </div>
 
@@ -23,9 +23,9 @@
 
 ## ✨ Overview
 
-Intellifarm is a monorepo built around a **NestJS backend as the single source of truth**, with thin Next.js and Expo clients consuming the same `/v1` REST API. It runs fully on **mock/seeded providers out of the box** — no external API keys needed to demo — and swaps in live providers via environment variables.
+Intellifarm is a monorepo built around a **NestJS backend as the single source of truth**, with an Expo mobile client consuming the `/v1` REST API. It runs fully on **mock/seeded providers out of the box** — no external API keys needed to demo — and swaps in live providers via environment variables.
 
-> **Status:** active hackathon project, hardened for production-readiness. Builds green from a fresh clone; ships with Docker, CI, and a one-command local stack.
+> **Status:** active hackathon project, hardened for production-readiness. Builds green from a fresh clone; ships with Docker, CI, and a one-command local backend.
 
 ## 🚜 Features
 
@@ -43,24 +43,23 @@ Intellifarm is a monorepo built around a **NestJS backend as the single source o
 ## 🏗️ Architecture
 
 ```
-                    ┌──────────────────┐      ┌──────────────────┐
-                    │   Web (Next.js)  │      │  Mobile (Expo)   │
-                    │   React 19 :3000 │      │  React Native    │
-                    └────────┬─────────┘      └────────┬─────────┘
-                             │   REST /v1 + cookies     │  REST /v1 + WS /voice
-                             └────────────┬─────────────┘
-                                          ▼
-                              ┌───────────────────────┐
-                              │   API (NestJS) :4000   │
-                              │  REST · Swagger /docs  │
-                              │  WebSocket /voice      │
-                              │  helmet · rate-limit   │
-                              └───────────┬───────────┘
-                                          │ Prisma
-                                          ▼
-                              ┌───────────────────────┐
-                              │      PostgreSQL        │
-                              └───────────────────────┘
+                              ┌──────────────────┐
+                              │  Mobile (Expo)   │
+                              │  React Native    │
+                              └────────┬─────────┘
+                                       │ REST /v1 + cookies · WS /voice
+                                       ▼
+                           ┌───────────────────────┐
+                           │   API (NestJS) :4000   │
+                           │  REST · Swagger /docs  │
+                           │  WebSocket /voice      │
+                           │  helmet · rate-limit   │
+                           └───────────┬───────────┘
+                                       │ Prisma
+                                       ▼
+                           ┌───────────────────────┐
+                           │      PostgreSQL        │
+                           └───────────────────────┘
 
    pluggable providers (env-selected) ─ markets · disease · assistant
    external: Open-Meteo · Gemini · Data.gov · ML/disease HTTP services
@@ -68,19 +67,18 @@ Intellifarm is a monorepo built around a **NestJS backend as the single source o
    ESP32 node ──POST /v1/devices/ingest (x-device-key)──▶ API
 ```
 
-`packages/contracts` (Zod schemas + enums) is the shared contract imported by the API and every client.
+`packages/contracts` (Zod schemas + enums) is the shared contract imported by the API and the mobile client.
 
 ## 🧰 Tech stack
 
 | Layer | Stack |
 |---|---|
 | **Monorepo** | Turborepo · pnpm workspaces · Node 24 |
-| **Web** | Next.js 16 (App Router) · React 19 · Tailwind 4 · SWR |
 | **Mobile** | Expo · React Native 0.81 · Expo Router · EAS Build |
 | **API** | NestJS 11 · REST · Swagger · WebSockets (`ws`) |
 | **Database** | PostgreSQL · Prisma |
 | **Auth** | Phone OTP → JWT in secure HTTP-only cookies |
-| **Contracts** | Zod schemas shared across API + clients |
+| **Contracts** | Zod schemas shared across API + client |
 
 ## 📁 Project structure
 
@@ -88,7 +86,6 @@ Intellifarm is a monorepo built around a **NestJS backend as the single source o
 intellifarm/
 ├── apps/
 │   ├── api/         NestJS REST API        @intellifarm/api
-│   ├── web/         Next.js web app        @intellifarm/web
 │   └── mobile/      Expo mobile app        @intellifarm/mobile
 ├── packages/
 │   ├── contracts/   Shared Zod schemas     @intellifarm/contracts
@@ -98,11 +95,13 @@ intellifarm/
 └── docs/            Diagrams, pitch assets, specs
 ```
 
-Each app has its own README → [api](./apps/api/README.md) · [web](./apps/web/README.md) · [mobile](./apps/mobile/README.md)
+Each app has its own README → [api](./apps/api/README.md) · [mobile](./apps/mobile/README.md)
 
 ## 🚀 Quick start
 
-### Option A — Docker (one command)
+### 1. Backend
+
+The API + PostgreSQL run with one command via Docker:
 
 ```bash
 docker compose up --build
@@ -110,9 +109,7 @@ docker compose up --build
 docker compose run --rm api pnpm --filter @intellifarm/api db:seed
 ```
 
-→ Web **http://localhost:3000** · API **http://localhost:4000** · Swagger **http://localhost:4000/docs**
-
-### Option B — Local dev
+Or run it locally:
 
 ```powershell
 corepack enable
@@ -122,10 +119,21 @@ Copy-Item .env.example .env   # set DATABASE_URL + JWT secrets (required)
 
 pnpm db:deploy                # apply migrations
 pnpm db:seed                  # seed demo content
-pnpm dev                      # web + api + contracts watcher
+pnpm dev                      # api + contracts watcher
 ```
 
+→ API **http://localhost:4000** · Swagger **http://localhost:4000/docs**
+
 > Required env vars are validated at API startup — a missing `DATABASE_URL` or JWT secret fails fast with a clear message.
+
+### 2. Mobile app
+
+```bash
+pnpm --filter @intellifarm/mobile start   # Expo dev server
+# then press 'a' (Android) / 'i' (iOS), or scan with a dev client
+```
+
+See [apps/mobile/README.md](./apps/mobile/README.md) for device setup and the voice-assistant requirements.
 
 ### 🔑 Demo login
 
@@ -137,11 +145,11 @@ pnpm dev                      # web + api + contracts watcher
 ## 📜 Commands
 
 ```bash
-pnpm dev          # web + api + contracts watcher, in parallel
+pnpm dev          # api + contracts watcher, in parallel
 pnpm build        # build all workspaces
 pnpm lint         # eslint across workspaces
 pnpm typecheck    # tsc --noEmit across workspaces
-pnpm test         # jest (api) + vitest (web)
+pnpm test         # jest (api)
 
 pnpm db:generate  # prisma generate
 pnpm db:migrate   # prisma migrate dev   (local DBs)
@@ -164,11 +172,11 @@ Runs fully on **mock/seeded providers** by default. Live providers are opt-in (s
 
 | Target | Platform | Config |
 |---|---|---|
-| Web | Vercel | `vercel.json` (builds contracts first) |
 | API | Fly.io / any Docker host | `apps/api/fly.toml` · `apps/api/Dockerfile` |
 | Database | Neon · Supabase · RDS | `prisma migrate deploy` on release |
+| Mobile | EAS Build | `apps/mobile/eas.json` |
 
-CI (`.github/workflows/ci.yml`) runs lint · typecheck · test · build and builds both Docker images on every PR. `/health` checks DB connectivity for load-balancer probes.
+CI (`.github/workflows/ci.yml`) runs lint · typecheck · test · build and builds the API Docker image on every PR. `/health` checks DB connectivity for load-balancer probes.
 
 ## 📚 Documentation
 

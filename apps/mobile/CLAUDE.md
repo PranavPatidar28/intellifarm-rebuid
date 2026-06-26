@@ -4,7 +4,7 @@ Guidance for working in the Intellifarm mobile app. For shared API, auth, and co
 
 ## What this is
 
-An Expo / React Native 0.81 app that consumes the same `/v1` REST API as `apps/web`, over HTTP. It depends on `@intellifarm/contracts` (workspace) for Zod schemas and enums, so it must stay in sync with the API's contract.
+An Expo / React Native 0.81 app that consumes the `/v1` REST API over HTTP. It depends on `@intellifarm/contracts` (workspace) for Zod schemas and enums, so it must stay in sync with the API's contract.
 
 ## Project structure
 
@@ -16,7 +16,7 @@ An Expo / React Native 0.81 app that consumes the same `/v1` REST API as `apps/w
 
 ## Conventions
 
-- **API client** mirrors the `apps/web` client patterns (cookie/session handling, 401 refresh-and-retry) but adapted for React Native networking — reuse it in `lib/` rather than calling `fetch` ad hoc.
+- **API client** lives in `lib/` and handles cookie/session state and 401 refresh-and-retry for React Native networking — reuse it rather than calling `fetch` ad hoc.
 - **Contracts** are the source of truth for request/response shapes. Import schemas/types from `@intellifarm/contracts`; rebuild contracts after editing them.
 - **Routing** follows Expo Router conventions — add screens as files under the appropriate `app/` group.
 - **Typecheck** before considering work done: `pnpm --filter @intellifarm/mobile typecheck`.

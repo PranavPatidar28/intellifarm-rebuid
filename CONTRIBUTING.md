@@ -40,7 +40,7 @@ pnpm test
 pnpm build
 ```
 
-All four must pass. CI also builds the API and web Docker images.
+All four must pass. CI also builds the API Docker image.
 
 ## Conventions
 
@@ -49,7 +49,7 @@ All four must pass. CI also builds the API and web Docker images.
 - **Line endings:** LF everywhere (enforced by `.gitattributes` + `.editorconfig`).
 - **Formatting:** Prettier (`pnpm format` to check). The API enforces it via ESLint.
 - **API endpoints:** define request schemas in `packages/contracts` and validate with `parseWithSchema`. New domains follow the controller + service + module pattern.
-- **Web:** read `apps/web/AGENTS.md` first — this Next.js version has breaking changes from older conventions.
+- **Mobile:** Expo / React Native — see `apps/mobile/CLAUDE.md` for conventions; reuse the `lib/` API client rather than calling `fetch` directly.
 - **Don't commit:** `.env`, build outputs, generated Prisma client (`apps/api/src/generated/`), or local logs — all gitignored.
 
 ## Project layout

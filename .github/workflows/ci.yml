@@ -50,8 +50,6 @@ jobs:
 
       - name: Build
         run: pnpm build
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:4000
 
   docker:
     name: Build Docker images
@@ -69,16 +67,5 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build web image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          push: false
-          build-args: |
-            NEXT_PUBLIC_API_URL=http://localhost:4000
           cache-from: type=gha
           cache-to: type=gha,mode=max

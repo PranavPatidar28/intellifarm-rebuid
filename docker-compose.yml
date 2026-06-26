@@ -1,4 +1,4 @@
-# Local full-stack spin-up: Postgres + API + web.
+# Local stack: Postgres + API.
 #   docker compose up --build
 # Then seed once the API is healthy:
 #   docker compose exec api pnpm --filter @intellifarm/api db:seed
@@ -55,22 +55,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://localhost:4000
-    restart: unless-stopped
-    depends_on:
-      api:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-    ports:
-      - "3000:3000"
 
 volumes:
   intellifarm-db:

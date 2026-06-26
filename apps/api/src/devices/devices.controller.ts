@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 
 import {
   ingestTelemetrySchema,
@@ -28,6 +29,7 @@ export class DeviceIngestController {
   constructor(private readonly devicesService: DevicesService) {}
 
   @Post('devices/ingest')
+  @SkipThrottle()
   ingest(
     @Headers('x-device-key') deviceKey: string | undefined,
     @Body() body: unknown,

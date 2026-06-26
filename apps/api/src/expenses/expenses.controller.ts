@@ -15,6 +15,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { imageUploadOptions } from '../common/upload/multer-options';
+
 import {
   createExpenseSchema,
   expenseBudgetUpsertSchema,
@@ -36,10 +38,7 @@ export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 
   @Get()
-  list(
-    @CurrentUser() user: AuthUser,
-    @Query() query: Record<string, unknown>,
-  ) {
+  list(@CurrentUser() user: AuthUser, @Query() query: Record<string, unknown>) {
     return this.expensesService.listExpenses(
       user.sub,
       parseWithSchema(expenseListQuerySchema, query),
@@ -58,7 +57,7 @@ export class ExpensesController {
   }
 
   @Post()
-  @UseInterceptors(FileInterceptor('receipt'))
+  @UseInterceptors(FileInterceptor('receipt', imageUploadOptions))
   create(
     @CurrentUser() user: AuthUser,
     @Body() body: Record<string, unknown>,
@@ -72,7 +71,7 @@ export class ExpensesController {
   }
 
   @Patch(':id')
-  @UseInterceptors(FileInterceptor('receipt'))
+  @UseInterceptors(FileInterceptor('receipt', imageUploadOptions))
   update(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -93,10 +92,7 @@ export class ExpensesController {
   }
 
   @Put('budget')
-  upsertBudget(
-    @CurrentUser() user: AuthUser,
-    @Body() body: unknown,
-  ) {
+  upsertBudget(@CurrentUser() user: AuthUser, @Body() body: unknown) {
     return this.expensesService.upsertBudget(
       user.sub,
       parseWithSchema(expenseBudgetUpsertSchema, body),

@@ -1,22 +1,46 @@
-# Intellifarm
+<div align="center">
 
-An India-first farmer platform — a crop-season copilot that helps smallholder farmers plan, decide, and act. Built as a `pnpm` + Turborepo monorepo with a NestJS backend as the single source of truth, a Next.js web app, an Expo mobile app, and shared type-safe contracts.
+# 🌾 Intellifarm
 
-> **Status:** active hackathon project being hardened for production. The full stack runs on mock/seeded providers out of the box — no external API keys required to demo.
+### An India-first farmer platform — a crop-season copilot that helps smallholder farmers plan, decide, and act.
 
-## What it does
+[![CI](https://github.com/PranavPatidar28/intellifarm-rebuid/actions/workflows/ci.yml/badge.svg)](https://github.com/PranavPatidar28/intellifarm-rebuid/actions/workflows/ci.yml)
+![Node](https://img.shields.io/badge/node-24.x-339933?logo=node.js&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-10.x-F69220?logo=pnpm&logoColor=white)
+![Turborepo](https://img.shields.io/badge/Turborepo-monorepo-EF4444?logo=turborepo&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![License](https://img.shields.io/badge/license-Proprietary-red)
 
-- **Phone OTP auth** and farmer profile onboarding
-- **Farm plot + crop season** setup with a deterministic crop rules engine and timeline
-- **Weekly dashboard** — tasks, alerts, and live weather
-- **Grounded AI assistant** (text + voice) that answers using *your* saved farm data, rules, weather, markets, and schemes
-- **Dual-angle disease reporting** with escalation-first triage
-- **Location-aware mandis & warehouses** with best-price callouts
-- **Government schemes** with crop-aware filters
-- **IoT pump control** — ESP32 telemetry ingest with a two-step, confirmation-gated pump command flow
-- Lightweight internal **admin** view
+<sub>NestJS API · Next.js web · Expo mobile · PostgreSQL · shared Zod contracts</sub>
 
-## Architecture
+<br/>
+
+<img src="./docs/screenshots/login-desktop.png" alt="Intellifarm" width="80%"/>
+
+</div>
+
+---
+
+## ✨ Overview
+
+Intellifarm is a monorepo built around a **NestJS backend as the single source of truth**, with thin Next.js and Expo clients consuming the same `/v1` REST API. It runs fully on **mock/seeded providers out of the box** — no external API keys needed to demo — and swaps in live providers via environment variables.
+
+> **Status:** active hackathon project, hardened for production-readiness. Builds green from a fresh clone; ships with Docker, CI, and a one-command local stack.
+
+## 🚜 Features
+
+| | |
+|---|---|
+| 📱 **Phone OTP auth** | Passwordless login with JWT in secure HTTP-only cookies |
+| 🌱 **Crop-season planning** | Farm plots, crop seasons, a deterministic rules engine + timeline |
+| 📊 **Weekly dashboard** | Tasks, alerts, and live weather at a glance |
+| 🤖 **Grounded AI assistant** | Text + voice answers from *your* farm data, rules, markets & schemes |
+| 🔬 **Disease reporting** | Dual-angle photo capture with escalation-first triage |
+| 🏪 **Mandis & warehouses** | Location-aware discovery with best-price callouts |
+| 📜 **Government schemes** | Crop-aware filtering of official programs |
+| 💧 **IoT pump control** | ESP32 telemetry ingest with two-step, confirmation-gated commands |
+
+## 🏗️ Architecture
 
 ```
                     ┌──────────────────┐      ┌──────────────────┐
@@ -30,65 +54,63 @@ An India-first farmer platform — a crop-season copilot that helps smallholder 
                               │   API (NestJS) :4000   │
                               │  REST · Swagger /docs  │
                               │  WebSocket /voice      │
-                              │  helmet · throttler    │
+                              │  helmet · rate-limit   │
                               └───────────┬───────────┘
                                           │ Prisma
                                           ▼
                               ┌───────────────────────┐
-                              │   PostgreSQL           │
+                              │      PostgreSQL        │
                               └───────────────────────┘
-                                          ▲
-              pluggable providers (env-selected) ─ markets · disease · assistant
-              external: Open-Meteo · Gemini · Data.gov · ML/disease HTTP services
+
+   pluggable providers (env-selected) ─ markets · disease · assistant
+   external: Open-Meteo · Gemini · Data.gov · ML/disease HTTP services
 
    ESP32 node ──POST /v1/devices/ingest (x-device-key)──▶ API
 ```
 
-`packages/contracts` (Zod schemas + enums) is the shared contract imported by the API and every client. See **[CLAUDE.md](./CLAUDE.md)** for detailed development conventions.
+`packages/contracts` (Zod schemas + enums) is the shared contract imported by the API and every client.
 
-## Tech stack
+## 🧰 Tech stack
 
 | Layer | Stack |
-| --- | --- |
-| Monorepo | Turborepo + pnpm workspaces, Node 24 |
-| Web | Next.js 16 App Router, React 19, Tailwind 4, SWR |
-| Mobile | Expo / React Native 0.81, Expo Router, EAS Build |
-| API | NestJS 11, REST, Swagger, WebSockets (`ws`) |
-| Database | PostgreSQL + Prisma |
-| Auth | Phone OTP → JWT in secure HTTP-only cookies |
-| Contracts | Zod schemas shared across API + clients |
+|---|---|
+| **Monorepo** | Turborepo · pnpm workspaces · Node 24 |
+| **Web** | Next.js 16 (App Router) · React 19 · Tailwind 4 · SWR |
+| **Mobile** | Expo · React Native 0.81 · Expo Router · EAS Build |
+| **API** | NestJS 11 · REST · Swagger · WebSockets (`ws`) |
+| **Database** | PostgreSQL · Prisma |
+| **Auth** | Phone OTP → JWT in secure HTTP-only cookies |
+| **Contracts** | Zod schemas shared across API + clients |
 
-## Workspace layout
+## 📁 Project structure
 
-```text
-apps/
-  api/        NestJS REST API  (@intellifarm/api)
-  web/        Next.js web app  (@intellifarm/web)
-  mobile/     Expo mobile app  (@intellifarm/mobile)
-packages/
-  contracts/  shared Zod schemas + enums  (@intellifarm/contracts)
-  config/     shared TS/Prettier config
-iot/
-  esp32/      Arduino firmware for the sensor/pump node
+```
+intellifarm/
+├── apps/
+│   ├── api/         NestJS REST API        @intellifarm/api
+│   ├── web/         Next.js web app        @intellifarm/web
+│   └── mobile/      Expo mobile app        @intellifarm/mobile
+├── packages/
+│   ├── contracts/   Shared Zod schemas     @intellifarm/contracts
+│   └── config/      Shared TS/Prettier config
+├── iot/
+│   └── esp32/       Arduino sensor/pump firmware
+└── docs/            Diagrams, pitch assets, specs
 ```
 
-Each app has its own README: [api](./apps/api/README.md) · [web](./apps/web/README.md) · [mobile](./apps/mobile/README.md).
+Each app has its own README → [api](./apps/api/README.md) · [web](./apps/web/README.md) · [mobile](./apps/mobile/README.md)
 
-## Quick start
+## 🚀 Quick start
 
 ### Option A — Docker (one command)
-
-Spins up Postgres + API + web together:
 
 ```bash
 docker compose up --build
 # once the API is healthy, seed demo data:
-docker compose exec api ./node_modules/.bin/prisma migrate deploy
 docker compose run --rm api pnpm --filter @intellifarm/api db:seed
 ```
 
-- Web: http://localhost:3000
-- API: http://localhost:4000 · Swagger: http://localhost:4000/docs
+→ Web **http://localhost:3000** · API **http://localhost:4000** · Swagger **http://localhost:4000/docs**
 
 ### Option B — Local dev
 
@@ -96,82 +118,83 @@ docker compose run --rm api pnpm --filter @intellifarm/api db:seed
 corepack enable
 pnpm install
 
-# configure environment (DATABASE_URL + JWT secrets are required)
-Copy-Item .env.example .env
+Copy-Item .env.example .env   # set DATABASE_URL + JWT secrets (required)
 
-# apply migrations and seed demo content
-pnpm db:deploy
-pnpm db:seed
-
-# run web + api + contracts watcher in parallel
-pnpm dev
+pnpm db:deploy                # apply migrations
+pnpm db:seed                  # seed demo content
+pnpm dev                      # web + api + contracts watcher
 ```
 
-Default URLs: web `http://localhost:3000`, API `http://localhost:4000`, Swagger `http://localhost:4000/docs`.
+> Required env vars are validated at API startup — a missing `DATABASE_URL` or JWT secret fails fast with a clear message.
 
-> The required env vars are validated at API startup — a missing `DATABASE_URL`, `JWT_ACCESS_SECRET`, or `JWT_REFRESH_SECRET` fails fast with a clear message.
-
-### Demo login
+### 🔑 Demo login
 
 | Role | Phone | OTP |
-| --- | --- | --- |
-| Farmer (seeded farm + crops) | `9876543210` | `123456` |
-| Admin (`/admin` access) | `9999999998` | `123456` |
+|---|---|---|
+| Farmer *(seeded farm + crops)* | `9876543210` | `123456` |
+| Admin *(`/admin` access)* | `9999999998` | `123456` |
 
-## Commands
+## 📜 Commands
 
-Run from the repo root (Turborepo fans out to workspaces):
-
-```powershell
-pnpm dev          # web + api + contracts watcher, all in parallel
+```bash
+pnpm dev          # web + api + contracts watcher, in parallel
 pnpm build        # build all workspaces
 pnpm lint         # eslint across workspaces
 pnpm typecheck    # tsc --noEmit across workspaces
-pnpm test         # jest (api)
+pnpm test         # jest (api) + vitest (web)
 
 pnpm db:generate  # prisma generate
-pnpm db:migrate   # prisma migrate dev (local DBs)
+pnpm db:migrate   # prisma migrate dev   (local DBs)
 pnpm db:deploy    # prisma migrate deploy (managed/pooled DBs)
 pnpm db:seed      # demo farmer, admin, crops, mandis
 ```
 
-Single API test: `pnpm --filter @intellifarm/api test -- devices.service.spec`
+## 🔌 Provider configuration
 
-## Provider configuration
-
-The app runs fully on **mock/seeded providers by default**. Live providers are opt-in via env vars (see `.env.example` for the full list):
+Runs fully on **mock/seeded providers** by default. Live providers are opt-in (see `.env.example`):
 
 | Domain | Mode var | Live config |
-| --- | --- | --- |
-| Markets / mandi prices | `MARKET_PROVIDER_MODE` (`seeded` \| `scraper` \| `live`) | `DATA_GOV_API_KEY`, `DATA_GOV_RESOURCE_ID` |
-| Disease analysis | `DISEASE_PROVIDER_MODE` (`mock` \| `live`) | `DISEASE_PROVIDER_URL`, `DISEASE_PROVIDER_API_KEY` |
+|---|---|---|
+| Markets / mandi prices | `MARKET_PROVIDER_MODE` &nbsp;`seeded ∣ scraper ∣ live` | `DATA_GOV_API_KEY`, `DATA_GOV_RESOURCE_ID` |
+| Disease analysis | `DISEASE_PROVIDER_MODE` &nbsp;`mock ∣ live` | `DISEASE_PROVIDER_URL`, `DISEASE_PROVIDER_API_KEY` |
 | AI assistant | — | `GEMINI_API_KEY`, `AI_ASSISTANT_MODEL` |
 | Weather | always live (Open-Meteo) | `OPEN_METEO_BASE_URL` |
 
-All clients use the same backend routes, auth, and data models regardless of provider mode.
+## ☁️ Deployment
 
-## Deployment
+| Target | Platform | Config |
+|---|---|---|
+| Web | Vercel | `vercel.json` (builds contracts first) |
+| API | Fly.io / any Docker host | `apps/api/fly.toml` · `apps/api/Dockerfile` |
+| Database | Neon · Supabase · RDS | `prisma migrate deploy` on release |
 
-- **Web** → Vercel (`vercel.json` builds contracts first). Set `NEXT_PUBLIC_API_URL`.
-- **API** → Fly.io (`apps/api/fly.toml`) or any Docker host (`apps/api/Dockerfile`). Set `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` as secrets. `/health` checks DB connectivity for load-balancer probes.
-- **Database** → any managed Postgres (Neon, Supabase, RDS). Run `prisma migrate deploy` on release (the API image does this on boot).
-- **CI** → `.github/workflows/ci.yml` runs lint/typecheck/test/build and builds both Docker images on every PR.
+CI (`.github/workflows/ci.yml`) runs lint · typecheck · test · build and builds both Docker images on every PR. `/health` checks DB connectivity for load-balancer probes.
 
-## Documentation & presentation
+## 📚 Documentation
 
-- **[CLAUDE.md](./CLAUDE.md)** — development conventions and architecture
-- **[docs/](./docs/README.md)** — user-flow diagrams, pitch slides, poster, and the [voice assistant spec](./docs/voice-assistant.md)
-- **Swagger / OpenAPI** — `http://localhost:4000/docs` when the API is running
+- **[Development guide](./CLAUDE.md)** — conventions and architecture
+- **[Contributing](./CONTRIBUTING.md)** — setup, commit style, workflow
+- **[docs/](./docs/README.md)** — user-flow diagrams, pitch slides, the [voice assistant spec](./docs/voice-assistant.md)
+- **API reference** — Swagger/OpenAPI at `/docs` when the API is running
 
-### Screenshots
+## 🔒 Notes
 
-| Login (desktop) | Login (mobile) |
-| --- | --- |
-| ![Login desktop](./docs/screenshots/login-desktop.png) | ![Login mobile](./docs/screenshots/login-mobile.png) |
-
-## Notes
-
-- Crop/resource prediction is advisory and provider-backed — there is no in-repo trained model.
-- Disease analysis stays escalation-first and avoids blind chemical prescriptions.
+- Crop/resource predictions are advisory and provider-backed — no in-repo trained model.
+- Disease analysis is escalation-first and avoids blind chemical prescriptions.
 - Assistant answers are grounded in saved farm data, not open-ended agronomy guarantees.
 - Pump control is confirmation-gated end to end (device API and voice assistant alike).
+
+## ⚖️ License
+
+**Proprietary — all rights reserved.** Copyright © 2026 Pranav Patidar.
+
+This repository may be publicly visible, but **no rights are granted**. You may
+not use, copy, modify, distribute, or create derivative works from any part of
+it without the owner's prior written permission. See [LICENSE](./LICENSE) for
+the full terms. To request permission, contact the owner.
+
+---
+
+<div align="center">
+<sub>Built for Indian smallholder farmers 🇮🇳</sub>
+</div>

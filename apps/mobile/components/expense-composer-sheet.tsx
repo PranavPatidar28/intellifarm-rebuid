@@ -390,7 +390,9 @@ export function ExpenseComposerSheet({
             label="Category"
             value={category}
             options={categoryOptions}
-            onChange={setCategory}
+            onChange={(value) =>
+              setCategory(value as ExpenseDraftPayload['category'])
+            }
             placeholder="Choose the category"
             open={openSelect === 'category'}
             onOpenChange={(open) => {

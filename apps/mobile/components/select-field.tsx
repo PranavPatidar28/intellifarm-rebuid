@@ -32,6 +32,12 @@ type SelectFieldProps = {
   options: ReadonlyArray<SelectOption>;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Optional helper text shown beneath the field. */
+  helper?: string;
+  /** Controlled open state. When provided, the dropdown is controlled by the parent. */
+  open?: boolean;
+  /** Called when the dropdown wants to change its open state (controlled mode). */
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function SelectField({
@@ -40,16 +46,33 @@ export function SelectField({
   options,
   onChange,
   placeholder = 'Select…',
+  helper,
+  open,
+  onOpenChange,
 }: SelectFieldProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+
+  const isControlled = open !== undefined;
+  const expanded = isControlled ? open : internalExpanded;
+
+  const setExpanded = useCallback(
+    (next: boolean) => {
+      if (isControlled) {
+        onOpenChange?.(next);
+      } else {
+        setInternalExpanded(next);
+      }
+    },
+    [isControlled, onOpenChange],
+  );
 
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption?.label ?? placeholder;
 
   const toggle = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded((v) => !v);
-  }, []);
+    setExpanded(!expanded);
+  }, [expanded, setExpanded]);
 
   const handleSelect = useCallback(
     (optionValue: string) => {
@@ -57,7 +80,7 @@ export function SelectField({
       onChange(optionValue);
       setExpanded(false);
     },
-    [onChange],
+    [onChange, setExpanded],
   );
 
   return (
@@ -196,6 +219,19 @@ export function SelectField({
           })}
         </View>
       )}
+
+      {helper ? (
+        <Text
+          style={{
+            color: palette.inkSoft,
+            fontFamily: typography.bodyRegular,
+            fontSize: 12,
+            lineHeight: 17,
+          }}
+        >
+          {helper}
+        </Text>
+      ) : null}
     </View>
   );
 }

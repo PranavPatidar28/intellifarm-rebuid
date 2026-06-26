@@ -284,7 +284,7 @@ export default function CommunityRoute() {
                     onOpenChange={(open) => setOpenFilter(open ? 'scope' : null)}
                     onChange={(value) => {
                       startTransition(() => {
-                        setSelectedScope(value);
+                        setSelectedScope(value as CommunityFeedScopeType);
                       });
                     }}
                   />
@@ -304,7 +304,7 @@ export default function CommunityRoute() {
                     onOpenChange={(open) => setOpenFilter(open ? 'category' : null)}
                     onChange={(value) => {
                       startTransition(() => {
-                        setSelectedCategory(value);
+                        setSelectedCategory(value as CommunityCategoryFilter);
                       });
                     }}
                   />

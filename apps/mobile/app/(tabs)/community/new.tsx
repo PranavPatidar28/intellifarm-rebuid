@@ -23,6 +23,7 @@ import {
   formatCommunityContextLabel,
   type CommunityComposerDraft,
 } from '@/lib/community';
+import type { CommunityCategoryType } from '@/lib/api-types';
 import { storageKeys } from '@/lib/constants';
 import { getAllSeasons } from '@/lib/domain';
 import { storage } from '@/lib/storage';
@@ -214,7 +215,10 @@ export default function NewCommunityPostRoute() {
               open={openField === 'category'}
               onOpenChange={(open) => setOpenField(open ? 'category' : null)}
               onChange={(value) => {
-                setForm((current) => ({ ...current, category: value }));
+                setForm((current) => ({
+                  ...current,
+                  category: value as CommunityCategoryType,
+                }));
                 if (statusMessage) {
                   setStatusMessage(null);
                 }

@@ -11,6 +11,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
+import { mediaUploadOptions } from '../common/upload/multer-options';
+
 import { createDiseaseReportSchema } from '@intellifarm/contracts';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -37,12 +39,15 @@ export class DiseaseReportsController {
 
   @Post()
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'images', maxCount: 2 },
-      { name: 'diseasedImage', maxCount: 1 },
-      { name: 'cropImage', maxCount: 1 },
-      { name: 'voiceNote', maxCount: 1 },
-    ]),
+    FileFieldsInterceptor(
+      [
+        { name: 'images', maxCount: 2 },
+        { name: 'diseasedImage', maxCount: 1 },
+        { name: 'cropImage', maxCount: 1 },
+        { name: 'voiceNote', maxCount: 1 },
+      ],
+      mediaUploadOptions,
+    ),
   )
   create(
     @CurrentUser() user: AuthUser,

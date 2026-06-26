@@ -38,11 +38,18 @@ export class VoiceSessionStoreService {
 
     if (params.resumeSessionId) {
       const existing = this.sessions.get(params.resumeSessionId);
-      if (existing && existing.userId === params.userId && existing.state !== 'closed') {
+      if (
+        existing &&
+        existing.userId === params.userId &&
+        existing.state !== 'closed'
+      ) {
         existing.updatedAt = Date.now();
-        existing.preferredLanguage = params.preferredLanguage ?? existing.preferredLanguage;
-        existing.focusFarmPlotId = params.focusFarmPlotId ?? existing.focusFarmPlotId;
-        existing.focusCropSeasonId = params.focusCropSeasonId ?? existing.focusCropSeasonId;
+        existing.preferredLanguage =
+          params.preferredLanguage ?? existing.preferredLanguage;
+        existing.focusFarmPlotId =
+          params.focusFarmPlotId ?? existing.focusFarmPlotId;
+        existing.focusCropSeasonId =
+          params.focusCropSeasonId ?? existing.focusCropSeasonId;
         return existing;
       }
     }
@@ -140,13 +147,23 @@ export class VoiceSessionStoreService {
     );
 
     if (activeSessions.length >= max) {
-      throw new BadRequestException('Too many active voice sessions. End one before starting another.');
+      throw new BadRequestException(
+        'Too many active voice sessions. End one before starting another.',
+      );
     }
   }
 
   private enforceRateLimit(userId: string, clientIp: string) {
-    const limit = this.configService.get<number>('VOICE_RATE_LIMIT_PER_MINUTE', 6);
-    this.consumeBucket(this.userBuckets, userId, limit, 'Voice session rate limit exceeded.');
+    const limit = this.configService.get<number>(
+      'VOICE_RATE_LIMIT_PER_MINUTE',
+      6,
+    );
+    this.consumeBucket(
+      this.userBuckets,
+      userId,
+      limit,
+      'Voice session rate limit exceeded.',
+    );
     this.consumeBucket(
       this.ipBuckets,
       clientIp || 'unknown',

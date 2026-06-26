@@ -11,6 +11,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { imageUploadOptions } from '../common/upload/multer-options';
+
 import { updateProfileSchema } from '@intellifarm/contracts';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -39,7 +41,7 @@ export class UsersController {
   }
 
   @Post('me/photo')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions))
   uploadPhoto(
     @CurrentUser() user: AuthUser,
     @UploadedFile() file?: Express.Multer.File,

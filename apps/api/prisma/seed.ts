@@ -1,5 +1,4 @@
 import { Prisma, PrismaClient, type CommunityCategory } from '@prisma/client';
-import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -536,7 +535,9 @@ const seededCommunityUsers = [
   },
 ] as const;
 
-type CommunitySeedUserKey = (typeof seededCommunityUsers)[number]['key'] | 'demo';
+type CommunitySeedUserKey =
+  | (typeof seededCommunityUsers)[number]['key']
+  | 'demo';
 type DemoSeasonKey = 'wheat' | 'cotton';
 
 type SeededCommunityUserRecord = {
@@ -585,8 +586,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
   {
     authorKey: 'gurpreet',
     title: 'Flowering wheat after last night rain - irrigate or wait?',
-    body:
-      'We had a good shower in Baddowal last night. The top layer is moist but the lower bed still feels slightly dry. Is anyone waiting a day or two before the next irrigation at flowering?',
+    body: 'We had a good shower in Baddowal last night. The top layer is moist but the lower bed still feels slightly dry. Is anyone waiting a day or two before the next irrigation at flowering?',
     category: 'QUESTION',
     hoursAgo: 5,
     cropName: 'Wheat',
@@ -596,23 +596,21 @@ const communityPostSeeds: CommunityPostSeed[] = [
     replies: [
       {
         authorKey: 'demo',
-        body:
-          'I usually wait until the soil stops sticking at 2 to 3 inches. If the breeze stays cool today, I will skip one irrigation turn.',
+        body: 'I usually wait until the soil stops sticking at 2 to 3 inches. If the breeze stays cool today, I will skip one irrigation turn.',
         hoursAgo: 3,
       },
       {
         authorKey: 'meena',
-        body:
-          'Waiting one day helped us avoid lodging in a similar shower last season, but only where drainage was clear.',
+        body: 'Waiting one day helped us avoid lodging in a similar shower last season, but only where drainage was clear.',
         hoursAgo: 2,
       },
     ],
   },
   {
     authorKey: 'demo',
-    title: 'Cotton leaves curling on the canal side plot - what should I check first?',
-    body:
-      'In square formation, some top leaves are curling inward and a few plants look dull by noon. Drip timing is unchanged and I have not sprayed anything yet. What would you inspect first?',
+    title:
+      'Cotton leaves curling on the canal side plot - what should I check first?',
+    body: 'In square formation, some top leaves are curling inward and a few plants look dull by noon. Drip timing is unchanged and I have not sprayed anything yet. What would you inspect first?',
     category: 'PEST_DISEASE',
     hoursAgo: 20,
     cropSeasonKey: 'cotton',
@@ -623,23 +621,21 @@ const communityPostSeeds: CommunityPostSeed[] = [
     replies: [
       {
         authorKey: 'harjit',
-        body:
-          'Check the underside of the newest leaves first. We saw early sucking pest pressure before the field looked serious from a distance.',
+        body: 'Check the underside of the newest leaves first. We saw early sucking pest pressure before the field looked serious from a distance.',
         hoursAgo: 18,
       },
       {
         authorKey: 'suresh',
-        body:
-          'Also compare one stressed patch with a healthy patch after sunrise. In our case, a partially blocked line made the noon wilt look like a pest issue.',
+        body: 'Also compare one stressed patch with a healthy patch after sunrise. In our case, a partially blocked line made the noon wilt look like a pest issue.',
         hoursAgo: 16,
       },
     ],
   },
   {
     authorKey: 'meena',
-    title: 'Selling small wheat lots: do you combine with neighbors or go alone?',
-    body:
-      'A trader is quoting lower rates for a small lot from our side. How are others managing transport and weighing when harvest is less than one trolley?',
+    title:
+      'Selling small wheat lots: do you combine with neighbors or go alone?',
+    body: 'A trader is quoting lower rates for a small lot from our side. How are others managing transport and weighing when harvest is less than one trolley?',
     category: 'MARKET',
     hoursAgo: 36,
     cropName: 'Wheat',
@@ -649,8 +645,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
     replies: [
       {
         authorKey: 'asha',
-        body:
-          'We combine loads with one trusted neighbor and settle by weight slip. It reduces transport cost and gives better bargaining room.',
+        body: 'We combine loads with one trusted neighbor and settle by weight slip. It reduces transport cost and gives better bargaining room.',
         hoursAgo: 30,
       },
     ],
@@ -658,8 +653,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
   {
     authorKey: 'asha',
     title: 'Paddy spacing change gave stronger tillers this season',
-    body:
-      'We kept the rows a little wider and were more careful during line transplanting. Tillers look more even this season and seed use was lower than last year.',
+    body: 'We kept the rows a little wider and were more careful during line transplanting. Tillers look more even this season and seed use was lower than last year.',
     category: 'SUCCESS',
     hoursAgo: 60,
     cropName: 'Paddy',
@@ -669,8 +663,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
     replies: [
       {
         authorKey: 'demo',
-        body:
-          'That is useful. Did you also notice any difference in weed pressure with the wider spacing?',
+        body: 'That is useful. Did you also notice any difference in weed pressure with the wider spacing?',
         hoursAgo: 50,
       },
     ],
@@ -678,8 +671,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
   {
     authorKey: 'suresh',
     title: 'Pink bollworm trap count is rising in nearby fields',
-    body:
-      'Three neighboring cotton fields saw a jump in trap counts this week. No major square damage yet, but farmers have started closer scouting on early fruiting branches.',
+    body: 'Three neighboring cotton fields saw a jump in trap counts this week. No major square damage yet, but farmers have started closer scouting on early fruiting branches.',
     category: 'WARNING',
     hoursAgo: 10,
     cropName: 'Cotton',
@@ -689,8 +681,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
     replies: [
       {
         authorKey: 'harjit',
-        body:
-          'We started evening scouting in five rows per side and it made the first signs easier to catch before damage spread.',
+        body: 'We started evening scouting in five rows per side and it made the first signs easier to catch before damage spread.',
         hoursAgo: 7,
       },
     ],
@@ -698,8 +689,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
   {
     authorKey: 'harjit',
     title: 'Drip block in one wheat corner - flushing fixed flow for us',
-    body:
-      'If one corner stays lighter green, check the last lateral first. A quick flush cleared sediment in our field and the color improved within three days.',
+    body: 'If one corner stays lighter green, check the last lateral first. A quick flush cleared sediment in our field and the color improved within three days.',
     category: 'WATER',
     hoursAgo: 14,
     cropName: 'Wheat',
@@ -711,8 +701,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
   {
     authorKey: 'gurpreet',
     title: 'Anyone splitting the last nitrogen top-up after cloudy weather?',
-    body:
-      'The crop is moving well but I am unsure whether to keep the full top-up together after this cloudy spell. Interested in what worked without pushing too much lush growth.',
+    body: 'The crop is moving well but I am unsure whether to keep the full top-up together after this cloudy spell. Interested in what worked without pushing too much lush growth.',
     category: 'NUTRITION',
     hoursAgo: 26,
     cropName: 'Wheat',
@@ -722,8 +711,7 @@ const communityPostSeeds: CommunityPostSeed[] = [
     replies: [
       {
         authorKey: 'demo',
-        body:
-          'I would rather split it if the forecast keeps humidity high. That has kept the crop steadier for us than a single heavy dose.',
+        body: 'I would rather split it if the forecast keeps humidity high. That has kept the crop steadier for us than a single heavy dose.',
         hoursAgo: 22,
       },
     ],
@@ -996,7 +984,8 @@ async function seedDemoDevices(demoUserId: string) {
           source: 'AUTO_RULE' as const,
           previousState: 'OFF' as const,
           nextState: 'ON' as const,
-          reason: 'Auto irrigation started because soil moisture dropped below the low threshold.',
+          reason:
+            'Auto irrigation started because soil moisture dropped below the low threshold.',
           minutesAgo: 22,
         },
       ],
@@ -1147,7 +1136,10 @@ async function seedCommunityUsers() {
 
   return Object.fromEntries(
     users.map((user, index) => [seededCommunityUsers[index].key, user]),
-  ) as Record<(typeof seededCommunityUsers)[number]['key'], SeededCommunityUserRecord>;
+  ) as Record<
+    (typeof seededCommunityUsers)[number]['key'],
+    SeededCommunityUserRecord
+  >;
 }
 
 async function loadDemoSeasonMap(demoUserId: string) {
@@ -1264,7 +1256,9 @@ async function seedCommunityData(demoUser: SeededCommunityUserRecord) {
 
   for (const postSeed of communityPostSeeds) {
     const author = usersByKey[postSeed.authorKey];
-    const season = postSeed.cropSeasonKey ? demoSeasons[postSeed.cropSeasonKey] : null;
+    const season = postSeed.cropSeasonKey
+      ? demoSeasons[postSeed.cropSeasonKey]
+      : null;
     const createdAt = hoursAgo(postSeed.hoursAgo);
     const replies = postSeed.replies.map((reply) => ({
       authorId: usersByKey[reply.authorKey].id,
@@ -1277,8 +1271,10 @@ async function seedCommunityData(demoUser: SeededCommunityUserRecord) {
       createdAt,
     );
     const state = postSeed.location?.state ?? season?.state ?? author.state;
-    const district = postSeed.location?.district ?? season?.district ?? author.district;
-    const village = postSeed.location?.village ?? season?.village ?? author.village;
+    const district =
+      postSeed.location?.district ?? season?.district ?? author.district;
+    const village =
+      postSeed.location?.village ?? season?.village ?? author.village;
 
     await prisma.communityPost.create({
       data: {

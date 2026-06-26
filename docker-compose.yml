@@ -1,0 +1,76 @@
+# Local full-stack spin-up: Postgres + API + web.
+#   docker compose up --build
+# Then seed once the API is healthy:
+#   docker compose exec api pnpm --filter @intellifarm/api db:seed
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: intellifarm
+    ports:
+      - "5432:5432"
+    volumes:
+      - intellifarm-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d intellifarm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/intellifarm?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret-change-me-please}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-me-please}
+      APP_URL: http://localhost:3000
+      APP_URLS: http://localhost:3000
+      # Provider modes default to mock/seeded; override via a .env file if needed.
+      MARKET_PROVIDER_MODE: ${MARKET_PROVIDER_MODE:-seeded}
+      DISEASE_PROVIDER_MODE: ${DISEASE_PROVIDER_MODE:-mock}
+    ports:
+      - "4000:4000"
+    # Use the image's default CMD (migrate deploy + start). Override here only
+    # if you need different boot behaviour.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+
+volumes:
+  intellifarm-db:

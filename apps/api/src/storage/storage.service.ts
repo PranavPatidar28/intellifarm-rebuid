@@ -68,9 +68,7 @@ export class StorageService {
   }
 
   async getPublicFilePath(folder: string, filename: string) {
-    const allowedFolders = new Set([
-      'disease-reports',
-    ]);
+    const allowedFolders = new Set(['disease-reports']);
 
     if (!allowedFolders.has(folder)) {
       throw new NotFoundException('Media file not found');

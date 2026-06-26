@@ -182,9 +182,9 @@ export default function SeasonSetupRoute() {
       {suggestions ? (
         <SunriseCard accent="info" title="Planning assist">
           <View style={{ gap: spacing.sm }}>
-            {suggestions.suggestions
+            {suggestions.topCrops
               .slice(0, 3)
-              .map((item: CropSuggestionResponse['suggestions'][number]) => (
+              .map((item: CropSuggestionResponse['topCrops'][number]) => (
               <Text
                 key={item.cropName}
                 style={{
@@ -194,7 +194,7 @@ export default function SeasonSetupRoute() {
                   lineHeight: 21,
                 }}
               >
-                {item.cropName}: {Math.round(item.score * 100)}% fit · {item.rationale}
+                {item.cropName}: {Math.round(item.finalScore)}% fit · {item.suggestion}
               </Text>
               ))}
           </View>

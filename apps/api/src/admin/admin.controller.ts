@@ -70,7 +70,8 @@ const communityPostModerationSchema = z
     locked: z.boolean().optional(),
   })
   .refine(
-    (value) => typeof value.hidden === 'boolean' || typeof value.locked === 'boolean',
+    (value) =>
+      typeof value.hidden === 'boolean' || typeof value.locked === 'boolean',
     {
       message: 'Provide at least one moderation field',
     },

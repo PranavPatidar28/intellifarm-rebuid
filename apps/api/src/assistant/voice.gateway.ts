@@ -14,7 +14,11 @@ import { AssistantToolRegistryService } from './assistant-tool-registry.service'
 import { GeminiLiveService } from './gemini-live.service';
 import { VoiceSessionStoreService } from './voice-session-store.service';
 import { VoiceTicketService } from './voice-ticket.service';
-import type { VoiceClientEvent, VoiceServerEvent, VoiceSessionRecord } from './voice.types';
+import type {
+  VoiceClientEvent,
+  VoiceServerEvent,
+  VoiceSessionRecord,
+} from './voice.types';
 
 const VOICE_WS_PATH = '/voice';
 
@@ -84,7 +88,10 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
         event: 'session.error',
         data: {
           code: 'voice_connection_rejected',
-          message: error instanceof Error ? error.message : 'Voice connection rejected.',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Voice connection rejected.',
         },
       });
       client.close(1008, 'unauthorized');
@@ -107,25 +114,33 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private bindRawMessageHandler(client: WsClient) {
-    client.on('message', async (raw) => {
-      const record = this.clientSessions.get(client);
-      if (!record || record.state === 'closed') {
-        return;
-      }
-
-      try {
-        const event = this.parseClientEvent(raw);
-        await this.handleClientEvent(record, event);
-      } catch (error) {
-        this.sendEvent(client, {
-          event: 'session.error',
-          data: {
-            code: 'invalid_voice_event',
-            message: error instanceof Error ? error.message : 'Invalid voice event.',
-          },
-        });
-      }
+    client.on('message', (raw) => {
+      void this.handleRawMessage(client, raw);
     });
+  }
+
+  private async handleRawMessage(
+    client: WsClient,
+    raw: Buffer | ArrayBuffer | Buffer[],
+  ) {
+    const record = this.clientSessions.get(client);
+    if (!record || record.state === 'closed') {
+      return;
+    }
+
+    try {
+      const event = this.parseClientEvent(raw);
+      await this.handleClientEvent(record, event);
+    } catch (error) {
+      this.sendEvent(client, {
+        event: 'session.error',
+        data: {
+          code: 'invalid_voice_event',
+          message:
+            error instanceof Error ? error.message : 'Invalid voice event.',
+        },
+      });
+    }
   }
 
   private async attachGemini(record: VoiceSessionRecord) {
@@ -140,7 +155,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
             event: 'session.ready',
             data: {
               voiceSessionId: record.id,
-              reconnectGraceSeconds: this.sessionStore.getReconnectGraceSeconds(),
+              reconnectGraceSeconds:
+                this.sessionStore.getReconnectGraceSeconds(),
               state: 'listening',
             },
           });
@@ -216,14 +232,18 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
         },
         onResumptionUpdate: (handle, lastConsumedClientMessageIndex) => {
           record.resumptionHandle = handle;
-          record.lastConsumedClientMessageIndex = lastConsumedClientMessageIndex ?? null;
+          record.lastConsumedClientMessageIndex =
+            lastConsumedClientMessageIndex ?? null;
           this.sessionStore.markUpdated(record);
         },
       },
     });
   }
 
-  private async handleClientEvent(record: VoiceSessionRecord, event: VoiceClientEvent) {
+  private async handleClientEvent(
+    record: VoiceSessionRecord,
+    event: VoiceClientEvent,
+  ) {
     switch (event.event) {
       case 'input.audio':
         this.validateAudio(event.data.audio);
@@ -261,7 +281,10 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private async confirmPendingAction(record: VoiceSessionRecord, actionId?: string) {
+  private async confirmPendingAction(
+    record: VoiceSessionRecord,
+    actionId?: string,
+  ) {
     const pending = record.pendingConfirmation;
     if (!pending || (actionId && pending.id !== actionId)) {
       this.sendEvent(record.client, {
@@ -290,7 +313,9 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data: {
         toolName: pending.toolName,
         status: result.ok ? 'completed' : 'failed',
-        message: result.ok ? 'Confirmed action completed.' : result.error?.message,
+        message: result.ok
+          ? 'Confirmed action completed.'
+          : result.error?.message,
       },
     });
 
@@ -338,11 +363,14 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data: summary,
     });
 
-    await this.interactionLogService.finalizeTurn(this.sessionStore.toAssistantSession(record), {
-      userTranscript: summary.userTranscript || '(voice turn)',
-      assistantTranscript: summary.assistantTranscript,
-      toolsUsed: summary.toolsUsed,
-    });
+    await this.interactionLogService.finalizeTurn(
+      this.sessionStore.toAssistantSession(record),
+      {
+        userTranscript: summary.userTranscript || '(voice turn)',
+        assistantTranscript: summary.assistantTranscript,
+        toolsUsed: summary.toolsUsed,
+      },
+    );
 
     record.currentInputTranscript = '';
     record.currentOutputTranscript = '';
@@ -350,7 +378,11 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private parseClientEvent(raw: Buffer | ArrayBuffer | Buffer[]) {
-    const text = Buffer.isBuffer(raw) ? raw.toString('utf8') : raw.toString();
+    const text = Buffer.isBuffer(raw)
+      ? raw.toString('utf8')
+      : Array.isArray(raw)
+        ? Buffer.concat(raw).toString('utf8')
+        : Buffer.from(raw).toString('utf8');
     const parsed = JSON.parse(text) as VoiceClientEvent;
     const allowedEvents = new Set([
       'input.audio',
@@ -360,7 +392,11 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       'session.end',
     ]);
 
-    if (!parsed || typeof parsed !== 'object' || !allowedEvents.has(parsed.event)) {
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      !allowedEvents.has(parsed.event)
+    ) {
       throw new Error('Unknown voice event.');
     }
 
@@ -372,7 +408,10 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new Error('Audio chunk is required.');
     }
 
-    const maxBytes = this.configService.get<number>('VOICE_MAX_AUDIO_CHUNK_BYTES', 96 * 1024);
+    const maxBytes = this.configService.get<number>(
+      'VOICE_MAX_AUDIO_CHUNK_BYTES',
+      96 * 1024,
+    );
     const estimatedBytes = Math.floor((base64Audio.length * 3) / 4);
     if (estimatedBytes > maxBytes) {
       throw new Error('Audio chunk is too large.');

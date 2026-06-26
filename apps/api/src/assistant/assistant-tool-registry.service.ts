@@ -6,7 +6,10 @@ import { z } from 'zod';
 
 import { AlertsService } from '../alerts/alerts.service';
 import { CropSeasonsService } from '../crop-seasons/crop-seasons.service';
-import { DISEASE_PROVIDER, type DiseaseProvider } from '../disease-reports/disease-provider';
+import {
+  DISEASE_PROVIDER,
+  type DiseaseProvider,
+} from '../disease-reports/disease-provider';
 import { DevicesService } from '../devices/devices.service';
 import { ExpensesService } from '../expenses/expenses.service';
 import { FarmsService } from '../farms/farms.service';
@@ -20,7 +23,6 @@ import { WeatherService } from '../weather/weather.service';
 import { AssistantInteractionLogService } from './assistant-interaction-log.service';
 import type {
   AssistantHistoryMessage,
-  AssistantSessionContext,
   AssistantToolExecutionContext,
   AssistantToolResult,
   PendingVoiceAction,
@@ -37,7 +39,10 @@ type ToolDefinition<TSchema extends z.ZodTypeAny = z.ZodTypeAny> = {
   ) => Promise<AssistantToolResult>;
 };
 
-type ToolExecutionObserver = (toolName: string, result: AssistantToolResult) => void;
+type ToolExecutionObserver = (
+  toolName: string,
+  result: AssistantToolResult,
+) => void;
 
 const NO_ARGS_SCHEMA = z.object({});
 const supportedImageMimeTypes = ['image/jpeg', 'image/jpg', 'image/png'];
@@ -111,7 +116,10 @@ export class AssistantToolRegistryService {
     context: AssistantToolExecutionContext,
   ) {
     if (!isDeviceControlTool(action.toolName)) {
-      return failure('unsupported_confirmation', 'Unsupported confirmation action.');
+      return failure(
+        'unsupported_confirmation',
+        'Unsupported confirmation action.',
+      );
     }
 
     return this.execute(action.toolName, action.parameters, {
@@ -125,10 +133,14 @@ export class AssistantToolRegistryService {
   }
 
   private getDefinition(toolName: string) {
-    const definition = this.getDefinitions().find((item) => item.name === toolName);
+    const definition = this.getDefinitions().find(
+      (item) => item.name === toolName,
+    );
 
     if (!definition) {
-      throw new NotFoundException(`Assistant tool "${toolName}" is not registered.`);
+      throw new NotFoundException(
+        `Assistant tool "${toolName}" is not registered.`,
+      );
     }
 
     return definition;
@@ -138,11 +150,14 @@ export class AssistantToolRegistryService {
     return [
       {
         name: 'getFarmerProfile',
-        description: 'Get the authenticated farmer profile and basic farm summary.',
+        description:
+          'Get the authenticated farmer profile and basic farm summary.',
         schema: NO_ARGS_SCHEMA,
         jsonSchema: emptyObjectJsonSchema(),
         execute: async (_args, context) => {
-          const profile = await this.usersService.getCurrentUser(context.session.userId);
+          const profile = await this.usersService.getCurrentUser(
+            context.session.userId,
+          );
           return success(profile, {
             detectedLanguage: profile.user.preferredLanguage,
           });
@@ -150,7 +165,8 @@ export class AssistantToolRegistryService {
       },
       {
         name: 'getFarmDetails',
-        description: 'Get details for a farm plot, its active crop seasons, and upcoming tasks.',
+        description:
+          'Get details for a farm plot, its active crop seasons, and upcoming tasks.',
         schema: z.object({
           farmPlotId: z.string().optional(),
         }),
@@ -166,25 +182,33 @@ export class AssistantToolRegistryService {
             );
           }
 
-          const farm = await this.farmsService.getFarmPlot(context.session.userId, plotId);
+          const farm = await this.farmsService.getFarmPlot(
+            context.session.userId,
+            plotId,
+          );
           const latestSeason = farm.farmPlot.cropSeasons[0] ?? null;
 
           return success(farm, {
             focusFarmPlotId: farm.farmPlot.id,
             activeFarmName: farm.farmPlot.name,
-            focusCropSeasonId: latestSeason?.id ?? context.session.focusCropSeasonId ?? null,
-            activeCropName: latestSeason?.cropName ?? context.session.activeCropName ?? null,
+            focusCropSeasonId:
+              latestSeason?.id ?? context.session.focusCropSeasonId ?? null,
+            activeCropName:
+              latestSeason?.cropName ?? context.session.activeCropName ?? null,
           });
         },
       },
       {
         name: 'getWeather',
-        description: 'Get the latest field weather and advisories for a farm plot.',
+        description:
+          'Get the latest field weather and advisories for a farm plot.',
         schema: z.object({
           farmPlotId: z.string().optional(),
         }),
         jsonSchema: objectJsonSchema({
-          farmPlotId: stringJsonSchema('Saved farm plot id to inspect weather for.'),
+          farmPlotId: stringJsonSchema(
+            'Saved farm plot id to inspect weather for.',
+          ),
         }),
         execute: async ({ farmPlotId }, context) => {
           const plotId = await this.resolveFarmPlotId(context, farmPlotId);
@@ -205,12 +229,15 @@ export class AssistantToolRegistryService {
       },
       {
         name: 'getSoilSensorData',
-        description: 'Get the latest soil moisture and smart irrigation telemetry for a farm plot.',
+        description:
+          'Get the latest soil moisture and smart irrigation telemetry for a farm plot.',
         schema: z.object({
           farmPlotId: z.string().optional(),
         }),
         jsonSchema: objectJsonSchema({
-          farmPlotId: stringJsonSchema('Saved farm plot id to inspect telemetry for.'),
+          farmPlotId: stringJsonSchema(
+            'Saved farm plot id to inspect telemetry for.',
+          ),
         }),
         execute: async ({ farmPlotId }, context) => {
           const plotId = await this.resolveFarmPlotId(context, farmPlotId);
@@ -221,7 +248,10 @@ export class AssistantToolRegistryService {
             );
           }
 
-          const device = await this.devicesService.getPlotDevice(context.session.userId, plotId);
+          const device = await this.devicesService.getPlotDevice(
+            context.session.userId,
+            plotId,
+          );
           if (!device.device?.latestReading) {
             return unavailable(
               'sensor_data_unavailable',
@@ -272,63 +302,61 @@ CRITICAL USAGE RULES:
             .optional(),
           seasonKey: z.enum(['KHARIF', 'RABI', 'ZAID']).optional(),
           sowingMonth: z.number().int().min(1).max(12).optional(),
-          waterSupplyLevel: z.enum(['PLENTY', 'MODERATE', 'LIMITED', 'SCARCE']).optional(),
+          waterSupplyLevel: z
+            .enum(['PLENTY', 'MODERATE', 'LIMITED', 'SCARCE'])
+            .optional(),
           farmSizeAcre: z.number().positive().optional(),
         }),
-        jsonSchema: objectJsonSchema(
-          {
-            farmPlotId: stringJsonSchema(
-              'Saved farm plot id. If provided, location/soil/irrigation/size are auto-filled from the database. Use the focusFarmPlotId from system context when available.',
-            ),
-            state: stringJsonSchema(
-              'Farmer state for explorer mode (when no farm plot is saved). E.g. "Madhya Pradesh".',
-            ),
-            district: stringJsonSchema(
-              'Farmer district for explorer mode. E.g. "Bhopal".',
-            ),
-            village: stringJsonSchema(
-              'Farmer village for explorer mode.',
-            ),
-            irrigationType: enumJsonSchema(
-              ['RAIN_FED', 'DRIP', 'SPRINKLER', 'FLOOD', 'MANUAL'],
-              'Irrigation type for explorer mode.',
-            ),
-            soilType: enumJsonSchema(
-              [
-                'ALLUVIAL',
-                'BLACK_REGUR',
-                'RED',
-                'LATERITE',
-                'SANDY',
-                'CLAY_HEAVY',
-                'LOAMY_MIXED',
-                'NOT_SURE',
-              ],
-              'Soil type override. Only pass if farmer explicitly mentions it.',
-            ),
-            seasonKey: enumJsonSchema(
-              ['KHARIF', 'RABI', 'ZAID'],
-              'Season to optimize for. Auto-detected from current date if not specified.',
-            ),
-            sowingMonth: numberJsonSchema(
-              'Sowing month (1–12). Defaults based on season: KHARIF=6, RABI=11, ZAID=3.',
-            ),
-            waterSupplyLevel: enumJsonSchema(
-              ['PLENTY', 'MODERATE', 'LIMITED', 'SCARCE'],
-              'Water availability. Infer from irrigationType if farmer does not specify: DRIP/SPRINKLER→PLENTY, FLOOD→MODERATE, MANUAL→LIMITED, RAIN_FED→SCARCE.',
-            ),
-            farmSizeAcre: numberJsonSchema(
-              'Farm size in acres for explorer mode. Use a sensible default (2.5) if unknown.',
-            ),
-          },
-        ),
+        jsonSchema: objectJsonSchema({
+          farmPlotId: stringJsonSchema(
+            'Saved farm plot id. If provided, location/soil/irrigation/size are auto-filled from the database. Use the focusFarmPlotId from system context when available.',
+          ),
+          state: stringJsonSchema(
+            'Farmer state for explorer mode (when no farm plot is saved). E.g. "Madhya Pradesh".',
+          ),
+          district: stringJsonSchema(
+            'Farmer district for explorer mode. E.g. "Bhopal".',
+          ),
+          village: stringJsonSchema('Farmer village for explorer mode.'),
+          irrigationType: enumJsonSchema(
+            ['RAIN_FED', 'DRIP', 'SPRINKLER', 'FLOOD', 'MANUAL'],
+            'Irrigation type for explorer mode.',
+          ),
+          soilType: enumJsonSchema(
+            [
+              'ALLUVIAL',
+              'BLACK_REGUR',
+              'RED',
+              'LATERITE',
+              'SANDY',
+              'CLAY_HEAVY',
+              'LOAMY_MIXED',
+              'NOT_SURE',
+            ],
+            'Soil type override. Only pass if farmer explicitly mentions it.',
+          ),
+          seasonKey: enumJsonSchema(
+            ['KHARIF', 'RABI', 'ZAID'],
+            'Season to optimize for. Auto-detected from current date if not specified.',
+          ),
+          sowingMonth: numberJsonSchema(
+            'Sowing month (1–12). Defaults based on season: KHARIF=6, RABI=11, ZAID=3.',
+          ),
+          waterSupplyLevel: enumJsonSchema(
+            ['PLENTY', 'MODERATE', 'LIMITED', 'SCARCE'],
+            'Water availability. Infer from irrigationType if farmer does not specify: DRIP/SPRINKLER→PLENTY, FLOOD→MODERATE, MANUAL→LIMITED, RAIN_FED→SCARCE.',
+          ),
+          farmSizeAcre: numberJsonSchema(
+            'Farm size in acres for explorer mode. Use a sensible default (2.5) if unknown.',
+          ),
+        }),
         execute: async (args, context) => {
           const plotId = await this.resolveFarmPlotId(context, args.farmPlotId);
 
           // Infer water supply level from irrigation type if not explicitly provided
-          const inferredWaterSupply = args.waterSupplyLevel ?? inferWaterSupplyFromIrrigation(
-            args.irrigationType,
-          );
+          const inferredWaterSupply =
+            args.waterSupplyLevel ??
+            inferWaterSupplyFromIrrigation(args.irrigationType);
 
           // Build the season profile with smart defaults
           const seasonKey = args.seasonKey ?? inferSeasonKey();
@@ -337,30 +365,35 @@ CRITICAL USAGE RULES:
             RABI: 11,
             ZAID: 3,
           };
-          const sowingMonth = args.sowingMonth ?? defaultSowingMonths[seasonKey] ?? (new Date().getMonth() + 1);
+          const sowingMonth =
+            args.sowingMonth ??
+            defaultSowingMonths[seasonKey] ??
+            new Date().getMonth() + 1;
 
-          const prediction = await this.predictionsService.predictCropSuggestions(
-            context.session.userId,
-            {
-              farmPlotId: plotId ?? undefined,
-              explorerContext:
-                plotId == null
-                  ? {
-                      state: args.state ?? '',
-                      district: args.district,
-                      village: args.village,
-                      irrigationType: (args.irrigationType ?? 'MANUAL') as IrrigationType,
-                      farmSizeAcre: args.farmSizeAcre,
-                    }
-                  : undefined,
-              soilType: (args.soilType as SoilType | undefined) ?? undefined,
-              waterSupplyLevel: inferredWaterSupply,
-              seasonProfile: {
-                seasonKey,
-                sowingMonth,
+          const prediction =
+            await this.predictionsService.predictCropSuggestions(
+              context.session.userId,
+              {
+                farmPlotId: plotId ?? undefined,
+                explorerContext:
+                  plotId == null
+                    ? {
+                        state: args.state ?? '',
+                        district: args.district,
+                        village: args.village,
+                        irrigationType: (args.irrigationType ??
+                          'MANUAL') as IrrigationType,
+                        farmSizeAcre: args.farmSizeAcre,
+                      }
+                    : undefined,
+                soilType: (args.soilType as SoilType | undefined) ?? undefined,
+                waterSupplyLevel: inferredWaterSupply,
+                seasonProfile: {
+                  seasonKey,
+                  sowingMonth,
+                },
               },
-            },
-          );
+            );
 
           return success(prediction, {
             focusFarmPlotId: plotId ?? context.session.focusFarmPlotId ?? null,
@@ -369,7 +402,8 @@ CRITICAL USAGE RULES:
       },
       {
         name: 'detectCropDisease',
-        description: 'Analyze crop disease or stress from dual-angle crop images.',
+        description:
+          'Analyze crop disease or stress from dual-angle crop images.',
         schema: z.object({
           cropName: z.string().optional(),
           diseasedImageBase64: z.string().optional(),
@@ -384,10 +418,15 @@ CRITICAL USAGE RULES:
           healthyImageBase64: stringJsonSchema(
             'Base64 image for the healthy or reference crop photo, or the string LATEST.',
           ),
-          userNote: stringJsonSchema('Farmer notes about the visible symptoms.'),
+          userNote: stringJsonSchema(
+            'Farmer notes about the visible symptoms.',
+          ),
         }),
         execute: async (args, context) => {
-          const latestCropName = await this.resolveCropName(context, args.cropName);
+          const latestCropName = await this.resolveCropName(
+            context,
+            args.cropName,
+          );
           const latestDiseasedImage = resolveImagePayload(
             args.diseasedImageBase64,
             context.historyMessages,
@@ -458,22 +497,35 @@ CRITICAL USAGE RULES:
         }),
         jsonSchema: objectJsonSchema(
           {
-            cropName: stringJsonSchema('Crop name to look up in mandi records.'),
+            cropName: stringJsonSchema(
+              'Crop name to look up in mandi records.',
+            ),
             state: stringJsonSchema('State override for mandi search.'),
             district: stringJsonSchema('District override for mandi search.'),
-            bestPriceOnly: booleanJsonSchema('Return only the best priced market result.'),
+            bestPriceOnly: booleanJsonSchema(
+              'Return only the best priced market result.',
+            ),
           },
           ['cropName'],
         ),
-        execute: async ({ cropName, state, district, bestPriceOnly }, context) => {
+        execute: async (
+          { cropName, state, district, bestPriceOnly },
+          context,
+        ) => {
           let latitude: number | undefined;
           let longitude: number | undefined;
 
           const farmId = context.session.focusFarmPlotId;
           if (farmId) {
             try {
-              const farmData = await this.farmsService.getFarmPlot(context.session.userId, farmId);
-              if (farmData.farmPlot.latitude != null && farmData.farmPlot.longitude != null) {
+              const farmData = await this.farmsService.getFarmPlot(
+                context.session.userId,
+                farmId,
+              );
+              if (
+                farmData.farmPlot.latitude != null &&
+                farmData.farmPlot.longitude != null
+              ) {
                 latitude = farmData.farmPlot.latitude;
                 longitude = farmData.farmPlot.longitude;
               }
@@ -482,15 +534,18 @@ CRITICAL USAGE RULES:
             }
           }
 
-          const marketData = await this.marketsService.listMarkets(context.session.userId, {
-            cropName,
-            state,
-            district,
-            bestPriceOnly,
-            includeDistance: true,
-            latitude,
-            longitude,
-          });
+          const marketData = await this.marketsService.listMarkets(
+            context.session.userId,
+            {
+              cropName,
+              state,
+              district,
+              bestPriceOnly,
+              includeDistance: true,
+              latitude,
+              longitude,
+            },
+          );
 
           return success(marketData, {
             activeCropName: cropName,
@@ -505,8 +560,12 @@ CRITICAL USAGE RULES:
           reason: z.string().optional(),
         }),
         jsonSchema: objectJsonSchema({
-          farmPlotId: stringJsonSchema('Farm plot id whose pump should be turned on.'),
-          reason: stringJsonSchema('Optional reason to store with the pump command.'),
+          farmPlotId: stringJsonSchema(
+            'Farm plot id whose pump should be turned on.',
+          ),
+          reason: stringJsonSchema(
+            'Optional reason to store with the pump command.',
+          ),
         }),
         execute: async (args, context) =>
           this.executePumpCommand('turnPumpOn', 'FORCE_ON', args, context),
@@ -519,34 +578,46 @@ CRITICAL USAGE RULES:
           reason: z.string().optional(),
         }),
         jsonSchema: objectJsonSchema({
-          farmPlotId: stringJsonSchema('Farm plot id whose pump should be turned off.'),
-          reason: stringJsonSchema('Optional reason to store with the pump command.'),
+          farmPlotId: stringJsonSchema(
+            'Farm plot id whose pump should be turned off.',
+          ),
+          reason: stringJsonSchema(
+            'Optional reason to store with the pump command.',
+          ),
         }),
         execute: async (args, context) =>
           this.executePumpCommand('turnPumpOff', 'FORCE_OFF', args, context),
       },
       {
         name: 'setPumpAuto',
-        description: 'Set the irrigation pump to automatic mode. In auto mode the system turns the pump on or off based on soil moisture sensor thresholds.',
+        description:
+          'Set the irrigation pump to automatic mode. In auto mode the system turns the pump on or off based on soil moisture sensor thresholds.',
         schema: z.object({
           farmPlotId: z.string().optional(),
           reason: z.string().optional(),
         }),
         jsonSchema: objectJsonSchema({
-          farmPlotId: stringJsonSchema('Farm plot id whose pump should be set to auto mode.'),
-          reason: stringJsonSchema('Optional reason to store with the pump command.'),
+          farmPlotId: stringJsonSchema(
+            'Farm plot id whose pump should be set to auto mode.',
+          ),
+          reason: stringJsonSchema(
+            'Optional reason to store with the pump command.',
+          ),
         }),
         execute: async (args, context) =>
           this.executePumpCommand('setPumpAuto', 'AUTO' as any, args, context),
       },
       {
         name: 'getIrrigationStatus',
-        description: 'Get current pump state, pending commands, and irrigation device health.',
+        description:
+          'Get current pump state, pending commands, and irrigation device health.',
         schema: z.object({
           farmPlotId: z.string().optional(),
         }),
         jsonSchema: objectJsonSchema({
-          farmPlotId: stringJsonSchema('Farm plot id to inspect irrigation status for.'),
+          farmPlotId: stringJsonSchema(
+            'Farm plot id to inspect irrigation status for.',
+          ),
         }),
         execute: async ({ farmPlotId }, context) => {
           const plotId = await this.resolveFarmPlotId(context, farmPlotId);
@@ -557,7 +628,10 @@ CRITICAL USAGE RULES:
             );
           }
 
-          const device = await this.devicesService.getPlotDevice(context.session.userId, plotId);
+          const device = await this.devicesService.getPlotDevice(
+            context.session.userId,
+            plotId,
+          );
           if (!device.device) {
             return unavailable(
               'device_not_found',
@@ -578,7 +652,9 @@ CRITICAL USAGE RULES:
           limit: numberJsonSchema('Maximum number of recent alerts to return.'),
         }),
         execute: async ({ limit }, context) => {
-          const alerts = await this.alertsService.listAlerts(context.session.userId);
+          const alerts = await this.alertsService.listAlerts(
+            context.session.userId,
+          );
           return success({
             alerts: alerts.alerts.slice(0, limit ?? 5),
           });
@@ -596,14 +672,25 @@ CRITICAL USAGE RULES:
         }),
         jsonSchema: objectJsonSchema(
           {
-            userQuery: stringJsonSchema('Farmer query or transcript summary to log.'),
-            assistantSummary: stringJsonSchema('Assistant reply or summary to log.'),
-            detectedLanguage: stringJsonSchema('Detected language code or label.'),
-            actionOutcome: stringJsonSchema('Outcome of any farm action or recommendation.'),
+            userQuery: stringJsonSchema(
+              'Farmer query or transcript summary to log.',
+            ),
+            assistantSummary: stringJsonSchema(
+              'Assistant reply or summary to log.',
+            ),
+            detectedLanguage: stringJsonSchema(
+              'Detected language code or label.',
+            ),
+            actionOutcome: stringJsonSchema(
+              'Outcome of any farm action or recommendation.',
+            ),
           },
           ['userQuery'],
         ),
-        execute: async ({ userQuery, assistantSummary, actionOutcome, detectedLanguage }, context) => {
+        execute: async (
+          { userQuery, assistantSummary, actionOutcome, detectedLanguage },
+          context,
+        ) => {
           const record = await this.interactionLogService.createLog(
             {
               ...context.session,
@@ -638,7 +725,9 @@ CRITICAL USAGE RULES:
           category: stringJsonSchema(
             'Scheme category to filter by (e.g. insurance, subsidy, credit).',
           ),
-          cropName: stringJsonSchema('Crop name to find crop-specific schemes.'),
+          cropName: stringJsonSchema(
+            'Crop name to find crop-specific schemes.',
+          ),
           search: stringJsonSchema('Free-text search keyword.'),
         }),
         execute: async ({ category, cropName, search }, context) => {
@@ -648,7 +737,8 @@ CRITICAL USAGE RULES:
               category,
               cropName: cropName ?? context.session.activeCropName ?? undefined,
               search,
-              language: context.session.preferredLanguage === 'hi' ? 'hi' : 'en',
+              language:
+                context.session.preferredLanguage === 'hi' ? 'hi' : 'en',
             },
           );
 
@@ -736,7 +826,7 @@ CRITICAL USAGE RULES:
           const resolvedScope = scope ?? 'month';
           const resolvedSeasonId =
             resolvedScope === 'season'
-              ? cropSeasonId ?? context.session.focusCropSeasonId ?? null
+              ? (cropSeasonId ?? context.session.focusCropSeasonId ?? null)
               : undefined;
 
           if (resolvedScope === 'season' && !resolvedSeasonId) {
@@ -787,7 +877,9 @@ CRITICAL USAGE RULES:
           return success(timeline, {
             focusCropSeasonId: seasonId,
             activeCropName:
-              timeline.cropSeason.cropName ?? context.session.activeCropName ?? null,
+              timeline.cropSeason.cropName ??
+              context.session.activeCropName ??
+              null,
           });
         },
       },
@@ -808,14 +900,21 @@ CRITICAL USAGE RULES:
       );
     }
 
-    const response = await this.devicesService.issuePumpCommand(context.session.userId, plotId, {
-      targetMode,
-      reason: args.reason,
-    });
+    const response = await this.devicesService.issuePumpCommand(
+      context.session.userId,
+      plotId,
+      {
+        targetMode,
+        reason: args.reason,
+      },
+    );
 
     return success(response, {
       focusFarmPlotId: plotId,
-      activeFieldLabel: response.deviceOverview?.name ?? context.session.activeFieldLabel ?? null,
+      activeFieldLabel:
+        response.deviceOverview?.name ??
+        context.session.activeFieldLabel ??
+        null,
     });
   }
 
@@ -858,7 +957,9 @@ CRITICAL USAGE RULES:
       }
     }
 
-    const profile = await this.usersService.getCurrentUser(context.session.userId);
+    const profile = await this.usersService.getCurrentUser(
+      context.session.userId,
+    );
     const firstFarm = profile.farms[0] ?? null;
     if (!firstFarm) {
       return null;
@@ -912,7 +1013,9 @@ CRITICAL USAGE RULES:
   }
 }
 
-function isDeviceControlTool(toolName: string): toolName is 'turnPumpOn' | 'turnPumpOff' {
+function isDeviceControlTool(
+  toolName: string,
+): toolName is 'turnPumpOn' | 'turnPumpOff' {
   return toolName === 'turnPumpOn' || toolName === 'turnPumpOff';
 }
 
@@ -957,7 +1060,7 @@ function resolveImagePayload(
     return null;
   }
 
-  return strategy === 'latest' ? images.at(-1) ?? null : images[0] ?? null;
+  return strategy === 'latest' ? (images.at(-1) ?? null) : (images[0] ?? null);
 }
 
 function findAllImages(messages: AssistantHistoryMessage[]) {

@@ -34,6 +34,9 @@ export class AssistantController {
 
   @Post('chat')
   @UseGuards(AuthGuard)
+  // Chat is sent as multipart FormData (the AI SDK stringifies `messages`).
+  // The service does not consume uploaded files, so no MIME/size filter here —
+  // adding one would reject legitimate requests while protecting nothing.
   @UseInterceptors(AnyFilesInterceptor())
   async chat(
     @Req() req: Request,
@@ -41,20 +44,25 @@ export class AssistantController {
     @CurrentUser() user: AuthUser,
   ) {
     let parsedBody = body;
-    
+
     // If sent as FormData, the AI SDK stringifies the messages array into the 'messages' field
     if (typeof body.messages === 'string') {
       try {
         parsedBody = { ...body, messages: JSON.parse(body.messages) };
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
 
-    const payload = AssistantChatRequestSchema.parse(parsedBody) as AssistantChatRequest;
+    const payload = AssistantChatRequestSchema.parse(
+      parsedBody,
+    ) as AssistantChatRequest;
     const result = await this.assistantService.chat(payload, user.sub);
 
-    const allToolCalls = result.steps?.flatMap((step: any) => step.toolCalls?.map((tc: any) => tc.toolName) || []) || [];
+    const allToolCalls =
+      result.steps?.flatMap(
+        (step: any) => step.toolCalls?.map((tc: any) => tc.toolName) || [],
+      ) || [];
     const uniqueToolsUsed = Array.from(
       new Set([...(result.intelliFarmToolsUsed ?? []), ...allToolCalls]),
     );
@@ -68,10 +76,7 @@ export class AssistantController {
 
   @Get('status/:requestId')
   @UseGuards(AuthGuard)
-  async getStatus(
-    @Req() req: Request,
-    @CurrentUser() user: AuthUser,
-  ) {
+  getStatus(@Req() req: Request, @CurrentUser() _user: AuthUser) {
     const requestId = req.params.requestId as string;
     const status = this.assistantService.getStatus(requestId) || 'Thinking...';
     return { status };
@@ -144,7 +149,7 @@ export class AssistantController {
   @UseGuards(AuthGuard)
   async generateTitle(
     @Body() body: { message: string },
-    @CurrentUser() user: AuthUser,
+    @CurrentUser() _user: AuthUser,
   ) {
     const title = await this.assistantService.generateTitle(body.message);
     return { title };

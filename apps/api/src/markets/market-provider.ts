@@ -113,13 +113,20 @@ export class DataGovMarketProvider implements MarketProvider {
 
   // ── Public interface ────────────────────────────────────────────────────
 
-  async listMarketRecords(query: MarketQueryInput): Promise<NormalizedMarketRecord[]> {
+  async listMarketRecords(
+    query: MarketQueryInput,
+  ): Promise<NormalizedMarketRecord[]> {
     const cacheKey = buildCacheKey(query);
     const cached = this.cache.get(cacheKey);
 
     // Serve from in-memory cache if still fresh
-    if (cached && Date.now() - cached.fetchedAt < DataGovMarketProvider.CACHE_TTL_MS) {
-      this.logger.debug(`Cache HIT for key "${cacheKey}" (age ${Math.round((Date.now() - cached.fetchedAt) / 1000)}s)`);
+    if (
+      cached &&
+      Date.now() - cached.fetchedAt < DataGovMarketProvider.CACHE_TTL_MS
+    ) {
+      this.logger.debug(
+        `Cache HIT for key "${cacheKey}" (age ${Math.round((Date.now() - cached.fetchedAt) / 1000)}s)`,
+      );
       return cached.records;
     }
 
@@ -134,20 +141,24 @@ export class DataGovMarketProvider implements MarketProvider {
         this.logger.warn(`Background DB persist failed: ${error.message}`);
       });
 
-      this.logger.log(`Fetched ${records.length} records from data.gov.in (key="${cacheKey}")`);
       return records;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.warn(`Live API fetch failed: ${errorMessage}`);
 
       // Serve stale cache if available
       if (cached) {
-        this.logger.log(`Serving stale cache for key "${cacheKey}" (age ${Math.round((Date.now() - cached.fetchedAt) / 1000)}s)`);
+        this.logger.log(
+          `Serving stale cache for key "${cacheKey}" (age ${Math.round((Date.now() - cached.fetchedAt) / 1000)}s)`,
+        );
         return cached.records;
       }
 
       // Let the caller (MarketsService) fall back to the database
-      throw new Error(`Live market API failed and no cache available: ${errorMessage}`);
+      throw new Error(
+        `Live market API failed and no cache available: ${errorMessage}`,
+      );
     }
   }
 
@@ -166,7 +177,9 @@ export class DataGovMarketProvider implements MarketProvider {
       this.cache.set(globalKey, { records, fetchedAt: Date.now() });
 
       await this.persistRecords(records);
-      this.logger.log(`Cache warm-up complete — ${records.length} records cached and persisted.`);
+      this.logger.log(
+        `Cache warm-up complete — ${records.length} records cached and persisted.`,
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Cache warm-up failed: ${msg}`);
@@ -177,7 +190,7 @@ export class DataGovMarketProvider implements MarketProvider {
    * On application startup, trigger an initial cache warm-up so the first
    * user request doesn't have to wait for the API.
    */
-  async onModuleInit() {
+  onModuleInit() {
     // Delay slightly to avoid blocking startup
     setTimeout(() => {
       this.warmUpCache().catch(() => {});
@@ -186,7 +199,9 @@ export class DataGovMarketProvider implements MarketProvider {
 
   // ── API call ──────────────────────────────────────────────────────────
 
-  private async fetchFromApi(query: MarketQueryInput): Promise<NormalizedMarketRecord[]> {
+  private async fetchFromApi(
+    query: MarketQueryInput,
+  ): Promise<NormalizedMarketRecord[]> {
     const resourceId = this.configService.get<string>('DATA_GOV_RESOURCE_ID');
     const apiKey = this.configService.get<string>('DATA_GOV_API_KEY');
     const baseUrl = this.configService.get<string>(
@@ -195,7 +210,9 @@ export class DataGovMarketProvider implements MarketProvider {
     );
 
     if (!resourceId || !apiKey) {
-      throw new Error('Data.gov market provider is not configured (missing DATA_GOV_RESOURCE_ID or DATA_GOV_API_KEY)');
+      throw new Error(
+        'Data.gov market provider is not configured (missing DATA_GOV_RESOURCE_ID or DATA_GOV_API_KEY)',
+      );
     }
 
     // When filtering by a specific commodity, widen the date range to 7 days
@@ -244,7 +261,9 @@ export class DataGovMarketProvider implements MarketProvider {
         });
 
         if (!response.ok) {
-          this.logger.warn(`Data.gov API responded with HTTP ${response.status} for date ${dateStr}`);
+          this.logger.warn(
+            `Data.gov API responded with HTTP ${response.status} for date ${dateStr}`,
+          );
           continue;
         }
 
@@ -257,13 +276,17 @@ export class DataGovMarketProvider implements MarketProvider {
         };
 
         if (payload.status === 'error') {
-          this.logger.warn(`Data.gov API error for date ${dateStr}: ${payload.message}`);
+          this.logger.warn(
+            `Data.gov API error for date ${dateStr}: ${payload.message}`,
+          );
           continue;
         }
 
         const rawRecords = payload.records ?? [];
         const normalized = rawRecords
-          .map((record, index) => normalizeApiRecord(record, globalIndex + index))
+          .map((record, index) =>
+            normalizeApiRecord(record, globalIndex + index),
+          )
           .filter(
             (record): record is NormalizedMarketRecord =>
               record != null && Number.isFinite(record.priceModal),
@@ -284,7 +307,9 @@ export class DataGovMarketProvider implements MarketProvider {
     }
 
     if (!allRecords.length) {
-      throw new Error('No records returned from data.gov.in for any recent date');
+      throw new Error(
+        'No records returned from data.gov.in for any recent date',
+      );
     }
 
     return allRecords;
@@ -297,7 +322,9 @@ export class DataGovMarketProvider implements MarketProvider {
    * data when the external API is unavailable. Uses upsert-like logic:
    * skip records that would create a unique conflict.
    */
-  private async persistRecords(records: NormalizedMarketRecord[]): Promise<void> {
+  private async persistRecords(
+    records: NormalizedMarketRecord[],
+  ): Promise<void> {
     if (!records.length) return;
 
     const batchSize = 50;
@@ -325,7 +352,9 @@ export class DataGovMarketProvider implements MarketProvider {
         persisted += result.count;
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Failed to persist batch ${i / batchSize + 1}: ${msg}`);
+        this.logger.warn(
+          `Failed to persist batch ${i / batchSize + 1}: ${msg}`,
+        );
       }
     }
 
@@ -349,26 +378,25 @@ function normalizeApiRecord(
   raw: Record<string, unknown>,
   index: number,
 ): NormalizedMarketRecord | null {
-  const cropName = readString(raw.Commodity) ?? readString(raw.commodity) ?? null;
+  const cropName =
+    readString(raw.Commodity) ?? readString(raw.commodity) ?? null;
   const mandiName = readString(raw.Market) ?? readString(raw.market) ?? null;
   const district = readString(raw.District) ?? readString(raw.district) ?? '';
   const state = readString(raw.State) ?? readString(raw.state) ?? '';
-  const variety = readString(raw.Variety) ?? readString(raw.variety) ?? '';
 
   const priceMin = readNumber(raw.Min_Price ?? raw.min_price);
   const priceMax = readNumber(raw.Max_Price ?? raw.max_price);
   const priceModal = readNumber(raw.Modal_Price ?? raw.modal_price);
 
   const rawDate =
-    readString(raw.Arrival_Date) ??
-    readString(raw.arrival_date) ??
-    null;
+    readString(raw.Arrival_Date) ?? readString(raw.arrival_date) ?? null;
 
   if (!cropName || !mandiName || !Number.isFinite(priceModal)) {
     return null;
   }
 
-  const recordDate = parseIndianDate(rawDate) ?? new Date().toISOString().slice(0, 10);
+  const recordDate =
+    parseIndianDate(rawDate) ?? new Date().toISOString().slice(0, 10);
 
   // Use the commodity name only (not variety) for consistent matching
   // throughout the enrichment pipeline. The variety data can cause
@@ -400,7 +428,7 @@ function parseIndianDate(dateStr: string | null): string | null {
   if (!dateStr) return null;
 
   // Handle DD/MM/YYYY or DD-MM-YYYY
-  const slashMatch = dateStr.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+  const slashMatch = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (slashMatch) {
     const [, day, month, year] = slashMatch;
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
@@ -413,7 +441,9 @@ function parseIndianDate(dateStr: string | null): string | null {
 
   // Fallback: try native Date parsing
   const parsed = new Date(dateStr);
-  return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : null;
+  return Number.isFinite(parsed.getTime())
+    ? parsed.toISOString().slice(0, 10)
+    : null;
 }
 
 function readString(value: unknown): string | null {

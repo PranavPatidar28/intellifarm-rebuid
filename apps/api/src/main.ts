@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WsAdapter } from '@nestjs/platform-ws';
 import cookieParser from 'cookie-parser';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -31,6 +32,21 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1', { exclude: ['health'] });
   app.use(cookieParser());
+  // Security headers. CSP is relaxed enough for the bundled Swagger UI at /docs
+  // to render (it needs inline styles/scripts); tighten if /docs is removed.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'script-src': ["'self'", "'unsafe-inline'"],
+          'style-src': ["'self'", "'unsafe-inline'"],
+          'img-src': ["'self'", 'data:', 'https:'],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
   app.enableCors({
     origin: (
       origin: string | undefined,
@@ -59,6 +75,10 @@ async function bootstrap() {
     .build();
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, swaggerDocument);
+
+  // Drain in-flight requests and close connections cleanly on SIGTERM/SIGINT
+  // (e.g. container eviction). NestJS lifecycle hooks (onModuleDestroy) fire.
+  app.enableShutdownHooks();
 
   await app.listen(process.env.PORT ?? 4000);
 }

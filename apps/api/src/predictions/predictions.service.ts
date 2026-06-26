@@ -203,17 +203,25 @@ export class PredictionsService {
     };
 
     // Build the ML API request — district must be a valid MP district for the ML model
-    const rawDistrict = effectiveContext.district?.trim() || effectiveContext.state || '';
+    const rawDistrict =
+      effectiveContext.district?.trim() || effectiveContext.state || '';
     const district = mapDistrictToMLApi(rawDistrict);
-    const districtWasMapped = rawDistrict.toLowerCase() !== district.toLowerCase();
-    const farmSizeAcre = effectiveContext.farmSizeAcre > 0 ? effectiveContext.farmSizeAcre : 2.5;
+    const districtWasMapped =
+      rawDistrict.toLowerCase() !== district.toLowerCase();
+    const farmSizeAcre =
+      effectiveContext.farmSizeAcre > 0 ? effectiveContext.farmSizeAcre : 2.5;
 
     // Derive water availability score — prefer waterSupplyLevel > irrigationType
-    const waterSupplyScore = mapWaterSupplyLevelToScore(payload.waterSupplyLevel);
-    const waterScore = waterSupplyScore ?? deriveWaterAvailabilityScore(effectiveContext.irrigationType);
-    const waterScoreSource = waterSupplyScore != null
-      ? `${payload.waterSupplyLevel?.toLowerCase()} water supply`
-      : `${effectiveContext.irrigationType.toLowerCase().replace(/_/g, ' ')} irrigation`;
+    const waterSupplyScore = mapWaterSupplyLevelToScore(
+      payload.waterSupplyLevel,
+    );
+    const waterScore =
+      waterSupplyScore ??
+      deriveWaterAvailabilityScore(effectiveContext.irrigationType);
+    const waterScoreSource =
+      waterSupplyScore != null
+        ? `${payload.waterSupplyLevel?.toLowerCase()} water supply`
+        : `${effectiveContext.irrigationType.toLowerCase().replace(/_/g, ' ')} irrigation`;
 
     const mlRequest: FarmerProfileRequest = {
       district,
@@ -225,7 +233,8 @@ export class PredictionsService {
       water_availability_score: waterScore,
       prediction_year: new Date().getFullYear(),
       // Season-averaged weather from historical archive
-      rainfall: weather.rainfallExpectedMm >= 0 ? weather.rainfallExpectedMm : null,
+      rainfall:
+        weather.rainfallExpectedMm >= 0 ? weather.rainfallExpectedMm : null,
       avg_temperature: weather.currentTemperatureC ?? null,
       min_temperature: seasonClimate.minTempC ?? null,
       max_temperature: seasonClimate.maxTempC ?? null,
@@ -258,7 +267,9 @@ export class PredictionsService {
       ...soilProfile.assumptions,
       ...seasonClimate.assumptions,
       ...(districtWasMapped
-        ? [`Your district "${rawDistrict}" is not directly covered by the ML model. Predictions are approximated using ${district} (Madhya Pradesh) as a reference.`]
+        ? [
+            `Your district "${rawDistrict}" is not directly covered by the ML model. Predictions are approximated using ${district} (Madhya Pradesh) as a reference.`,
+          ]
         : []),
       `Predictions are matched to ${formatSeasonSummary(payload.seasonProfile)}.`,
       `Farm size used: ${farmSizeAcre} acres.`,
@@ -471,12 +482,18 @@ export class PredictionsService {
 
 // ─── Mapping helpers ─────────────────────────────────────────────────────────
 
-function mapMLCropToResult(crop: MLCropRecommendation): CropRecommendationResult {
+function mapMLCropToResult(
+  crop: MLCropRecommendation,
+): CropRecommendationResult {
   return {
     cropName: crop.crop_name,
     averageYieldTonnePerHectare: round2(crop.average_yield_tonne_per_hectare),
-    bestCaseYieldTonnePerHectare: round2(crop.best_case_yield_tonne_per_hectare),
-    worstCaseYieldTonnePerHectare: round2(crop.worst_case_yield_tonne_per_hectare),
+    bestCaseYieldTonnePerHectare: round2(
+      crop.best_case_yield_tonne_per_hectare,
+    ),
+    worstCaseYieldTonnePerHectare: round2(
+      crop.worst_case_yield_tonne_per_hectare,
+    ),
     averageProfitRs: Math.round(crop.average_profit_rs),
     averageRevenueRs: Math.round(crop.average_revenue_rs),
     estimatedCostRs: Math.round(crop.estimated_cost_rs),

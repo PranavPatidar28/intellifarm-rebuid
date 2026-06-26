@@ -20,16 +20,18 @@ type ExpenseEntryCreateArg = {
 
 describe('ExpensesService', () => {
   it('creates a paid expense for an owned crop season', async () => {
-    const create = jest.fn<Promise<unknown>, [ExpenseEntryCreateArg]>().mockResolvedValue(
-      makeExpenseRecord({
-        id: 'expense-id',
-        cropSeasonId: 'season-id',
-        title: 'DAP fertilizer',
-        amount: 4800,
-        category: 'FERTILIZER',
-        status: 'PAID',
-      }),
-    );
+    const create = jest
+      .fn<Promise<unknown>, [ExpenseEntryCreateArg]>()
+      .mockResolvedValue(
+        makeExpenseRecord({
+          id: 'expense-id',
+          cropSeasonId: 'season-id',
+          title: 'DAP fertilizer',
+          amount: 4800,
+          category: 'FERTILIZER',
+          status: 'PAID',
+        }),
+      );
     const service = new ExpensesService(
       {
         cropSeason: {
@@ -79,18 +81,22 @@ describe('ExpensesService', () => {
   });
 
   it('creates a pending expense with a saved receipt attachment', async () => {
-    const saveFile = jest.fn().mockResolvedValue('/uploads/receipts/receipt.jpg');
-    const create = jest.fn<Promise<unknown>, [ExpenseEntryCreateArg]>().mockResolvedValue(
-      makeExpenseRecord({
-        id: 'expense-id',
-        cropSeasonId: 'season-id',
-        title: 'Tractor rental',
-        amount: 1800,
-        category: 'EQUIPMENT',
-        status: 'PENDING',
-        receiptUrl: '/uploads/receipts/receipt.jpg',
-      }),
-    );
+    const saveFile = jest
+      .fn()
+      .mockResolvedValue('/uploads/receipts/receipt.jpg');
+    const create = jest
+      .fn<Promise<unknown>, [ExpenseEntryCreateArg]>()
+      .mockResolvedValue(
+        makeExpenseRecord({
+          id: 'expense-id',
+          cropSeasonId: 'season-id',
+          title: 'Tractor rental',
+          amount: 1800,
+          category: 'EQUIPMENT',
+          status: 'PENDING',
+          receiptUrl: '/uploads/receipts/receipt.jpg',
+        }),
+      );
     const service = new ExpensesService(
       {
         cropSeason: {
@@ -119,7 +125,10 @@ describe('ExpensesService', () => {
       makeFile('receipt.jpg'),
     );
 
-    expect(saveFile).toHaveBeenCalledWith(expect.objectContaining({ originalname: 'receipt.jpg' }), 'expense-receipts');
+    expect(saveFile).toHaveBeenCalledWith(
+      expect.objectContaining({ originalname: 'receipt.jpg' }),
+      'expense-receipts',
+    );
     const createArg = create.mock.calls[0]?.[0];
     expect(createArg.data.receiptUrl).toBe('/uploads/receipts/receipt.jpg');
   });
@@ -192,11 +201,23 @@ describe('ExpensesService', () => {
     const findMany = jest
       .fn()
       .mockResolvedValueOnce([
-        makeSummaryEntry({ amount: 3500, category: 'FERTILIZER', status: 'PAID' }),
-        makeSummaryEntry({ amount: 1800, category: 'EQUIPMENT', status: 'PENDING' }),
+        makeSummaryEntry({
+          amount: 3500,
+          category: 'FERTILIZER',
+          status: 'PAID',
+        }),
+        makeSummaryEntry({
+          amount: 1800,
+          category: 'EQUIPMENT',
+          status: 'PENDING',
+        }),
       ])
       .mockResolvedValueOnce([
-        makeSummaryEntry({ amount: 2200, category: 'FERTILIZER', status: 'PAID' }),
+        makeSummaryEntry({
+          amount: 2200,
+          category: 'FERTILIZER',
+          status: 'PAID',
+        }),
       ]);
     const service = new ExpensesService(
       {
@@ -215,7 +236,9 @@ describe('ExpensesService', () => {
     expect(result.summary.paidAmount).toBe(3500);
     expect(result.summary.pendingAmount).toBe(1800);
     expect(result.summary.trend.direction).toBe('UP');
-    expect(result.summary.categories.find((item) => item.category === 'FERTILIZER')).toMatchObject({
+    expect(
+      result.summary.categories.find((item) => item.category === 'FERTILIZER'),
+    ).toMatchObject({
       amount: 3500,
       previousAmount: 2200,
     });
@@ -224,21 +247,52 @@ describe('ExpensesService', () => {
   it('builds season summaries against the previous season and returns season budget progress', async () => {
     const cropSeasonFindFirst = jest
       .fn()
-      .mockResolvedValueOnce(makeSeason({ id: 'season-id', cropName: 'Soybean' }))
-      .mockResolvedValueOnce(makeSeason({ id: 'previous-season-id', cropName: 'Wheat' }))
-      .mockResolvedValueOnce(makeSeason({ id: 'season-id', cropName: 'Soybean' }));
+      .mockResolvedValueOnce(
+        makeSeason({ id: 'season-id', cropName: 'Soybean' }),
+      )
+      .mockResolvedValueOnce(
+        makeSeason({ id: 'previous-season-id', cropName: 'Wheat' }),
+      )
+      .mockResolvedValueOnce(
+        makeSeason({ id: 'season-id', cropName: 'Soybean' }),
+      );
     const findMany = jest
       .fn()
       .mockResolvedValueOnce([
-        makeSummaryEntry({ amount: 4000, category: 'FERTILIZER', status: 'PAID', cropSeasonId: 'season-id' }),
-        makeSummaryEntry({ amount: 1200, category: 'LABOUR', status: 'PENDING', cropSeasonId: 'season-id' }),
+        makeSummaryEntry({
+          amount: 4000,
+          category: 'FERTILIZER',
+          status: 'PAID',
+          cropSeasonId: 'season-id',
+        }),
+        makeSummaryEntry({
+          amount: 1200,
+          category: 'LABOUR',
+          status: 'PENDING',
+          cropSeasonId: 'season-id',
+        }),
       ])
       .mockResolvedValueOnce([
-        makeSummaryEntry({ amount: 2600, category: 'FERTILIZER', status: 'PAID', cropSeasonId: 'previous-season-id' }),
+        makeSummaryEntry({
+          amount: 2600,
+          category: 'FERTILIZER',
+          status: 'PAID',
+          cropSeasonId: 'previous-season-id',
+        }),
       ])
       .mockResolvedValueOnce([
-        makeSummaryEntry({ amount: 4000, category: 'FERTILIZER', status: 'PAID', cropSeasonId: 'season-id' }),
-        makeSummaryEntry({ amount: 1200, category: 'LABOUR', status: 'PENDING', cropSeasonId: 'season-id' }),
+        makeSummaryEntry({
+          amount: 4000,
+          category: 'FERTILIZER',
+          status: 'PAID',
+          cropSeasonId: 'season-id',
+        }),
+        makeSummaryEntry({
+          amount: 1200,
+          category: 'LABOUR',
+          status: 'PENDING',
+          cropSeasonId: 'season-id',
+        }),
       ]);
     const service = new ExpensesService(
       {
@@ -267,7 +321,9 @@ describe('ExpensesService', () => {
     });
 
     expect(result.summary.periodLabel).toBe('Soybean season');
-    expect(result.summary.trend.comparisonLabel).toBe('vs previous Wheat season');
+    expect(result.summary.trend.comparisonLabel).toBe(
+      'vs previous Wheat season',
+    );
     expect(result.summary.totalAmount).toBe(5200);
     expect(result.summary.budget).toMatchObject({
       amount: 10000,
@@ -298,8 +354,16 @@ describe('ExpensesService', () => {
         },
         expenseEntry: {
           findMany: jest.fn().mockResolvedValue([
-            makeSummaryEntry({ amount: 12000, status: 'PAID', cropSeasonId: 'season-id' }),
-            makeSummaryEntry({ amount: 1800, status: 'PENDING', cropSeasonId: 'season-id' }),
+            makeSummaryEntry({
+              amount: 12000,
+              status: 'PAID',
+              cropSeasonId: 'season-id',
+            }),
+            makeSummaryEntry({
+              amount: 1800,
+              status: 'PENDING',
+              cropSeasonId: 'season-id',
+            }),
           ]),
         },
       } as never,
@@ -326,14 +390,16 @@ describe('ExpensesService', () => {
   });
 });
 
-function makeSeason(overrides?: Partial<{
-  id: string;
-  cropName: string;
-  currentStage: string;
-  sowingDate: Date;
-  farmPlotId: string;
-  status: 'PLANNED' | 'ACTIVE' | 'HARVESTED' | 'ARCHIVED';
-}>) {
+function makeSeason(
+  overrides?: Partial<{
+    id: string;
+    cropName: string;
+    currentStage: string;
+    sowingDate: Date;
+    farmPlotId: string;
+    status: 'PLANNED' | 'ACTIVE' | 'HARVESTED' | 'ARCHIVED';
+  }>,
+) {
   return {
     id: 'season-id',
     cropName: 'Soybean',
@@ -345,18 +411,20 @@ function makeSeason(overrides?: Partial<{
   };
 }
 
-function makeExpenseRecord(overrides?: Partial<{
-  id: string;
-  cropSeasonId: string;
-  title: string;
-  amount: number;
-  category: string;
-  status: string;
-  isRecurring: boolean;
-  vendor: string | null;
-  note: string | null;
-  receiptUrl: string | null;
-}>) {
+function makeExpenseRecord(
+  overrides?: Partial<{
+    id: string;
+    cropSeasonId: string;
+    title: string;
+    amount: number;
+    category: string;
+    status: string;
+    isRecurring: boolean;
+    vendor: string | null;
+    note: string | null;
+    receiptUrl: string | null;
+  }>,
+) {
   const season = makeSeason({ id: overrides?.cropSeasonId ?? 'season-id' });
 
   return {
@@ -379,12 +447,14 @@ function makeExpenseRecord(overrides?: Partial<{
   };
 }
 
-function makeSummaryEntry(overrides?: Partial<{
-  amount: number;
-  category: string;
-  status: string;
-  cropSeasonId: string;
-}>) {
+function makeSummaryEntry(
+  overrides?: Partial<{
+    amount: number;
+    category: string;
+    status: string;
+    cropSeasonId: string;
+  }>,
+) {
   return {
     id: `expense-${Math.random().toString(36).slice(2, 8)}`,
     userId: 'user-id',

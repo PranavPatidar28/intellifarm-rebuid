@@ -1,5 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { Facility, MarketRecord as PrismaMarketRecord } from '@prisma/client';
+import type {
+  Facility,
+  MarketRecord as PrismaMarketRecord,
+} from '@prisma/client';
 
 import { diffInDays } from '../common/utils/date.util';
 import { haversineDistanceKm } from '../common/utils/geo.util';
@@ -78,13 +81,15 @@ export class MarketsService {
           .slice()
           .sort((left, right) => right.priceModal - left.priceModal)[0]
       : null;
-    const topNearby = records.filter((record) => record.distanceKm != null).slice(0, 3);
+    const topNearby = records
+      .filter((record) => record.distanceKm != null)
+      .slice(0, 3);
     const recommendedRecord =
       topNearby[0] && bestRecord
         ? topNearby[0].priceModal + 75 >= bestRecord.priceModal
           ? topNearby[0]
           : bestRecord
-        : topNearby[0] ?? bestRecord;
+        : (topNearby[0] ?? bestRecord);
 
     return {
       bestRecord: serializeRecord(bestRecord),
@@ -103,7 +108,8 @@ export class MarketsService {
   async listExplorerCrops(userId: string, query: MarketExplorerQuery) {
     const scopeContext = await this.resolveScopeContext(userId, query.scope);
     const records = await this.loadEnrichedRecords({
-      district: scopeContext.scope === 'district' ? scopeContext.district : undefined,
+      district:
+        scopeContext.scope === 'district' ? scopeContext.district : undefined,
       includeDistance: true,
       latitude: query.latitude,
       limit: 240,
@@ -116,16 +122,24 @@ export class MarketsService {
       .map((group) => buildCropSummary(group))
       .filter((summary) =>
         query.search
-          ? summary.cropName.toLowerCase().includes(query.search.trim().toLowerCase())
+          ? summary.cropName
+              .toLowerCase()
+              .includes(query.search.trim().toLowerCase())
           : true,
       )
       .sort((left, right) => {
         const leftPrice = left.latestRecord?.priceModal ?? 0;
         const rightPrice = right.latestRecord?.priceModal ?? 0;
-        return rightPrice - leftPrice || left.cropName.localeCompare(right.cropName);
+        return (
+          rightPrice - leftPrice || left.cropName.localeCompare(right.cropName)
+        );
       });
 
-    const pageInfo = buildPageInfo(summaries.length, query.page, query.pageSize);
+    const pageInfo = buildPageInfo(
+      summaries.length,
+      query.page,
+      query.pageSize,
+    );
 
     return {
       crops: summaries.slice(pageInfo.startIndex, pageInfo.endIndex),
@@ -138,7 +152,8 @@ export class MarketsService {
   async listExplorerMandis(userId: string, query: MarketExplorerQuery) {
     const scopeContext = await this.resolveScopeContext(userId, query.scope);
     const records = await this.loadEnrichedRecords({
-      district: scopeContext.scope === 'district' ? scopeContext.district : undefined,
+      district:
+        scopeContext.scope === 'district' ? scopeContext.district : undefined,
       includeDistance: true,
       latitude: query.latitude,
       limit: 240,
@@ -170,7 +185,11 @@ export class MarketsService {
         );
       });
 
-    const pageInfo = buildPageInfo(summaries.length, query.page, query.pageSize);
+    const pageInfo = buildPageInfo(
+      summaries.length,
+      query.page,
+      query.pageSize,
+    );
 
     return {
       generatedAt: new Date().toISOString(),
@@ -188,7 +207,8 @@ export class MarketsService {
     const scopeContext = await this.resolveScopeContext(userId, query.scope);
     const records = await this.loadEnrichedRecords({
       cropName,
-      district: scopeContext.scope === 'district' ? scopeContext.district : undefined,
+      district:
+        scopeContext.scope === 'district' ? scopeContext.district : undefined,
       includeDistance: true,
       latitude: query.latitude,
       limit: 240,
@@ -235,7 +255,8 @@ export class MarketsService {
   ) {
     const scopeContext = await this.resolveScopeContext(userId, query.scope);
     const records = await this.loadEnrichedRecords({
-      district: scopeContext.scope === 'district' ? scopeContext.district : undefined,
+      district:
+        scopeContext.scope === 'district' ? scopeContext.district : undefined,
       includeDistance: true,
       latitude: query.latitude,
       limit: 240,
@@ -243,7 +264,9 @@ export class MarketsService {
       state: scopeContext.state,
     });
 
-    const mandiRecords = records.filter((record) => record.mandiKey === mandiKey);
+    const mandiRecords = records.filter(
+      (record) => record.mandiKey === mandiKey,
+    );
     if (!mandiRecords.length) {
       throw new NotFoundException('Mandi not found');
     }
@@ -252,7 +275,8 @@ export class MarketsService {
       .slice()
       .sort(
         (left, right) =>
-          new Date(right.recordDate).getTime() - new Date(left.recordDate).getTime(),
+          new Date(right.recordDate).getTime() -
+          new Date(left.recordDate).getTime(),
       )[0];
     const topRecord = mandiRecords
       .slice()
@@ -271,7 +295,8 @@ export class MarketsService {
         cropCount: new Set(mandiRecords.map((record) => record.cropKey)).size,
         district: freshestRecord.district,
         distanceKm:
-          mandiRecords.find((record) => record.distanceKm != null)?.distanceKm ?? null,
+          mandiRecords.find((record) => record.distanceKm != null)
+            ?.distanceKm ?? null,
         freshestRecord: serializeRecord(freshestRecord),
         linkedFacility,
         mandiKey: freshestRecord.mandiKey,
@@ -396,7 +421,9 @@ export class MarketsService {
             },
           });
 
-    const facilityById = new Map(facilities.map((facility) => [facility.id, facility]));
+    const facilityById = new Map(
+      facilities.map((facility) => [facility.id, facility]),
+    );
     const facilityByKey = new Map(
       facilities.map((facility) => [
         createMandiKey(facility.name, facility.district, facility.state),
@@ -430,25 +457,34 @@ export class MarketsService {
 
     const enriched = await Promise.all(
       records.map(async (record) => {
-        const mandiKey = createMandiKey(record.mandiName, record.district, record.state);
+        const mandiKey = createMandiKey(
+          record.mandiName,
+          record.district,
+          record.state,
+        );
         const linkedFacility =
-          (record.facilityId ? facilityById.get(record.facilityId) : undefined) ??
+          (record.facilityId
+            ? facilityById.get(record.facilityId)
+            : undefined) ??
           facilityByKey.get(mandiKey) ??
           null;
-        const mandiLocation =
-          linkedFacility
-            ? { latitude: linkedFacility.latitude, longitude: linkedFacility.longitude }
-            : await this.mandiLocationEngine.getCoordinates(record.mandiName, record.district, record.state);
+        const mandiLocation = linkedFacility
+          ? {
+              latitude: linkedFacility.latitude,
+              longitude: linkedFacility.longitude,
+            }
+          : await this.mandiLocationEngine.getCoordinates(
+              record.mandiName,
+              record.district,
+              record.state,
+            );
 
         const distanceKm =
           includeDistance &&
           latitude != null &&
           longitude != null &&
           mandiLocation
-            ? haversineDistanceKm(
-                { latitude, longitude },
-                mandiLocation,
-              )
+            ? haversineDistanceKm({ latitude, longitude }, mandiLocation)
             : null;
 
         const history = historyByKey.get(createHistoryKey(record)) ?? [];
@@ -481,29 +517,36 @@ export class MarketsService {
                 ? `Down by Rs ${Math.abs(deltaFromPrevious ?? 0)}`
                 : 'Stable',
         } satisfies EnrichedMarketRecord;
-      })
+      }),
     );
 
     return enriched.sort((left, right) => {
-        if (includeDistance && left.distanceKm != null && right.distanceKm != null) {
-          return left.distanceKm - right.distanceKm;
-        }
+      if (
+        includeDistance &&
+        left.distanceKm != null &&
+        right.distanceKm != null
+      ) {
+        return left.distanceKm - right.distanceKm;
+      }
 
-        return right.priceModal - left.priceModal;
-      });
+      return right.priceModal - left.priceModal;
+    });
   }
 }
 
 function buildCropSummary(records: EnrichedMarketRecord[]) {
-  const latestRecord = records
-    .slice()
-    .sort(
-      (left, right) =>
-        new Date(right.recordDate).getTime() - new Date(left.recordDate).getTime(),
-    )[0] ?? null;
-  const bestRecord = records
-    .slice()
-    .sort((left, right) => right.priceModal - left.priceModal)[0] ?? null;
+  const latestRecord =
+    records
+      .slice()
+      .sort(
+        (left, right) =>
+          new Date(right.recordDate).getTime() -
+          new Date(left.recordDate).getTime(),
+      )[0] ?? null;
+  const bestRecord =
+    records
+      .slice()
+      .sort((left, right) => right.priceModal - left.priceModal)[0] ?? null;
   const nearestRecord =
     records
       .filter((record) => record.distanceKm != null)
@@ -527,15 +570,18 @@ function buildCropSummary(records: EnrichedMarketRecord[]) {
 }
 
 function buildMandiSummary(records: EnrichedMarketRecord[]) {
-  const freshestRecord = records
-    .slice()
-    .sort(
-      (left, right) =>
-        new Date(right.recordDate).getTime() - new Date(left.recordDate).getTime(),
-    )[0] ?? null;
-  const topRecord = records
-    .slice()
-    .sort((left, right) => right.priceModal - left.priceModal)[0] ?? null;
+  const freshestRecord =
+    records
+      .slice()
+      .sort(
+        (left, right) =>
+          new Date(right.recordDate).getTime() -
+          new Date(left.recordDate).getTime(),
+      )[0] ?? null;
+  const topRecord =
+    records
+      .slice()
+      .sort((left, right) => right.priceModal - left.priceModal)[0] ?? null;
 
   return {
     cropCount: new Set(records.map((record) => record.cropKey)).size,
@@ -570,7 +616,9 @@ function buildLinkedFacilitySummary(
 
   return {
     distanceBucket:
-      distanceKm == null ? 'Location needed' : describeDistanceBucket(distanceKm),
+      distanceKm == null
+        ? 'Location needed'
+        : describeDistanceBucket(distanceKm),
     distanceKm: distanceKm != null ? Number(distanceKm.toFixed(1)) : null,
     district: facility.district,
     id: facility.id,
@@ -662,7 +710,9 @@ function slugify(value: string) {
 function createHistoryKey(
   record: Pick<NormalizedMarketRecord, 'cropName' | 'mandiName' | 'state'>,
 ) {
-  return `${record.cropName}|${record.mandiName}|${record.state}`.trim().toLowerCase();
+  return `${record.cropName}|${record.mandiName}|${record.state}`
+    .trim()
+    .toLowerCase();
 }
 
 function groupMarketHistory(records: PrismaMarketRecord[]) {

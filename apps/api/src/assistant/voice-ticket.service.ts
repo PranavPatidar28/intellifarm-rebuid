@@ -31,16 +31,23 @@ export class VoiceTicketService {
         secret: this.getSecret(),
       });
     } catch {
-      throw new UnauthorizedException('Voice session ticket is invalid or expired.');
+      throw new UnauthorizedException(
+        'Voice session ticket is invalid or expired.',
+      );
     }
   }
 
   getTicketTtlSeconds() {
-    return this.configService.get<number>('VOICE_SESSION_TICKET_TTL_SECONDS', 120);
+    return this.configService.get<number>(
+      'VOICE_SESSION_TICKET_TTL_SECONDS',
+      120,
+    );
   }
 
   private getSecret() {
-    return this.configService.get<string>('VOICE_SESSION_TICKET_SECRET')
-      ?? this.configService.getOrThrow<string>('JWT_ACCESS_SECRET');
+    return (
+      this.configService.get<string>('VOICE_SESSION_TICKET_SECRET') ??
+      this.configService.getOrThrow<string>('JWT_ACCESS_SECRET')
+    );
   }
 }

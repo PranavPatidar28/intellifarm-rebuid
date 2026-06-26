@@ -1,4 +1,7 @@
-import type { AssistantChannel, AssistantSessionContext } from './assistant.types';
+import type {
+  AssistantChannel,
+  AssistantSessionContext,
+} from './assistant.types';
 
 type PromptOptions = {
   channel: AssistantChannel;
@@ -14,16 +17,10 @@ type PromptOptions = {
   >;
 };
 
-function describePreferredLanguage(language?: string | null) {
-  if (language === 'hi') {
-    return 'Hindi (use Hinglish only for technical farming terms that have no simple Hindi equivalent)';
-  }
-
-  return 'English or Hindi based on what the user speaks. Do NOT mix both languages in one response. Use Hinglish only for technical farming terms that have no simple equivalent';
-}
-
 export function buildAssistantSystemPrompt(options: PromptOptions) {
-  const currentDate = (options.currentDate ?? new Date()).toISOString().slice(0, 10);
+  const currentDate = (options.currentDate ?? new Date())
+    .toISOString()
+    .slice(0, 10);
   const responseStyle =
     options.channel === 'VOICE'
       ? 'Respond like a calm farm helper speaking to a farmer on a phone call.'

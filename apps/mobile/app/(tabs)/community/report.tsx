@@ -100,7 +100,7 @@ export default function CommunityReportRoute() {
               open={reasonOpen}
               onOpenChange={setReasonOpen}
               onChange={(value) => {
-                setReason(value);
+                setReason(value as CommunityReportReasonType);
                 if (statusMessage) {
                   setStatusMessage(null);
                 }

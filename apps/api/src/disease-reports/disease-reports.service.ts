@@ -80,6 +80,12 @@ export class DiseaseReportsService {
 
     const placeLabel = payload.placeLabel?.trim();
 
+    if (!season && !placeLabel) {
+      throw new BadRequestException(
+        'Choose a saved crop season or enter a new place label',
+      );
+    }
+
     if (payload.captureMode !== 'CAMERA_DUAL_ANGLE') {
       throw new BadRequestException(
         'Disease reports require dual-angle capture with a diseased photo and a healthy/reference crop photo.',
@@ -170,39 +176,35 @@ export class DiseaseReportsService {
   }
 }
 
-function presentDiseaseReport(
-  report: {
+function presentDiseaseReport(report: {
+  id: string;
+  userId: string;
+  cropSeasonId: string | null;
+  placeLabel: string | null;
+  image1Url: string | null;
+  image2Url: string | null;
+  voiceNoteUrl: string | null;
+  userNote: string | null;
+  predictedIssue: string | null;
+  confidenceScore: number;
+  recommendation: string;
+  escalationRequired: boolean;
+  status: 'PENDING' | 'ANALYZED' | 'ESCALATED';
+  provider: string;
+  providerRef: string | null;
+  captureMode: 'STANDARD' | 'CAMERA_DUAL_ANGLE';
+  analysisSource: 'MOCK_PROVIDER' | 'LIVE_PROVIDER';
+  cropSeason?: {
     id: string;
-    userId: string;
-    cropSeasonId: string | null;
-    placeLabel: string | null;
-    image1Url: string | null;
-    image2Url: string | null;
-    voiceNoteUrl: string | null;
-    userNote: string | null;
-    predictedIssue: string | null;
-    confidenceScore: number;
-    recommendation: string;
-    escalationRequired: boolean;
-    status: 'PENDING' | 'ANALYZED' | 'ESCALATED';
-    provider: string;
-    providerRef: string | null;
-    captureMode: 'STANDARD' | 'CAMERA_DUAL_ANGLE';
-    analysisSource: 'MOCK_PROVIDER' | 'LIVE_PROVIDER';
-    cropSeason?:
-      | {
-          id: string;
-          cropName: string;
-          currentStage: string;
-          sowingDate: Date;
-          farmPlotId: string;
-          status: 'PLANNED' | 'ACTIVE' | 'HARVESTED' | 'ARCHIVED';
-        }
-      | null;
-    createdAt: Date;
-    updatedAt: Date;
-  },
-) {
+    cropName: string;
+    currentStage: string;
+    sowingDate: Date;
+    farmPlotId: string;
+    status: 'PLANNED' | 'ACTIVE' | 'HARVESTED' | 'ARCHIVED';
+  } | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
   const confidenceBand =
     report.confidenceScore >= 0.75
       ? 'HIGH'
@@ -317,11 +319,15 @@ function deriveNextActions(report: {
   ];
 
   if (report.captureMode === 'CAMERA_DUAL_ANGLE') {
-    nextActions.unshift('Retake photos in daylight if symptoms are spreading quickly.');
+    nextActions.unshift(
+      'Retake photos in daylight if symptoms are spreading quickly.',
+    );
   }
 
   if (report.escalationRequired || report.confidenceScore < 0.45) {
-    nextActions.push('Escalate this case to an expert or KVK before chemical action.');
+    nextActions.push(
+      'Escalate this case to an expert or KVK before chemical action.',
+    );
   }
 
   return nextActions.slice(0, 3);

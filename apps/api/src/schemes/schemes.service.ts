@@ -90,11 +90,17 @@ export class SchemesService {
       orderBy: [{ applicableState: 'asc' }, { title: 'asc' }],
     });
 
-    const recommended = pickRecommendedScheme(schemes, query.cropName, stateFilter);
+    const recommended = pickRecommendedScheme(
+      schemes,
+      query.cropName,
+      stateFilter,
+    );
 
     return {
       generatedAt: new Date().toISOString(),
-      schemes: schemes.map((scheme) => presentScheme(scheme, query.cropName, stateFilter)),
+      schemes: schemes.map((scheme) =>
+        presentScheme(scheme, query.cropName, stateFilter),
+      ),
       recommendedSchemeId: recommended?.id ?? null,
     };
   }
@@ -152,12 +158,17 @@ function inferEligibilityTone(
 ) {
   if (
     cropName &&
-    scheme.relatedCrops.some((value) => value.toLowerCase() === cropName.toLowerCase())
+    scheme.relatedCrops.some(
+      (value) => value.toLowerCase() === cropName.toLowerCase(),
+    )
   ) {
     return 'LIKELY_ELIGIBLE' as const;
   }
 
-  if (scheme.applicableState === 'ALL' || scheme.applicableState === stateFilter) {
+  if (
+    scheme.applicableState === 'ALL' ||
+    scheme.applicableState === stateFilter
+  ) {
     return 'CHECK_DETAILS' as const;
   }
 
@@ -165,11 +176,14 @@ function inferEligibilityTone(
 }
 
 function inferPriority(scheme: Scheme, cropName?: string) {
-  const haystack = `${scheme.title} ${scheme.description} ${scheme.category}`.toLowerCase();
+  const haystack =
+    `${scheme.title} ${scheme.description} ${scheme.category}`.toLowerCase();
 
   if (
     /insurance|pmfby|credit|kcc|subsidy|crop loss/.test(haystack) ||
-    scheme.relatedCrops.some((value) => value.toLowerCase() === cropName?.toLowerCase())
+    scheme.relatedCrops.some(
+      (value) => value.toLowerCase() === cropName?.toLowerCase(),
+    )
   ) {
     return 'HIGH' as const;
   }
@@ -188,7 +202,9 @@ function buildWhyRelevant(
 ) {
   if (
     cropName &&
-    scheme.relatedCrops.some((value) => value.toLowerCase() === cropName.toLowerCase())
+    scheme.relatedCrops.some(
+      (value) => value.toLowerCase() === cropName.toLowerCase(),
+    )
   ) {
     return `This scheme explicitly lines up with ${cropName}, which makes it a strong fit for your current season.`;
   }
@@ -213,7 +229,9 @@ function extractDocumentPreview(description: string) {
 
   return preview.length
     ? preview
-    : ['Keep identity, land, and bank-related documents ready before applying.'];
+    : [
+        'Keep identity, land, and bank-related documents ready before applying.',
+      ];
 }
 
 function inferDeadlineLabel(scheme: Scheme) {

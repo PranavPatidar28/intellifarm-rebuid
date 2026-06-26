@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { CropSeason, FarmPlot, Scheme } from '@prisma/client';
 
-import { diffInDays, endOfWindow, startOfToday } from '../common/utils/date.util';
+import {
+  diffInDays,
+  endOfWindow,
+  startOfToday,
+} from '../common/utils/date.util';
 import { DevicesService } from '../devices/devices.service';
 import { haversineDistanceKm } from '../common/utils/geo.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -65,7 +69,9 @@ export class DashboardService {
 
     const refreshedSeasons = (
       await Promise.all(
-        seasons.map((season) => this.rulesEngineService.syncSeasonLifecycle(season.id)),
+        seasons.map((season) =>
+          this.rulesEngineService.syncSeasonLifecycle(season.id),
+        ),
       )
     ).filter((season): season is NonNullable<typeof season> => Boolean(season));
 
@@ -87,50 +93,55 @@ export class DashboardService {
       irrigationType: featuredSeason.farmPlot.irrigationType,
     });
 
-    const [tasks, completedCount, latestDiseaseReport, latestAlert, cachedSnapshot] =
-      await Promise.all([
-        this.prisma.cropTask.findMany({
-          where: {
-            cropSeasonId: featuredSeason.id,
-            OR: [
-              {
-                dueDate: {
-                  lte: endOfWindow(7),
-                },
-                status: {
-                  in: ['PENDING', 'OVERDUE'],
-                },
+    const [
+      tasks,
+      completedCount,
+      latestDiseaseReport,
+      latestAlert,
+      cachedSnapshot,
+    ] = await Promise.all([
+      this.prisma.cropTask.findMany({
+        where: {
+          cropSeasonId: featuredSeason.id,
+          OR: [
+            {
+              dueDate: {
+                lte: endOfWindow(7),
               },
-              { status: 'OVERDUE' },
-            ],
-          },
-          orderBy: [{ dueDate: 'asc' }],
-          take: 6,
-        }),
-        this.prisma.cropTask.count({
-          where: {
-            cropSeasonId: featuredSeason.id,
-            status: 'COMPLETED',
-          },
-        }),
-        this.prisma.diseaseReport.findFirst({
-          where: {
-            userId,
-            cropSeasonId: featuredSeason.id,
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.alert.findFirst({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.weatherSnapshot.findFirst({
-          where: {
-            farmPlotId: featuredSeason.farmPlotId,
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-      ]);
+              status: {
+                in: ['PENDING', 'OVERDUE'],
+              },
+            },
+            { status: 'OVERDUE' },
+          ],
+        },
+        orderBy: [{ dueDate: 'asc' }],
+        take: 6,
+      }),
+      this.prisma.cropTask.count({
+        where: {
+          cropSeasonId: featuredSeason.id,
+          status: 'COMPLETED',
+        },
+      }),
+      this.prisma.diseaseReport.findFirst({
+        where: {
+          userId,
+          cropSeasonId: featuredSeason.id,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.alert.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.weatherSnapshot.findFirst({
+        where: {
+          farmPlotId: featuredSeason.farmPlotId,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
     const pendingCount = tasks.filter((task) =>
       ['PENDING', 'OVERDUE'].includes(task.status),
@@ -138,7 +149,10 @@ export class DashboardService {
     const deviceOverview = await this.devicesService.getDashboardDeviceOverview(
       featuredSeason.farmPlotId,
     );
-    const marketPulse = await this.buildMarketPulse(featuredSeason.farmPlot, featuredSeason);
+    const marketPulse = await this.buildMarketPulse(
+      featuredSeason.farmPlot,
+      featuredSeason,
+    );
     const schemeSpotlight = await this.buildSchemeSpotlight(
       userId,
       featuredSeason.cropName,
@@ -261,7 +275,11 @@ export class DashboardService {
         ? Number((bestRecord.priceModal - previousRecord.priceModal).toFixed(0))
         : null;
     const trendDirection =
-      delta == null || Math.abs(delta) < 10 ? 'STABLE' : delta > 0 ? 'UP' : 'DOWN';
+      delta == null || Math.abs(delta) < 10
+        ? 'STABLE'
+        : delta > 0
+          ? 'UP'
+          : 'DOWN';
     const distanceKm =
       farmPlot.latitude != null &&
       farmPlot.longitude != null &&
@@ -315,7 +333,10 @@ export class DashboardService {
     const schemes = await this.prisma.scheme.findMany({
       where: {
         active: true,
-        OR: [{ applicableState: 'ALL' }, ...(state ? [{ applicableState: state }] : [])],
+        OR: [
+          { applicableState: 'ALL' },
+          ...(state ? [{ applicableState: state }] : []),
+        ],
       },
       orderBy: [{ updatedAt: 'desc' }, { title: 'asc' }],
       take: 8,
@@ -331,7 +352,12 @@ export class DashboardService {
       title: spotlight.title,
       benefitSummary: buildSchemeBenefitSummary(spotlight),
       priority: inferSchemePriority(spotlight, cropName),
-      whyRelevant: buildSchemeWhyRelevant(spotlight, cropName, state, user?.district),
+      whyRelevant: buildSchemeWhyRelevant(
+        spotlight,
+        cropName,
+        state,
+        user?.district,
+      ),
       officialLink: spotlight.officialLink,
       ctaLabel: 'Open scheme details',
     };
@@ -345,10 +371,14 @@ function computeStageProgressPercent(
     };
   },
 ) {
-  const daysSinceSowing = Math.max(0, diffInDays(new Date(season.sowingDate), new Date()));
+  const daysSinceSowing = Math.max(
+    0,
+    diffInDays(new Date(season.sowingDate), new Date()),
+  );
   const stageRules = season.cropDefinition?.stageRules ?? [];
   const currentRule =
-    stageRules.find((rule) => rule.labelEn === season.currentStage) ?? stageRules.at(-1);
+    stageRules.find((rule) => rule.labelEn === season.currentStage) ??
+    stageRules.at(-1);
   const totalWindow = Math.max(1, stageRules.at(-1)?.endDay ?? 120);
 
   if (!currentRule) {
@@ -372,7 +402,8 @@ function buildCropHealthSummary(
     return {
       riskLevel: 'LOW' as const,
       headline: 'No recent crop issue logged',
-      detail: 'Keep scouting the field and upload photos quickly if new stress appears.',
+      detail:
+        'Keep scouting the field and upload photos quickly if new stress appears.',
       confidenceBand: null,
       latestReportId: null,
       ctaLabel: 'Diagnose crop problem',
@@ -452,7 +483,9 @@ function pickRelevantScheme(
 
   return (
     schemes.find((scheme) =>
-      scheme.relatedCrops.some((value) => value.toLowerCase() === normalizedCrop),
+      scheme.relatedCrops.some(
+        (value) => value.toLowerCase() === normalizedCrop,
+      ),
     ) ??
     schemes.find((scheme) => scheme.applicableState === state) ??
     schemes[0] ??
@@ -466,7 +499,8 @@ function buildSchemeBenefitSummary(scheme: Scheme) {
 }
 
 function inferSchemePriority(scheme: Scheme, cropName: string) {
-  const haystack = `${scheme.title} ${scheme.description} ${scheme.category}`.toLowerCase();
+  const haystack =
+    `${scheme.title} ${scheme.description} ${scheme.category}`.toLowerCase();
   const normalizedCrop = cropName.toLowerCase();
 
   if (
@@ -489,7 +523,11 @@ function buildSchemeWhyRelevant(
   state?: string | null,
   district?: string | null,
 ) {
-  if (scheme.relatedCrops.some((value) => value.toLowerCase() === cropName.toLowerCase())) {
+  if (
+    scheme.relatedCrops.some(
+      (value) => value.toLowerCase() === cropName.toLowerCase(),
+    )
+  ) {
     return `This scheme already mentions ${cropName}, so it may fit your current season more closely.`;
   }
 

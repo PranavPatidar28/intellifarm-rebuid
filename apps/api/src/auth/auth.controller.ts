@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import { otpRequestSchema, otpVerifySchema } from '@intellifarm/contracts';
@@ -24,11 +25,13 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('otp/request')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   requestOtp(@Body() body: unknown) {
     return this.authService.requestOtp(parseWithSchema(otpRequestSchema, body));
   }
 
   @Post('otp/verify')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   verifyOtp(
     @Body() body: unknown,
     @Req() request: Request,

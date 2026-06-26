@@ -19,6 +19,7 @@
     "db:generate": "dotenv -e ../../.env -- prisma generate",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "db:deploy:prod": "prisma migrate deploy",
     "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts"
   },
   "dependencies": {
@@ -34,6 +35,7 @@
     "@nestjs/schedule": "^6.0.1",
     "@nestjs/serve-static": "^5.0.4",
     "@nestjs/swagger": "^11.2.1",
+    "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.19",
     "@prisma/client": "^6.19.3",
     "aedes": "^1.0.2",
@@ -42,8 +44,11 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
+    "express": "5.2.1",
+    "helmet": "^8.2.0",
     "mqtt": "^5.15.1",
     "multer": "^2.0.2",
+    "prisma": "^6.19.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "swagger-ui-express": "^5.0.1",
@@ -70,7 +75,6 @@
     "globals": "^16.4.0",
     "jest": "^30.0.0",
     "prettier": "^3.6.2",
-    "prisma": "^6.19.3",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
@@ -96,9 +100,33 @@
       "^@intellifarm/contracts$": "<rootDir>/../../../packages/contracts/dist/index.cjs"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.service.ts",
+      "**/guards/*.ts",
+      "**/utils/*.ts",
+      "!**/*.spec.ts",
+      "!**/generated/**"
     ],
     "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "**/auth/auth.service.ts": {
+        "statements": 70,
+        "branches": 55,
+        "functions": 60,
+        "lines": 70
+      },
+      "**/disease-reports/disease-reports.service.ts": {
+        "statements": 60,
+        "branches": 45,
+        "functions": 50,
+        "lines": 60
+      },
+      "**/common/utils/cors.util.ts": {
+        "statements": 80,
+        "branches": 70,
+        "functions": 80,
+        "lines": 80
+      }
+    },
     "testEnvironment": "node"
   }
 }

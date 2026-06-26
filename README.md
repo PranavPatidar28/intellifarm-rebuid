@@ -15,7 +15,7 @@
 
 <br/>
 
-<img src="./docs/screenshots/login-mobile.png" alt="Intellifarm" width="280"/>
+<img src="./apps/mobile/screenshots/dashboard.jpg" alt="Intellifarm mobile dashboard" width="300"/>
 
 </div>
 
@@ -39,6 +39,22 @@ Intellifarm is a monorepo built around a **NestJS backend as the single source o
 | 🏪 **Mandis & warehouses** | Location-aware discovery with best-price callouts |
 | 📜 **Government schemes** | Crop-aware filtering of official programs |
 | 💧 **IoT pump control** | ESP32 telemetry ingest with two-step, confirmation-gated commands |
+
+## 📱 Screenshots
+
+<div align="center">
+
+| Dashboard | AI Assistant | Crop recommendation |
+|:---:|:---:|:---:|
+| <img src="./apps/mobile/screenshots/dashboard.jpg" width="230"/> | <img src="./apps/mobile/screenshots/ai-assistant-chat.jpg" width="230"/> | <img src="./apps/mobile/screenshots/crop-recommendation.jpg" width="230"/> |
+| Weather, sensor telemetry & pump control | Grounded agronomist that acts on farm data | AI-ranked crops with profit & risk |
+
+| Disease check | Mandi prices | Community |
+|:---:|:---:|:---:|
+| <img src="./apps/mobile/screenshots/disease-check.jpg" width="230"/> | <img src="./apps/mobile/screenshots/mandi-prices.jpg" width="230"/> | <img src="./apps/mobile/screenshots/community.jpg" width="230"/> |
+| Dual-angle photo triage | Live mandi rates, buy/sell view | Farmer Q&A feed |
+
+</div>
 
 ## 🏗️ Architecture
 

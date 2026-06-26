@@ -48,14 +48,15 @@ COPY apps/api/package.json ./apps/api/
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/packages ./packages
-# Built artifacts: compiled API, built contracts, generated Prisma client + schema.
+# Built artifacts: compiled API + built contracts. The Prisma client is NOT
+# copied — prod-deps installed with --ignore-scripts, so we generate it below.
 COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/api/src/generated ./apps/api/src/generated
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 
 WORKDIR /app/apps/api
+# Generate the Prisma client into the production node_modules.
+RUN ./node_modules/.bin/prisma generate
 EXPOSE 4000
 # Default: run migrations (prisma is a runtime dep) then start. docker-compose
 # overrides this with the same intent; override in your platform if migrations

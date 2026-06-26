@@ -9,7 +9,7 @@ WORKDIR /app
 
 # ── Dependencies ────────────────────────────────────────────────────────────
 FROM base AS deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/config/package.json ./packages/config/
 COPY apps/web/package.json ./apps/web/

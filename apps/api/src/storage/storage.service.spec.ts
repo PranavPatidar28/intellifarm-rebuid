@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { StorageService } from './storage.service';
@@ -10,6 +11,22 @@ type DiseaseReportFindFirstArg = {
 };
 
 describe('StorageService', () => {
+  it.each(['../secret.jpg', '..\\secret.jpg', 'nested/secret.jpg'])(
+    'rejects unsafe public media filename %s',
+    async (filename) => {
+      const service = new StorageService(
+        {
+          get: jest.fn((key: string, fallback?: string) => fallback),
+        } as unknown as ConfigService,
+        {} as never,
+      );
+
+      await expect(
+        service.getPublicFilePath('disease-reports', filename),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    },
+  );
+
   it('authorizes disease report media through direct report user ownership', async () => {
     const findFirst = jest
       .fn<Promise<{ id: string }>, [DiseaseReportFindFirstArg]>()

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { basename, extname, join, sep } from 'node:path';
+import { basename, extname, join, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import type { AuthUser } from '../common/types/authenticated-request';
@@ -39,7 +39,6 @@ export class StorageService {
     folder: string,
     rawFilename: string,
   ) {
-    const filename = basename(rawFilename);
     const allowedFolders = new Set([
       'disease-reports',
       'voice-notes',
@@ -52,6 +51,8 @@ export class StorageService {
       throw new NotFoundException('Media file not found');
     }
 
+    const filename = this.getSafeFilename(rawFilename);
+
     if (user.role !== 'ADMIN') {
       const isOwned = await this.isOwnedByUser(user.sub, folder, filename);
 
@@ -60,16 +61,7 @@ export class StorageService {
       }
     }
 
-    const uploadRoot = this.getUploadRoot();
-    const absolutePath = join(uploadRoot, folder, filename);
-
-    const normalizedRoot = uploadRoot.endsWith(sep)
-      ? uploadRoot
-      : `${uploadRoot}${sep}`;
-
-    if (!absolutePath.startsWith(normalizedRoot)) {
-      throw new NotFoundException('Media file not found');
-    }
+    const absolutePath = this.getSafeFilePath(folder, filename);
 
     await access(absolutePath, constants.R_OK).catch(() => {
       throw new NotFoundException('Media file not found');
@@ -85,21 +77,40 @@ export class StorageService {
       throw new NotFoundException('Media file not found');
     }
 
-    const filename = basename(rawFilename);
-    const uploadRoot = this.getUploadRoot();
-    const absolutePath = join(uploadRoot, folder, filename);
-
-    const normalizedRoot = uploadRoot.endsWith(sep)
-      ? uploadRoot
-      : `${uploadRoot}${sep}`;
-
-    if (!absolutePath.startsWith(normalizedRoot)) {
-      throw new NotFoundException('Media file not found');
-    }
+    const filename = this.getSafeFilename(rawFilename);
+    const absolutePath = this.getSafeFilePath(folder, filename);
 
     await access(absolutePath, constants.R_OK).catch(() => {
       throw new NotFoundException('Media file not found');
     });
+
+    return absolutePath;
+  }
+
+  private getSafeFilename(rawFilename: string) {
+    if (
+      !rawFilename ||
+      rawFilename === '.' ||
+      rawFilename === '..' ||
+      rawFilename !== basename(rawFilename) ||
+      rawFilename.includes('/') ||
+      rawFilename.includes('\\') ||
+      rawFilename.includes('\0')
+    ) {
+      throw new NotFoundException('Media file not found');
+    }
+
+    return rawFilename;
+  }
+
+  private getSafeFilePath(folder: string, filename: string) {
+    const uploadRoot = resolve(this.getUploadRoot());
+    const folderPath = resolve(uploadRoot, folder);
+    const absolutePath = resolve(folderPath, filename);
+
+    if (!absolutePath.startsWith(`${folderPath}${sep}`)) {
+      throw new NotFoundException('Media file not found');
+    }
 
     return absolutePath;
   }

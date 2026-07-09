@@ -46,8 +46,12 @@ export class MarketsController {
     @Param('cropName') cropName: string,
     @Query() query: Record<string, unknown>,
   ) {
-    const { page: _page, pageSize: _pageSize, search: _search, ...detailQuery } =
-      parseWithSchema(marketExplorerQuerySchema, query);
+    const {
+      page: _page,
+      pageSize: _pageSize,
+      search: _search,
+      ...detailQuery
+    } = parseWithSchema(marketExplorerQuerySchema, query);
 
     return this.marketsService.getCropDetail(user.sub, cropName, detailQuery);
   }
@@ -58,8 +62,12 @@ export class MarketsController {
     @Param('mandiKey') mandiKey: string,
     @Query() query: Record<string, unknown>,
   ) {
-    const { page: _page, pageSize: _pageSize, search: _search, ...detailQuery } =
-      parseWithSchema(marketExplorerQuerySchema, query);
+    const {
+      page: _page,
+      pageSize: _pageSize,
+      search: _search,
+      ...detailQuery
+    } = parseWithSchema(marketExplorerQuerySchema, query);
 
     return this.marketsService.getMandiDetail(user.sub, mandiKey, detailQuery);
   }

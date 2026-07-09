@@ -206,6 +206,10 @@ function RootLayoutNav() {
         options={{ presentation: 'card', animation: detailAnimation }}
       />
       <Stack.Screen
+        name="device/[farmPlotId]"
+        options={{ presentation: 'card', animation: detailAnimation }}
+      />
+      <Stack.Screen
         name="disease-report/[id]"
         options={{ presentation: 'card', animation: detailAnimation }}
       />

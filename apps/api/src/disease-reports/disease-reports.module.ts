@@ -28,6 +28,6 @@ import { DiseaseReportsService } from './disease-reports.service';
           : mockDiseaseProvider,
     },
   ],
-  exports: [DiseaseReportsService],
+  exports: [DiseaseReportsService, DISEASE_PROVIDER],
 })
 export class DiseaseReportsModule {}

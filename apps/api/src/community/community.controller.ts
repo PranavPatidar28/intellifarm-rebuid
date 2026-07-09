@@ -12,6 +12,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { imageUploadOptions } from '../common/upload/multer-options';
+
 import {
   communityFeedQuerySchema,
   createCommunityPostSchema,
@@ -25,7 +27,9 @@ import type { AuthUser } from '../common/types/authenticated-request';
 import { parseWithSchema } from '../common/utils/zod.util';
 import { CommunityService } from './community.service';
 
-const reportBodySchema = reportCommunityContentSchema.omit({ targetType: true });
+const reportBodySchema = reportCommunityContentSchema.omit({
+  targetType: true,
+});
 
 @ApiTags('community')
 @UseGuards(AuthGuard)
@@ -34,7 +38,10 @@ export class CommunityController {
   constructor(private readonly communityService: CommunityService) {}
 
   @Get('feed')
-  listFeed(@CurrentUser() user: AuthUser, @Query() query: Record<string, unknown>) {
+  listFeed(
+    @CurrentUser() user: AuthUser,
+    @Query() query: Record<string, unknown>,
+  ) {
     return this.communityService.listFeed(
       user,
       parseWithSchema(communityFeedQuerySchema, query),
@@ -42,7 +49,10 @@ export class CommunityController {
   }
 
   @Get('me/posts')
-  listMyPosts(@CurrentUser() user: AuthUser, @Query() query: Record<string, unknown>) {
+  listMyPosts(
+    @CurrentUser() user: AuthUser,
+    @Query() query: Record<string, unknown>,
+  ) {
     return this.communityService.listMyPosts(
       user,
       parseWithSchema(communityFeedQuerySchema, query),
@@ -55,7 +65,7 @@ export class CommunityController {
   }
 
   @Post('posts')
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', imageUploadOptions))
   createPost(
     @CurrentUser() user: AuthUser,
     @Body() body: Record<string, unknown>,

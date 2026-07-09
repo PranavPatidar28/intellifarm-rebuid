@@ -19,7 +19,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "IntelliFarm uses your location to improve weather advice, nearby mandi discovery, and farm setup.",
         "NSPhotoLibraryUsageDescription": "IntelliFarm lets you choose crop photos for disease diagnosis and profile updates.",
-        "NSCameraUsageDescription": "IntelliFarm lets you capture crop photos for disease diagnosis."
+        "NSCameraUsageDescription": "IntelliFarm lets you capture crop photos for disease diagnosis.",
+        "NSMicrophoneUsageDescription": "IntelliFarm uses the microphone so you can speak naturally with the farming assistant."
       }
     },
     "android": {
@@ -29,14 +30,16 @@
       },
       "package": "com.intellifarm.mobile",
       "edgeToEdgeEnabled": true,
-      "softwareKeyboardLayoutMode": "pan",
+      "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "CAMERA",
-        "READ_MEDIA_IMAGES"
-      ]
+  "android.permission.ACCESS_COARSE_LOCATION",
+  "android.permission.ACCESS_FINE_LOCATION",
+  "android.permission.CAMERA",
+  "android.permission.RECORD_AUDIO",
+  "android.permission.MODIFY_AUDIO_SETTINGS",
+  "android.permission.READ_MEDIA_IMAGES"
+]
     },
     "web": {
       "bundler": "metro",
@@ -65,7 +68,11 @@
       "typedRoutes": true
     },
     "extra": {
-      "tagline": "From Sowing to Selling, Smarter Decisions"
+      "tagline": "From Sowing to Selling, Smarter Decisions",
+      "router": {},
+      "eas": {
+        "projectId": "d42fdc20-d58a-4433-907e-07dd39e282f1"
+      }
     }
   }
 }

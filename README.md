@@ -1,187 +1,224 @@
-# Intellifarm MVP
+<div align="center">
 
-An India-first farmer platform built as a `pnpm` + `Turborepo` monorepo with:
+# 🌾 Intellifarm
 
-- `apps/web`: Next.js farmer web app
-- `apps/api`: NestJS shared backend API
-- `packages/contracts`: shared enums, schemas, and API contracts
-- `packages/config`: shared workspace config
+### An India-first farmer platform — a crop-season copilot that helps smallholder farmers plan, decide, and act.
 
-The product is still intentionally narrow, but phase 2 adds the missing planning and support layers around the original crop-season copilot:
+[![CI](https://github.com/PranavPatidar28/intellifarm-rebuid/actions/workflows/ci.yml/badge.svg)](https://github.com/PranavPatidar28/intellifarm-rebuid/actions/workflows/ci.yml)
+![Node](https://img.shields.io/badge/node-24.x-339933?logo=node.js&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-10.x-F69220?logo=pnpm&logoColor=white)
+![Turborepo](https://img.shields.io/badge/Turborepo-monorepo-EF4444?logo=turborepo&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![License](https://img.shields.io/badge/license-Proprietary-red)
 
-- phone OTP authentication
-- farmer profile setup
-- farm plot and crop season onboarding
-- weekly dashboard with tasks, alerts, and weather
-- deterministic crop rules engine and crop timeline
-- crop suggestion and resource prediction providers
-- grounded AI farming assistant
-- dual-angle disease reporting with mock/live provider hooks
-- location-aware mandis and warehouses
-- government schemes with crop-aware filters
-- lightweight internal admin view
+<sub>NestJS API · Expo mobile · PostgreSQL · shared Zod contracts</sub>
 
-## Tech Stack
+<br/>
 
-- Monorepo: Turborepo + pnpm workspaces
-- Web: Next.js App Router, React 19, Tailwind 4
-- API: NestJS, REST, Swagger
-- Database: PostgreSQL + Prisma
-- Storage: local file storage in dev behind a storage service abstraction
-- Auth: OTP flow with secure cookies and a mock OTP adapter for v1
-- Weather: Open-Meteo integration
-- Live provider hooks:
-  - assistant: OpenAI-compatible chat endpoint
-  - predictions: external HTTP prediction service
-  - disease analysis: external HTTP analysis service
-  - mandi prices: Data.gov / Agmarknet-style feed adapter
+<img src="./apps/mobile/screenshots/dashboard.jpg" alt="Intellifarm mobile dashboard" width="300"/>
 
-## Repo Structure
+</div>
 
-```text
-apps/
-  api/
-  web/
-packages/
-  config/
-  contracts/
+---
+
+## ✨ Overview
+
+Intellifarm is a monorepo built around a **NestJS backend as the single source of truth**, with an Expo mobile client consuming the `/v1` REST API. It runs fully on **mock/seeded providers out of the box** — no external API keys needed to demo — and swaps in live providers via environment variables.
+
+> **Status:** active hackathon project, hardened for production-readiness. Builds green from a fresh clone; ships with Docker, CI, and a one-command local backend.
+
+## 🚜 Features
+
+| | |
+|---|---|
+| 📱 **Phone OTP auth** | Passwordless login with JWT in secure HTTP-only cookies |
+| 🌱 **Crop-season planning** | Farm plots, crop seasons, a deterministic rules engine + timeline |
+| 📊 **Weekly dashboard** | Tasks, alerts, and live weather at a glance |
+| 🤖 **Grounded AI assistant** | Text + voice answers from *your* farm data, rules, markets & schemes |
+| 🔬 **Disease reporting** | Dual-angle photo capture with escalation-first triage |
+| 🏪 **Mandis & warehouses** | Location-aware discovery with best-price callouts |
+| 📜 **Government schemes** | Crop-aware filtering of official programs |
+| 💧 **IoT pump control** | ESP32 telemetry ingest with two-step, confirmation-gated commands |
+
+## 📱 Screenshots
+
+<div align="center">
+
+| Dashboard | AI Assistant | Crop recommendation |
+|:---:|:---:|:---:|
+| <img src="./apps/mobile/screenshots/dashboard.jpg" width="230"/> | <img src="./apps/mobile/screenshots/ai-assistant-chat.jpg" width="230"/> | <img src="./apps/mobile/screenshots/crop-recommendation.jpg" width="230"/> |
+| Weather, sensor telemetry & pump control | Grounded agronomist that acts on farm data | AI-ranked crops with profit & risk |
+
+| Disease check | Mandi prices | Community |
+|:---:|:---:|:---:|
+| <img src="./apps/mobile/screenshots/disease-check.jpg" width="230"/> | <img src="./apps/mobile/screenshots/mandi-prices.jpg" width="230"/> | <img src="./apps/mobile/screenshots/community.jpg" width="230"/> |
+| Dual-angle photo triage | Live mandi rates, buy/sell view | Farmer Q&A feed |
+
+</div>
+
+## 🏗️ Architecture
+
+```
+                              ┌──────────────────┐
+                              │  Mobile (Expo)   │
+                              │  React Native    │
+                              └────────┬─────────┘
+                                       │ REST /v1 + cookies · WS /voice
+                                       ▼
+                           ┌───────────────────────┐
+                           │   API (NestJS) :4000   │
+                           │  REST · Swagger /docs  │
+                           │  WebSocket /voice      │
+                           │  helmet · rate-limit   │
+                           └───────────┬───────────┘
+                                       │ Prisma
+                                       ▼
+                           ┌───────────────────────┐
+                           │      PostgreSQL        │
+                           └───────────────────────┘
+
+   pluggable providers (env-selected) ─ markets · disease · assistant
+   external: Open-Meteo · Gemini · Data.gov · ML/disease HTTP services
+
+   ESP32 node ──POST /v1/devices/ingest (x-device-key)──▶ API
 ```
 
-## Local Setup
+`packages/contracts` (Zod schemas + enums) is the shared contract imported by the API and the mobile client.
 
-1. Enable Corepack and install dependencies:
+## 🧰 Tech stack
+
+| Layer | Stack |
+|---|---|
+| **Monorepo** | Turborepo · pnpm workspaces · Node 24 |
+| **Mobile** | Expo · React Native 0.81 · Expo Router · EAS Build |
+| **API** | NestJS 11 · REST · Swagger · WebSockets (`ws`) |
+| **Database** | PostgreSQL · Prisma |
+| **Auth** | Phone OTP → JWT in secure HTTP-only cookies |
+| **Contracts** | Zod schemas shared across API + client |
+
+## 📁 Project structure
+
+```
+intellifarm/
+├── apps/
+│   ├── api/         NestJS REST API        @intellifarm/api
+│   └── mobile/      Expo mobile app        @intellifarm/mobile
+├── packages/
+│   ├── contracts/   Shared Zod schemas     @intellifarm/contracts
+│   └── config/      Shared TS/Prettier config
+├── iot/
+│   └── esp32/       Arduino sensor/pump firmware
+└── docs/            Diagrams, pitch assets, specs
+```
+
+Each app has its own README → [api](./apps/api/README.md) · [mobile](./apps/mobile/README.md)
+
+## 🚀 Quick start
+
+### 1. Backend
+
+The API + PostgreSQL run with one command via Docker:
+
+```bash
+docker compose up --build
+# once the API is healthy, seed demo data:
+docker compose run --rm api pnpm --filter @intellifarm/api db:seed
+```
+
+Or run it locally:
 
 ```powershell
 corepack enable
 pnpm install
+
+Copy-Item .env.example .env   # set DATABASE_URL + JWT secrets (required)
+
+pnpm db:deploy                # apply migrations
+pnpm db:seed                  # seed demo content
+pnpm dev                      # api + contracts watcher
 ```
 
-2. Copy the environment file and fill in a PostgreSQL connection:
+→ API **http://localhost:4000** · Swagger **http://localhost:4000/docs**
 
-```powershell
-Copy-Item .env.example .env
+> Required env vars are validated at API startup — a missing `DATABASE_URL` or JWT secret fails fast with a clear message.
+
+### 2. Mobile app
+
+```bash
+pnpm --filter @intellifarm/mobile start   # Expo dev server
+# then press 'a' (Android) / 'i' (iOS), or scan with a dev client
 ```
 
-Required:
+See [apps/mobile/README.md](./apps/mobile/README.md) for device setup and the voice-assistant requirements.
 
-- `DATABASE_URL` should point to a PostgreSQL database
-- `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` should be replaced with long random values
+### 🔑 Demo login
 
-3. Apply migrations and seed demo content:
+| Role | Phone | OTP |
+|---|---|---|
+| Farmer *(seeded farm + crops)* | `9876543210` | `123456` |
+| Admin *(`/admin` access)* | `9999999998` | `123456` |
 
-```powershell
-pnpm db:deploy
-pnpm db:seed
+## 📜 Commands
+
+```bash
+pnpm dev          # api + contracts watcher, in parallel
+pnpm build        # build all workspaces
+pnpm lint         # eslint across workspaces
+pnpm typecheck    # tsc --noEmit across workspaces
+pnpm test         # jest (api)
+
+pnpm db:generate  # prisma generate
+pnpm db:migrate   # prisma migrate dev   (local DBs)
+pnpm db:deploy    # prisma migrate deploy (managed/pooled DBs)
+pnpm db:seed      # demo farmer, admin, crops, mandis
 ```
 
-If you are using a fully local PostgreSQL database for development, `pnpm db:migrate` also works. If you are using a managed pooled connection, prefer `pnpm db:deploy` against the committed migrations.
+## 🔌 Provider configuration
 
-4. Start the web app, API, and shared contracts watcher:
+Runs fully on **mock/seeded providers** by default. Live providers are opt-in (see `.env.example`):
 
-```powershell
-pnpm dev
-```
+| Domain | Mode var | Live config |
+|---|---|---|
+| Markets / mandi prices | `MARKET_PROVIDER_MODE` &nbsp;`seeded ∣ scraper ∣ live` | `DATA_GOV_API_KEY`, `DATA_GOV_RESOURCE_ID` |
+| Disease analysis | `DISEASE_PROVIDER_MODE` &nbsp;`mock ∣ live` | `DISEASE_PROVIDER_URL`, `DISEASE_PROVIDER_API_KEY` |
+| AI assistant | — | `GEMINI_API_KEY`, `AI_ASSISTANT_MODEL` |
+| Weather | always live (Open-Meteo) | `OPEN_METEO_BASE_URL` |
 
-Default local URLs:
+## ☁️ Deployment
 
-- Web: `http://localhost:3000`
-- API: `http://localhost:4000`
-- Swagger docs: `http://localhost:4000/docs`
+| Target | Platform | Config |
+|---|---|---|
+| API | Fly.io / any Docker host | `apps/api/fly.toml` · `apps/api/Dockerfile` |
+| Database | Neon · Supabase · RDS | `prisma migrate deploy` on release |
+| Mobile | EAS Build | `apps/mobile/eas.json` |
 
-OTP login requires both the web app and API to be running. In development,
-local auth is allowed from both `http://localhost:3000` and
-`http://localhost:3001` so the web app can still sign in if `3000` is already
-occupied.
+CI (`.github/workflows/ci.yml`) runs lint · typecheck · test · build and builds the API Docker image on every PR. `/health` checks DB connectivity for load-balancer probes.
 
-## Demo Login
+## 📚 Documentation
 
-The dev OTP adapter uses:
+- **[Development guide](./CLAUDE.md)** — conventions and architecture
+- **[Contributing](./CONTRIBUTING.md)** — setup, commit style, workflow
+- **[docs/](./docs/README.md)** — user-flow diagrams, pitch slides, the [voice assistant spec](./docs/voice-assistant.md)
+- **API reference** — Swagger/OpenAPI at `/docs` when the API is running
 
-- Phone: `9876543210`
-- OTP: `123456`
+## 🔒 Notes
 
-That seeded farmer already has demo farm plots and crop seasons. You can also log in with a new phone number and go through onboarding.
+- Crop/resource predictions are advisory and provider-backed — no in-repo trained model.
+- Disease analysis is escalation-first and avoids blind chemical prescriptions.
+- Assistant answers are grounded in saved farm data, not open-ended agronomy guarantees.
+- Pump control is confirmation-gated end to end (device API and voice assistant alike).
 
-Admin demo:
+## ⚖️ License
 
-- Phone: `9999999998`
-- OTP: `123456`
+**Proprietary — all rights reserved.** Copyright © 2026 Pranav Patidar.
 
-The admin account can access `/admin` for internal crop-rule, scheme, and report review.
+This repository may be publicly visible, but **no rights are granted**. You may
+not use, copy, modify, distribute, or create derivative works from any part of
+it without the owner's prior written permission. See [LICENSE](./LICENSE) for
+the full terms. To request permission, contact the owner.
 
-## Useful Commands
+---
 
-```powershell
-pnpm dev
-pnpm build
-pnpm lint
-pnpm test
-pnpm db:generate
-pnpm db:migrate
-pnpm db:deploy
-pnpm db:seed
-```
-
-## Seeded Demo Content
-
-The seed script adds:
-
-- crop definitions for Wheat, Paddy, and Cotton
-- crop stage rules and task templates
-- demo schemes with crop-aware tags
-- geolocated mandi and warehouse facilities
-- demo market records linked to facilities
-- a demo farmer account with farm plots and active crop seasons
-- an internal admin account
-
-## Phase 2 Features
-
-- Crop suggestions:
-  - `/v1/predictions/crop-suggestions`
-  - mock scoring now, external HTTP prediction provider later
-- Resource prediction:
-  - `/v1/predictions/resources`
-  - weekly water, fertilizer review, pesticide watch level, and safety note
-- Grounded assistant:
-  - `/v1/assistant/threads`
-  - `/v1/assistant/threads/:id`
-  - `/v1/assistant/threads/:id/messages`
-  - answers are restricted to saved farm data, rules, weather, markets, schemes, and disease history
-- Nearby facilities:
-  - `/v1/facilities/nearby`
-  - separate mandi and warehouse discovery with distance-first ranking
-- Upgraded markets:
-  - `/v1/markets`
-  - seeded or live-provider mode, plus best-price callout support
-- Upgraded disease reports:
-  - `/v1/disease-reports`
-  - supports `captureMode=CAMERA_DUAL_ANGLE`
-- Weather:
-  - normalized 3-day forecast blocks
-  - cached snapshots and safe fallback behavior
-- Voice:
-  - browser speech recognition for note/chat input
-  - browser text-to-speech for weather and assistant replies
-
-## Provider Configuration
-
-The app runs fully with mock providers by default.
-
-To enable live providers later:
-
-- Set `PREDICTION_PROVIDER_MODE=live` and configure `PREDICTION_PROVIDER_URL`
-- Set `DISEASE_PROVIDER_MODE=live` and configure `DISEASE_PROVIDER_URL`
-- Set `AI_ASSISTANT_PROVIDER_MODE=live` and configure `AI_ASSISTANT_BASE_URL`, `AI_ASSISTANT_API_KEY`, and `AI_ASSISTANT_MODEL`
-- Set `MARKET_PROVIDER_MODE=live` and configure `DATA_GOV_API_KEY` plus `DATA_GOV_RESOURCE_ID`
-
-The web app and any future mobile app continue to use the same backend routes, auth, business logic, uploads, and stored history regardless of provider mode.
-
-## Current Notes
-
-- Crop/resource prediction is advisory and provider-backed; there is no in-repo trained model.
-- Disease analysis stays escalation-first and avoids blind chemical prescriptions.
-- Assistant answers are grounded and should not be treated as open-ended agronomy guarantees.
-- Weather is live through Open-Meteo and can use current browser GPS when permission is allowed.
-- Uploaded media flows through authenticated API routes under `/v1/media/...`.
-- Voice support is browser-based in this phase.
-- The future mobile app should reuse the same API, auth flow, business logic, and data models from this repo.
+<div align="center">
+<sub>Built for Indian smallholder farmers 🇮🇳</sub>
+</div>

@@ -329,18 +329,20 @@ function toMarkdownBlocks(text: string) {
 }
 
 const headingTextStyle = {
-  color: palette.ink,
+  color: palette.leafDark,
   fontFamily: typography.bodyStrong,
-  fontSize: 19,
+  fontSize: 18,
   lineHeight: 26,
+  marginTop: spacing.sm,
+  marginBottom: spacing.xxs,
 } as const;
 
 const bodyTextStyle = {
   flex: 1,
-  color: palette.inkSoft,
+  color: palette.ink,
   fontFamily: typography.bodyRegular,
-  fontSize: 15,
-  lineHeight: 25,
+  fontSize: 16,
+  lineHeight: 24,
 } as const;
 
 const strongTextStyle = {
@@ -349,18 +351,20 @@ const strongTextStyle = {
 } as const;
 
 const bulletLabelStyle = {
-  width: 18,
-  color: palette.inkSoft,
+  width: 22,
+  color: palette.leaf,
   fontFamily: typography.bodyStrong,
-  fontSize: 15,
-  lineHeight: 25,
+  fontSize: 18,
+  lineHeight: 24,
+  textAlign: 'center',
 } as const;
 
 const emptyTextStyle = {
   color: palette.inkSoft,
   fontFamily: typography.bodyRegular,
-  fontSize: 14,
-  lineHeight: 22,
+  fontSize: 15,
+  lineHeight: 24,
+  fontStyle: 'italic',
 } as const;
 
 const topGalleryStyle = {
@@ -368,7 +372,7 @@ const topGalleryStyle = {
   padding: spacing.md,
   borderRadius: radii.xl,
   borderWidth: 1,
-  borderColor: 'rgba(47, 125, 78, 0.12)',
+  borderColor: palette.outline,
   backgroundColor: palette.white,
   boxShadow: shadow.soft,
 } as const;
@@ -381,28 +385,24 @@ const resultCardStyle = {
   overflow: 'hidden',
   borderRadius: radii.xl,
   borderWidth: 1,
-  borderColor: 'rgba(47, 125, 78, 0.18)',
+  borderColor: palette.outlineStrong,
   backgroundColor: palette.white,
-  boxShadow: shadow.soft,
+  boxShadow: shadow.medium,
 } as const;
 
 const resultCardHeaderStyle = {
   gap: spacing.xs,
-  paddingHorizontal: spacing.md,
+  paddingHorizontal: spacing.lg,
   paddingVertical: spacing.md,
   borderBottomWidth: 1,
-  borderBottomColor: 'rgba(47, 125, 78, 0.12)',
-  backgroundColor: palette.mint,
+  borderBottomColor: palette.outline,
+  backgroundColor: palette.mintStrong,
 } as const;
 
 const resultBodyShellStyle = {
-  margin: spacing.md,
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.lg,
-  borderRadius: radii.lg,
-  borderWidth: 1,
-  borderColor: palette.soil,
-  backgroundColor: palette.parchmentSoft,
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.xl,
+  backgroundColor: palette.white,
 } as const;
 
 const eyebrowTextStyle = {

@@ -1,46 +1,43 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
-
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { CalendarDays, ChevronDown, ChevronUp, History, MapPin, Sprout } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  CloudSun,
+  Droplets,
+  MapPin,
+  ShieldAlert,
+  Sparkles,
+  Sprout,
+  TrendingUp,
+  Wheat,
+} from 'lucide-react-native';
 
 import { Button } from '@/components/button';
-import { CompactListCard } from '@/components/compact-list-card';
 import { MetricBadge } from '@/components/metric-badge';
-import { OptionChipGroup } from '@/components/option-chip-group';
 import { PageShell } from '@/components/page-shell';
-import { SectionTitle } from '@/components/section-title';
+import { SelectField } from '@/components/select-field';
 import { SunriseCard } from '@/components/sunrise-card';
 import { useSession } from '@/features/session/session-provider';
 import { useDeviceLocation } from '@/hooks/use-device-location';
-import { ApiError, apiGet, apiPost } from '@/lib/api';
-import type { CropSuggestionResponse } from '@/lib/api-types';
-import { soilOptions, seasonKeyOptions, storageKeys } from '@/lib/constants';
+import { ApiError, apiPost } from '@/lib/api';
+import type { CropRecommendation, CropSuggestionResponse } from '@/lib/api-types';
+import {
+  irrigationOptions,
+  seasonKeyOptions,
+  soilOptions,
+  waterSupplyOptions,
+} from '@/lib/constants';
 import { findSeasonContext, getSuggestedSeasonKey } from '@/lib/domain';
 import { useStoredValue } from '@/lib/storage';
 import { palette, radii, spacing, typography } from '@/theme/tokens';
 
 const CURRENT_LOCATION_SOURCE = 'CURRENT_LOCATION';
-
 type SeasonKey = 'KHARIF' | 'RABI' | 'ZAID';
-type PredictionRun = {
-  id: string;
-  type: string;
-  provider: string;
-  status: string;
-  createdAt: string;
-  outputJson?: {
-    suggestions?: Array<{ cropName: string; score: number; rationale: string }>;
-    inputConfidence?: 'HIGH' | 'MEDIUM' | 'LOW';
-    seasonClimate?: { label?: string; locationLabel?: string };
-  };
-};
-
-const MONTH_LABELS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
 
 const SEASON_DEFAULT_MONTHS: Record<SeasonKey, number> = {
   KHARIF: 6,
@@ -51,207 +48,128 @@ const SEASON_DEFAULT_MONTHS: Record<SeasonKey, number> = {
 export default function CropPredictionRoute() {
   const router = useRouter();
   const { authUser, profile, token } = useSession();
-  const [selectedSeasonId] = useStoredValue(storageKeys.selectedSeasonId, '');
+  const gps = useDeviceLocation();
+  const [selectedSeasonId] = useStoredValue('intellifarm:selectedSeasonId', '');
   const activeSeason = useMemo(
     () => findSeasonContext(profile, selectedSeasonId),
     [profile, selectedSeasonId],
   );
   const farms = profile?.farms ?? [];
   const defaultFarmPlotId = activeSeason?.farmPlot.id ?? farms[0]?.id ?? '';
+
+  // ─── Form state ────────────────────────────────────────
   const [selectedSourceId, setSelectedSourceId] = useState(
     defaultFarmPlotId || CURRENT_LOCATION_SOURCE,
   );
   const [soilType, setSoilType] = useState('NOT_SURE');
-  const [seasonKey, setSeasonKey] = useState<SeasonKey>(() => {
-    const now = new Date();
-    return getSuggestedSeasonKey(now.getMonth()) as SeasonKey;
-  });
-  const [sowingMonth, setSowingMonth] = useState<number>(() => {
-    const now = new Date();
-    return now.getMonth() + 1;
-  });
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [seasonKey, setSeasonKey] = useState<SeasonKey>(() =>
+    getSuggestedSeasonKey(new Date().getMonth()) as SeasonKey,
+  );
+  const [waterSupply, setWaterSupply] = useState('MODERATE');
+  const [irrigationType, setIrrigationType] = useState('MANUAL');
+  const [farmSizeText, setFarmSizeText] = useState('2.5');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CropSuggestionResponse | null>(null);
-  const [hasTriggeredLocationFetch, setHasTriggeredLocationFetch] =
-    useState(false);
-  const {
-    location,
-    status: locationStatus,
-    message: locationMessage,
-    refreshLocation,
-  } = useDeviceLocation();
-
-  // Prediction history
-  const historyQueryKey = useMemo(() => {
-    const base = ['prediction-runs', token, 'CROP_SUGGESTION'];
-    if (selectedSourceId !== CURRENT_LOCATION_SOURCE) {
-      return [...base, selectedSourceId];
-    }
-    return base;
-  }, [token, selectedSourceId]);
-
-  const historyPath = useMemo(() => {
-    const params = new URLSearchParams({ type: 'CROP_SUGGESTION', limit: '3' });
-    if (selectedSourceId !== CURRENT_LOCATION_SOURCE) {
-      params.set('farmPlotId', selectedSourceId);
-    }
-    return `/predictions/runs?${params.toString()}`;
-  }, [selectedSourceId]);
-
-  const historyQuery = useQuery({
-    queryKey: historyQueryKey,
-    queryFn: () => apiGet<{ runs: PredictionRun[] }>(historyPath, token),
-    enabled: Boolean(token) && showHistory,
-    staleTime: 1000 * 60 * 2,
-  });
+  const [expandedCropIndex, setExpandedCropIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    setSelectedSourceId((current) => {
-      if (current === CURRENT_LOCATION_SOURCE) {
-        return current;
-      }
-
-      if (farms.some((farm) => farm.id === current)) {
-        return current;
-      }
-
+    setSelectedSourceId((c) => {
+      if (c === CURRENT_LOCATION_SOURCE) return c;
+      if (farms.some((f) => f.id === c)) return c;
       return defaultFarmPlotId || CURRENT_LOCATION_SOURCE;
     });
   }, [defaultFarmPlotId, farms]);
 
   const selectedFarm = useMemo(
-    () => farms.find((farm) => farm.id === selectedSourceId) ?? null,
+    () => farms.find((f) => f.id === selectedSourceId) ?? null,
     [farms, selectedSourceId],
   );
+
   const usingCurrentLocation = selectedSourceId === CURRENT_LOCATION_SOURCE;
 
-  // When season key changes (not on custom), update sowing month to season default
+  // Auto-trigger GPS when "current location" is selected
   useEffect(() => {
-    setSowingMonth(SEASON_DEFAULT_MONTHS[seasonKey]);
-  }, [seasonKey]);
+    if (usingCurrentLocation && gps.status === 'idle') {
+      void gps.refreshLocation();
+    }
+  }, [usingCurrentLocation, gps.status, gps.refreshLocation]);
 
   useEffect(() => {
     setSoilType(selectedFarm?.soilType ?? 'NOT_SURE');
     setMessage(null);
     setResult(null);
-  }, [selectedFarm?.id, selectedFarm?.soilType, usingCurrentLocation]);
-
-  useEffect(() => {
-    if (!usingCurrentLocation) {
-      if (hasTriggeredLocationFetch) {
-        setHasTriggeredLocationFetch(false);
-      }
-      return;
-    }
-
-    if (location || locationStatus === 'loading' || hasTriggeredLocationFetch) {
-      return;
-    }
-
-    setHasTriggeredLocationFetch(true);
-    void refreshLocation();
-  }, [
-    hasTriggeredLocationFetch,
-    location,
-    locationStatus,
-    refreshLocation,
-    usingCurrentLocation,
-  ]);
+  }, [selectedFarm?.id, selectedFarm?.soilType]);
 
   const sourceOptions = useMemo(
     () => [
-      ...farms.map((farm) => ({ value: farm.id, label: farm.name })),
-      { value: CURRENT_LOCATION_SOURCE, label: 'Current location' },
+      ...farms.map((f) => ({ value: f.id, label: f.name })),
+      { value: CURRENT_LOCATION_SOURCE, label: '📍 Use current location' },
     ],
     [farms],
   );
 
-  const locationBadgeTone =
-    locationStatus === 'ready'
-      ? 'success'
-      : locationStatus === 'loading'
-        ? 'info'
-        : 'warning';
-  const locationBadgeLabel =
-    locationStatus === 'ready'
-      ? 'GPS ready'
-      : locationStatus === 'loading'
-        ? 'Finding GPS'
-        : 'GPS needed';
-
-  const handleSourceChange = (value: string) => {
-    setSelectedSourceId(value);
+  const clearResult = useCallback(() => {
     setMessage(null);
     setResult(null);
-  };
+  }, []);
 
-  const handleSoilTypeChange = (value: string) => {
-    setSoilType(value);
-    setMessage(null);
-    setResult(null);
-  };
+  // ─── Derived labels for data sources summary ───────────
+  const locationLabel = usingCurrentLocation
+    ? gps.location?.label ?? authUser?.district ?? authUser?.state ?? 'GPS'
+    : `${selectedFarm?.name ?? 'Farm'} — ${selectedFarm?.district ?? ''}`;
 
-  const handleSeasonKeyChange = (value: string) => {
-    setSeasonKey(value as SeasonKey);
-    setMessage(null);
-    setResult(null);
-  };
+  const weatherLabel = `5-year ${seasonKeyOptions.find((o) => o.value === seasonKey)?.label ?? seasonKey} averages`;
 
-  const seasonProfile = useMemo(
-    () => ({ seasonKey, sowingMonth }),
-    [seasonKey, sowingMonth],
-  );
+  const soilLabel =
+    soilType !== 'NOT_SURE'
+      ? soilOptions.find((o) => o.value === soilType)?.label ?? soilType
+      : 'Not confirmed';
 
+  // ─── Run prediction ────────────────────────────────────
   const runPrediction = async () => {
     if (!token) {
       setMessage('Sign in again to use crop prediction.');
       return;
     }
-
     if (!usingCurrentLocation && !selectedFarm) {
       setMessage('Choose a plot before checking crop fit.');
       return;
     }
 
-    if (usingCurrentLocation && !location) {
-      setMessage(
-        locationMessage ??
-          'Current location is needed before running a new-location prediction.',
-      );
-      return;
-    }
-
-    if (usingCurrentLocation && !authUser?.state.trim()) {
-      setMessage(
-        'Your saved profile location is incomplete, so current-location prediction is unavailable right now.',
-      );
-      return;
-    }
-
     setBusy(true);
     setMessage(null);
+    setExpandedCropIndex(null);
 
-    // Strip NOT_SURE — API handles unknown soil via UNKNOWN_DEFAULT path
     const effectiveSoilType = soilType === 'NOT_SURE' ? undefined : soilType;
+    const sowingMonth = SEASON_DEFAULT_MONTHS[seasonKey];
+    const farmSizeAcre = parseFloat(farmSizeText) || 2.5;
 
     try {
       const payload = usingCurrentLocation
-        ? buildCurrentLocationPayload({
-            state: authUser?.state ?? '',
-            district: authUser?.district ?? undefined,
-            village: authUser?.village ?? undefined,
-            latitude: location?.latitude ?? 0,
-            longitude: location?.longitude ?? 0,
-            seasonProfile,
+        ? {
+            explorerContext: {
+              state: authUser?.state ?? '',
+              district: authUser?.district ?? undefined,
+              village: authUser?.village ?? undefined,
+              irrigationType: irrigationType as 'MANUAL',
+              farmSizeAcre,
+              ...(gps.location
+                ? {
+                    latitude: gps.location.latitude,
+                    longitude: gps.location.longitude,
+                  }
+                : {}),
+            },
+            seasonProfile: { seasonKey, sowingMonth },
             soilType: effectiveSoilType,
-          })
+            waterSupplyLevel: waterSupply,
+          }
         : {
             farmPlotId: selectedFarm?.id,
-            seasonProfile,
+            seasonProfile: { seasonKey, sowingMonth },
             soilType: effectiveSoilType,
+            waterSupplyLevel: waterSupply,
           };
 
       const response = await apiPost<CropSuggestionResponse>(
@@ -259,7 +177,6 @@ export default function CropPredictionRoute() {
         payload,
         token,
       );
-
       setResult(response);
     } catch (error) {
       setMessage(
@@ -276,397 +193,658 @@ export default function CropPredictionRoute() {
     <>
       <Stack.Screen options={{ title: 'Crop prediction' }} />
       <PageShell
-        eyebrow="Prediction tool"
-        title="Crop prediction"
-        subtitle="Choose a plot or current location, set the season and soil type. IntelliFarm infers weather and climate automatically."
+        eyebrow="AI prediction"
+        title="Smart crop recommendation"
+        subtitle="Get AI-powered crop recommendations with yield estimates, profit projections, and risk analysis."
       >
-        <OptionChipGroup
-          title="Plot or location"
+        {/* ─── Input Section ─── */}
+        <SelectField
+          label="Plot or location"
           value={selectedSourceId}
           options={sourceOptions}
-          onChange={handleSourceChange}
-        />
-
-        {selectedFarm ? (
-          <SunriseCard accent="soft" title="Saved plot context">
-            <View style={{ gap: spacing.sm }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.xs,
-                }}
-              >
-                <MapPin color={palette.sky} size={16} />
-                <Text selectable style={bodyText}>
-                  {selectedFarm.village}, {selectedFarm.district}
-                </Text>
-              </View>
-              <Text selectable style={bodyText}>
-                {selectedFarm.area} acre plot with{' '}
-                {formatIrrigationLabel(selectedFarm.irrigationType)} irrigation.
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                <MetricBadge
-                  label={
-                    selectedFarm.soilType
-                      ? `Saved soil ${getSoilLabel(selectedFarm.soilType)}`
-                      : 'Soil not saved yet'
-                  }
-                  tone={selectedFarm.soilType ? 'info' : 'neutral'}
-                />
-              </View>
-            </View>
-          </SunriseCard>
-        ) : (
-          <SunriseCard accent="info" title="Current location context">
-            <View style={{ gap: spacing.sm }}>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                <MetricBadge label={locationBadgeLabel} tone={locationBadgeTone} />
-              </View>
-              <Text selectable style={bodyText}>
-                {location
-                  ? 'Weather and climate matching will use your phone GPS for this prediction.'
-                  : locationMessage ??
-                    'Allow location access so IntelliFarm can run a new-location prediction from where you are.'}
-              </Text>
-              {location ? (
-                <Text selectable style={metaText}>
-                  {formatCoordinate(location.latitude)}, {formatCoordinate(location.longitude)}
-                </Text>
-              ) : null}
-              <Button
-                label={
-                  locationStatus === 'loading'
-                    ? 'Reading location...'
-                    : location
-                      ? 'Refresh location'
-                      : 'Use current location'
-                }
-                variant="soft"
-                loading={locationStatus === 'loading'}
-                onPress={() => {
-                  setHasTriggeredLocationFetch(true);
-                  void refreshLocation();
-                }}
-              />
-            </View>
-          </SunriseCard>
-        )}
-
-        {/* Season Selection */}
-        <OptionChipGroup
-          title="Season"
-          value={seasonKey}
-          options={seasonKeyOptions.filter((o) => o.value !== 'CUSTOM').map((o) => ({
-            value: o.value,
-            label: o.label,
-          }))}
-          onChange={handleSeasonKeyChange}
-        />
-
-        {/* Sowing Month Picker */}
-        <View style={{ gap: spacing.sm }}>
-          <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 14 }}>
-            Sowing month
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowMonthPicker(!showMonthPicker)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: spacing.md,
-              paddingVertical: 12,
-              borderRadius: radii.xl,
-              borderWidth: 1,
-              borderColor: palette.outline,
-              backgroundColor: palette.white,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <CalendarDays color={palette.leafDark} size={16} />
-              <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 14 }}>
-                {MONTH_LABELS[sowingMonth - 1]}
-              </Text>
-              <MetricBadge label={seasonKey.charAt(0) + seasonKey.slice(1).toLowerCase()} tone="info" />
-            </View>
-            {showMonthPicker
-              ? <ChevronUp color={palette.inkMuted} size={16} />
-              : <ChevronDown color={palette.inkMuted} size={16} />
-            }
-          </TouchableOpacity>
-          {showMonthPicker ? (
-            <View
-              style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                gap: spacing.xs,
-                padding: spacing.sm,
-                backgroundColor: palette.white,
-                borderRadius: radii.xl,
-                borderWidth: 1,
-                borderColor: palette.outline,
-              }}
-            >
-              {MONTH_LABELS.map((label, index) => {
-                const month = index + 1;
-                const active = sowingMonth === month;
-                return (
-                  <TouchableOpacity
-                    key={month}
-                    onPress={() => {
-                      setSowingMonth(month);
-                      setShowMonthPicker(false);
-                    }}
-                    style={{
-                      paddingHorizontal: spacing.sm,
-                      paddingVertical: 6,
-                      borderRadius: radii.pill,
-                      borderWidth: 1,
-                      borderColor: active ? palette.leaf : palette.outline,
-                      backgroundColor: active ? palette.leaf : 'transparent',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: active ? palette.white : palette.inkSoft,
-                        fontFamily: active ? typography.bodyStrong : typography.bodyRegular,
-                        fontSize: 12,
-                      }}
-                    >
-                      {label.slice(0, 3)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : null}
-        </View>
-
-        <OptionChipGroup
-          title="Soil type"
-          value={soilType}
-          options={soilOptions.map((option) => ({
-            value: option.value,
-            label: option.label,
-          }))}
-          onChange={handleSoilTypeChange}
-        />
-
-        {message ? (
-          <SunriseCard accent="warning" title="Prediction note">
-            <Text selectable style={bodyText}>
-              {message}
-            </Text>
-          </SunriseCard>
-        ) : null}
-
-        <Button
-          label={busy ? 'Checking crop fit...' : 'Run crop prediction'}
-          loading={busy}
-          onPress={() => {
-            void runPrediction();
+          onChange={(v) => {
+            setSelectedSourceId(v);
+            clearResult();
           }}
         />
 
-        {result ? (
-          <View style={{ gap: spacing.md }}>
-            <SectionTitle
-              eyebrow="Prediction result"
-              title="Best-fit crops"
-              action={
-                <MetricBadge
-                  label={formatConfidenceLabel(result.inputConfidence)}
-                  tone={confidenceToneMap[result.inputConfidence]}
-                />
-              }
-            />
-
-            
-            <View style={{ gap: spacing.sm }}>
-              {result.suggestions.slice(0, 3).map((item, index) => (
-                <CompactListCard
-                  key={item.cropName}
-                  title={item.cropName}
-                  subtitle={item.rationale}
-                  meta={index === 0 ? 'Best current match' : 'Alternative fit'}
-                  tone={index === 0 ? 'feature' : 'neutral'}
-                  prefix={
-                    <View
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 14,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: palette.leafMist,
-                      }}
-                    >
-                      <Sprout color={palette.leafDark} size={18} />
-                    </View>
-                  }
-                  trailing={
-                    <MetricBadge
-                      label={`${Math.round(item.score * 100)}% fit`}
-                      tone={index === 0 ? 'success' : 'info'}
-                    />
-                  }
-                />
-              ))}
-            </View>
-
-            {selectedFarm ? (
-              <Button
-                label="Continue to season setup"
-                onPress={() =>
-                  router.push({
-                    pathname: '/season',
-                    params: { farmPlotId: selectedFarm.id },
-                  })
-                }
-              />
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* Prediction History */}
-        <View style={{ gap: spacing.sm }}>
-          <TouchableOpacity
-            onPress={() => setShowHistory(!showHistory)}
+        {/* GPS status for current location */}
+        {usingCurrentLocation ? (
+          <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               gap: spacing.xs,
-              paddingVertical: spacing.xs,
+              paddingHorizontal: spacing.sm,
             }}
           >
-            <History color={palette.inkMuted} size={16} />
-            <Text
-              style={{
-                color: palette.inkSoft,
-                fontFamily: typography.bodyStrong,
-                fontSize: 13,
-                flex: 1,
-              }}
-            >
-              Past predictions
-            </Text>
-            {showHistory
-              ? <ChevronUp color={palette.inkMuted} size={15} />
-              : <ChevronDown color={palette.inkMuted} size={15} />
-            }
-          </TouchableOpacity>
+            {gps.status === 'loading' ? (
+              <>
+                <ActivityIndicator size="small" color={palette.leaf} />
+                <Text style={{ ...bodyText, color: palette.inkSoft }}>
+                  Fetching GPS location…
+                </Text>
+              </>
+            ) : gps.status === 'ready' && gps.location ? (
+              <>
+                <MapPin color={palette.leaf} size={14} />
+                <Text style={{ ...bodyText, color: palette.leafDark }}>
+                  Near {gps.location.label}
+                </Text>
+              </>
+            ) : gps.status === 'error' ? (
+              <>
+                <MapPin color={palette.terracotta} size={14} />
+                <Text style={{ ...bodyText, color: palette.inkSoft }}>
+                  Using profile: {authUser?.district || authUser?.state || 'India'}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        ) : selectedFarm ? (
+          <PlotContextCard farm={selectedFarm} />
+        ) : null}
 
-          {showHistory ? (
-            historyQuery.isLoading ? (
-              <Text style={metaText}>Loading history...</Text>
-            ) : (historyQuery.data?.runs ?? []).length === 0 ? (
-              <Text style={metaText}>No past predictions found for this plot.</Text>
-            ) : (
-              <View style={{ gap: spacing.xs }}>
-                {(historyQuery.data?.runs ?? []).map((run) => {
-                  const topCrop = run.outputJson?.suggestions?.[0];
-                  const confidence = run.outputJson?.inputConfidence;
-                  const label = run.outputJson?.seasonClimate?.label ?? '';
-                  return (
-                    <View
-                      key={run.id}
-                      style={{
-                        padding: spacing.md,
-                        borderRadius: radii.xl,
-                        borderWidth: 1,
-                        borderColor: palette.outline,
-                        backgroundColor: palette.white,
-                        gap: spacing.xs,
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 13 }}>
-                          {topCrop?.cropName ?? 'No suggestion'}
-                        </Text>
-                        {confidence ? (
-                          <MetricBadge
-                            label={formatConfidenceLabel(confidence)}
-                            tone={confidenceToneMap[confidence]}
-                          />
-                        ) : null}
-                      </View>
-                      {label ? (
-                        <Text style={metaText}>{label}</Text>
-                      ) : null}
-                      <Text style={metaText}>
-                        {new Date(run.createdAt).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )
-          ) : null}
-        </View>
+        <SelectField
+          label="Season"
+          value={seasonKey}
+          options={seasonKeyOptions.map((o) => ({
+            value: o.value,
+            label: o.label,
+            description: o.description,
+          }))}
+          onChange={(v) => {
+            setSeasonKey(v as SeasonKey);
+            clearResult();
+          }}
+        />
+
+        <SelectField
+          label="Soil type"
+          value={soilType}
+          options={soilOptions.map((o) => ({ value: o.value, label: o.label }))}
+          onChange={(v) => {
+            setSoilType(v);
+            clearResult();
+          }}
+        />
+
+        <SelectField
+          label="Water supply"
+          value={waterSupply}
+          options={waterSupplyOptions.map((o) => ({
+            value: o.value,
+            label: o.label,
+            description: o.description,
+          }))}
+          onChange={(v) => {
+            setWaterSupply(v);
+            clearResult();
+          }}
+        />
+
+        {/* Explorer-only fields */}
+        {usingCurrentLocation ? (
+          <View style={{ gap: spacing.md }}>
+            <SelectField
+              label="Irrigation type"
+              value={irrigationType}
+              options={irrigationOptions.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
+              onChange={(v) => {
+                setIrrigationType(v);
+                clearResult();
+              }}
+            />
+
+            <View style={{ gap: spacing.xs }}>
+              <Text
+                style={{
+                  color: palette.ink,
+                  fontFamily: typography.bodyStrong,
+                  fontSize: 14,
+                }}
+              >
+                Farm size (acres)
+              </Text>
+              <TextInput
+                value={farmSizeText}
+                onChangeText={(t) => {
+                  setFarmSizeText(t);
+                  clearResult();
+                }}
+                keyboardType="decimal-pad"
+                placeholder="e.g. 2.5"
+                placeholderTextColor={palette.inkMuted}
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 14,
+                  borderRadius: radii.lg,
+                  backgroundColor: palette.white,
+                  borderWidth: 1,
+                  borderColor: palette.outline,
+                  color: palette.ink,
+                  fontFamily: typography.bodyStrong,
+                  fontSize: 15,
+                }}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {/* Data sources summary */}
+        <SunriseCard accent="soft" title="Data sources">
+          <View style={{ gap: 6 }}>
+            <DataSourceRow
+              icon={<MapPin color={palette.sky} size={13} />}
+              label="Location"
+              value={locationLabel}
+            />
+            <DataSourceRow
+              icon={<CloudSun color="#F59E0B" size={13} />}
+              label="Weather"
+              value={weatherLabel}
+            />
+            <DataSourceRow
+              icon={<Sprout color={palette.leaf} size={13} />}
+              label="Soil"
+              value={soilLabel}
+            />
+            <DataSourceRow
+              icon={<Droplets color="#3B82F6" size={13} />}
+              label="Water"
+              value={waterSupplyOptions.find((o) => o.value === waterSupply)?.label ?? waterSupply}
+            />
+            {usingCurrentLocation ? (
+              <DataSourceRow
+                icon={<Sprout color={palette.inkSoft} size={13} />}
+                label="Farm size"
+                value={`${farmSizeText || '2.5'} acres`}
+              />
+            ) : null}
+          </View>
+        </SunriseCard>
+
+        {message ? (
+          <SunriseCard accent="warning" title="Note">
+            <Text selectable style={bodyText}>{message}</Text>
+          </SunriseCard>
+        ) : null}
+
+        <Button
+          label={busy ? 'Analyzing crops...' : 'Run AI crop prediction'}
+          loading={busy}
+          onPress={() => void runPrediction()}
+        />
+
+        {/* ─── Results ─── */}
+        {result ? (
+          <View style={{ gap: spacing.lg }}>
+            {result.cropMustNotBeGrown ? (
+              <CropAvoidWarning cropName={result.cropMustNotBeGrown} />
+            ) : null}
+
+            <ClimateContextRow result={result} />
+
+            {result.topCrops.map((crop, index) => (
+              <CropRecommendationCard
+                key={crop.cropName}
+                crop={crop}
+                rank={index + 1}
+                isExpanded={expandedCropIndex === index}
+                onToggle={() =>
+                  setExpandedCropIndex(expandedCropIndex === index ? null : index)
+                }
+                farmPlotId={selectedFarm?.id}
+                router={router}
+              />
+            ))}
+
+            {result.assumptions.length > 0 ? (
+              <AssumptionsCard assumptions={result.assumptions} />
+            ) : null}
+          </View>
+        ) : null}
       </PageShell>
     </>
   );
 }
 
-function buildCurrentLocationPayload(input: {
-  state: string;
-  district?: string;
-  village?: string;
-  latitude: number;
-  longitude: number;
-  seasonProfile: {
-    seasonKey: SeasonKey;
-    sowingMonth: number;
-  };
-  soilType?: string;
+function DataSourceRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      {icon}
+      <Text style={{ color: palette.inkMuted, fontFamily: typography.bodyRegular, fontSize: 12, width: 62 }}>
+        {label}
+      </Text>
+      <Text style={{ flex: 1, color: palette.ink, fontFamily: typography.bodyStrong, fontSize: 12 }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+/* ─── Sub-components ─────────────────────────────────────── */
+
+function PlotContextCard({ farm }: { farm: { name: string; village: string; district: string; area: number; irrigationType: string; soilType?: string | null } }) {
+  return (
+    <SunriseCard accent="soft" title="Plot context">
+      <View style={{ gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <MapPin color={palette.sky} size={14} />
+          <Text style={bodyText}>{farm.village}, {farm.district}</Text>
+        </View>
+        <Text style={bodyText}>
+          {farm.area} acre · {farm.irrigationType.toLowerCase().replace(/_/g, ' ')} irrigation
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+          <MetricBadge
+            label={farm.soilType ? soilOptions.find((o) => o.value === farm.soilType)?.label ?? 'Not sure' : 'Soil not set'}
+            tone={farm.soilType ? 'info' : 'neutral'}
+          />
+        </View>
+      </View>
+    </SunriseCard>
+  );
+}
+
+function CropAvoidWarning({ cropName }: { cropName: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        padding: spacing.md,
+        borderRadius: radii.xl,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+      }}
+    >
+      <ShieldAlert color="#DC2626" size={20} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: '#991B1B', fontFamily: typography.bodyStrong, fontSize: 13 }}>
+          Avoid growing {cropName}
+        </Text>
+        <Text style={{ color: '#B91C1C', fontFamily: typography.bodyRegular, fontSize: 12, marginTop: 2 }}>
+          The AI model recommends against this crop for your conditions.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function ClimateContextRow({ result }: { result: CropSuggestionResponse }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+      <MiniMetric
+        icon={<TrendingUp color="#F59E0B" size={14} />}
+        label="Temp"
+        value={`${result.weather.currentTemperatureC}°C`}
+        bg="#FFFBEB"
+      />
+      <MiniMetric
+        icon={<Droplets color="#3B82F6" size={14} />}
+        label="Humidity"
+        value={`${result.weather.humidityPercent}%`}
+        bg="#EFF6FF"
+      />
+      <MiniMetric
+        icon={<Droplets color="#10B981" size={14} />}
+        label="Rain"
+        value={`${result.weather.rainfallExpectedMm}mm`}
+        bg="#ECFDF5"
+      />
+    </View>
+  );
+}
+
+function MiniMetric({ icon, label, value, bg }: { icon: React.ReactNode; label: string; value: string; bg: string }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        padding: spacing.sm,
+        borderRadius: radii.lg,
+        backgroundColor: bg,
+        alignItems: 'center',
+        gap: 4,
+      }}
+    >
+      {icon}
+      <Text style={{ fontFamily: typography.bodyRegular, fontSize: 10, color: palette.inkMuted }}>{label}</Text>
+      <Text style={{ fontFamily: typography.bodyStrong, fontSize: 13, color: palette.ink }}>{value}</Text>
+    </View>
+  );
+}
+
+function CropRecommendationCard({
+  crop,
+  rank,
+  isExpanded,
+  onToggle,
+  farmPlotId,
+  router,
+}: {
+  crop: CropRecommendation;
+  rank: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+  farmPlotId?: string;
+  router: ReturnType<typeof useRouter>;
 }) {
-  return {
-    explorerContext: {
-      state: input.state.trim(),
-      district: input.district?.trim() || undefined,
-      village: input.village?.trim() || undefined,
-      irrigationType: 'MANUAL' as const,
-      latitude: input.latitude,
-      longitude: input.longitude,
-    },
-    seasonProfile: input.seasonProfile,
-    soilType: input.soilType || undefined,
-  };
+  const isProfitable = crop.averageProfitRs > 0;
+  const riskColor = crop.failureRiskPct > 50 ? '#DC2626' : crop.failureRiskPct > 20 ? '#F59E0B' : '#10B981';
+  const riskLabel = crop.failureRiskPct > 50 ? 'High risk' : crop.failureRiskPct > 20 ? 'Medium risk' : 'Low risk';
+  const rankColors = ['#10B981', '#3B82F6', '#8B5CF6'];
+  const rankBg = ['#ECFDF5', '#EFF6FF', '#F5F3FF'];
+
+  return (
+    <View
+      style={{
+        borderRadius: radii.xl,
+        borderWidth: 1,
+        borderColor: rank === 1 ? '#BBF7D0' : palette.outline,
+        backgroundColor: palette.white,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <TouchableOpacity onPress={onToggle} activeOpacity={0.7}>
+        <View style={{ padding: spacing.md, gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 12,
+                  backgroundColor: rankBg[rank - 1] ?? rankBg[2],
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Sprout color={rankColors[rank - 1] ?? rankColors[2]} size={16} />
+              </View>
+              <View>
+                <Text style={{ fontFamily: typography.bodyStrong, fontSize: 15, color: palette.ink }}>
+                  {crop.cropName}
+                </Text>
+                <Text style={{ fontFamily: typography.bodyRegular, fontSize: 11, color: palette.inkMuted }}>
+                  {rank === 1 ? 'Best match' : `Option #${rank}`}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <View
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: radii.pill,
+                  backgroundColor: rankBg[rank - 1] ?? rankBg[2],
+                }}
+              >
+                <Text style={{ fontFamily: typography.bodyStrong, fontSize: 12, color: rankColors[rank - 1] ?? rankColors[2] }}>
+                  Score {crop.finalScore.toFixed(0)}
+                </Text>
+              </View>
+              {isExpanded ? (
+                <ChevronUp color={palette.inkMuted} size={16} />
+              ) : (
+                <ChevronDown color={palette.inkMuted} size={16} />
+              )}
+            </View>
+          </View>
+
+          {/* Key metrics row */}
+          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+            <MetricPill
+              icon={<Wheat color={isProfitable ? '#10B981' : '#DC2626'} size={12} />}
+              label={`₹${formatCompact(crop.averageProfitRs)}`}
+              sublabel={isProfitable ? 'profit' : 'loss'}
+              bg={isProfitable ? '#ECFDF5' : '#FEF2F2'}
+              textColor={isProfitable ? '#059669' : '#DC2626'}
+            />
+            <MetricPill
+              icon={<BarChart3 color="#3B82F6" size={12} />}
+              label={`${crop.averageYieldTonnePerHectare} t/ha`}
+              sublabel="yield"
+              bg="#EFF6FF"
+              textColor="#2563EB"
+            />
+            <MetricPill
+              icon={<ShieldAlert color={riskColor} size={12} />}
+              label={`${crop.failureRiskPct}%`}
+              sublabel={riskLabel}
+              bg={crop.failureRiskPct > 50 ? '#FEF2F2' : crop.failureRiskPct > 20 ? '#FFFBEB' : '#ECFDF5'}
+              textColor={riskColor}
+            />
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      {/* Expanded details */}
+      {isExpanded ? (
+        <View style={{ borderTopWidth: 1, borderTopColor: palette.outline }}>
+          {/* Financial breakdown */}
+          <View style={{ padding: spacing.md, gap: spacing.sm }}>
+            <Text style={{ fontFamily: typography.bodyStrong, fontSize: 13, color: palette.ink }}>
+              Financial outlook
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <FinanceRow label="Revenue" value={crop.averageRevenueRs} positive />
+              <FinanceRow label="Cost" value={crop.estimatedCostRs} positive={false} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <FinanceRow label="Profit" value={crop.averageProfitRs} positive={crop.averageProfitRs > 0} />
+            </View>
+          </View>
+
+          {/* Yield range */}
+          <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.xs }}>
+            <Text style={{ fontFamily: typography.bodyStrong, fontSize: 13, color: palette.ink }}>
+              Yield range (t/ha)
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <ArrowDownRight color="#DC2626" size={12} />
+                <Text style={{ fontFamily: typography.bodyRegular, fontSize: 12, color: '#DC2626' }}>
+                  {crop.worstCaseYieldTonnePerHectare}
+                </Text>
+              </View>
+              <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                <View
+                  style={{
+                    width: `${Math.min(100, (crop.averageYieldTonnePerHectare / Math.max(crop.bestCaseYieldTonnePerHectare, 1)) * 100)}%`,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: '#10B981',
+                  }}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <ArrowUpRight color="#10B981" size={12} />
+                <Text style={{ fontFamily: typography.bodyRegular, fontSize: 12, color: '#10B981' }}>
+                  {crop.bestCaseYieldTonnePerHectare}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* RAG Explanations */}
+          {crop.ragExplanation.length > 0 ? (
+            <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm }}>
+              <Text style={{ fontFamily: typography.bodyStrong, fontSize: 13, color: palette.ink }}>
+                AI analysis
+              </Text>
+              {crop.ragExplanation.map((section) => (
+                <View
+                  key={section.heading}
+                  style={{
+                    padding: spacing.sm,
+                    borderRadius: radii.lg,
+                    backgroundColor: '#F9FAFB',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ fontFamily: typography.bodyStrong, fontSize: 12, color: palette.leafDark }}>
+                    {section.heading}
+                  </Text>
+                  <Text style={{ fontFamily: typography.bodyRegular, fontSize: 11, color: palette.inkSoft, lineHeight: 16 }}>
+                    {section.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Suggestion */}
+          <View
+            style={{
+              marginHorizontal: spacing.md,
+              marginBottom: spacing.md,
+              padding: spacing.sm,
+              borderRadius: radii.lg,
+              backgroundColor: '#F0FDF4',
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: spacing.xs,
+            }}
+          >
+            <Sparkles color="#10B981" size={14} style={{ marginTop: 2 }} />
+            <Text style={{ flex: 1, fontFamily: typography.bodyRegular, fontSize: 12, color: '#166534', lineHeight: 17 }}>
+              {crop.suggestion}
+            </Text>
+          </View>
+
+          {/* CTA */}
+          {farmPlotId ? (
+            <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
+              <Button
+                label={`Plan ${crop.cropName} season`}
+                variant="soft"
+                onPress={() =>
+                  router.push({
+                    pathname: '/season',
+                    params: { farmPlotId },
+                  })
+                }
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
-function formatConfidenceLabel(value: CropSuggestionResponse['inputConfidence']) {
-  return value === 'HIGH'
-    ? 'High confidence'
-    : value === 'MEDIUM'
-      ? 'Medium confidence'
-      : 'Low confidence';
+function MetricPill({
+  icon,
+  label,
+  sublabel,
+  bg,
+  textColor,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sublabel: string;
+  bg: string;
+  textColor: string;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: radii.lg,
+        backgroundColor: bg,
+      }}
+    >
+      {icon}
+      <View>
+        <Text style={{ fontFamily: typography.bodyStrong, fontSize: 12, color: textColor }}>{label}</Text>
+        <Text style={{ fontFamily: typography.bodyRegular, fontSize: 9, color: textColor, opacity: 0.7 }}>{sublabel}</Text>
+      </View>
+    </View>
+  );
 }
 
-const confidenceToneMap: Record<
-  CropSuggestionResponse['inputConfidence'],
-  'success' | 'warning' | 'danger'
-> = {
-  HIGH: 'success',
-  MEDIUM: 'warning',
-  LOW: 'danger',
-};
-
-function formatIrrigationLabel(value: string) {
-  return value.toLowerCase().replace(/_/g, ' ');
+function FinanceRow({ label, value, positive }: { label: string; value: number; positive: boolean }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        padding: spacing.sm,
+        borderRadius: radii.lg,
+        backgroundColor: '#F9FAFB',
+        gap: 2,
+      }}
+    >
+      <Text style={{ fontFamily: typography.bodyRegular, fontSize: 10, color: palette.inkMuted }}>{label}</Text>
+      <Text
+        style={{
+          fontFamily: typography.bodyStrong,
+          fontSize: 14,
+          color: positive ? '#059669' : '#DC2626',
+        }}
+      >
+        ₹{formatCompact(Math.abs(value))}
+      </Text>
+    </View>
+  );
 }
 
-function getSoilLabel(value: string | null | undefined) {
-  return soilOptions.find((option) => option.value === value)?.label ?? 'Not sure';
+function AssumptionsCard({ assumptions }: { assumptions: string[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? assumptions : assumptions.slice(0, 2);
+
+  return (
+    <View
+      style={{
+        padding: spacing.md,
+        borderRadius: radii.xl,
+        borderWidth: 1,
+        borderColor: palette.outline,
+        backgroundColor: palette.white,
+        gap: spacing.sm,
+      }}
+    >
+      <Text style={{ fontFamily: typography.bodyStrong, fontSize: 13, color: palette.ink }}>
+        Model assumptions
+      </Text>
+      {visible.map((a) => (
+        <View key={a} style={{ flexDirection: 'row', gap: spacing.xs }}>
+          <Text style={{ color: palette.leafDark, fontSize: 10, marginTop: 3 }}>●</Text>
+          <Text style={{ flex: 1, fontFamily: typography.bodyRegular, fontSize: 11, color: palette.inkSoft, lineHeight: 16 }}>
+            {a}
+          </Text>
+        </View>
+      ))}
+      {assumptions.length > 2 ? (
+        <TouchableOpacity onPress={() => setShowAll(!showAll)}>
+          <Text style={{ fontFamily: typography.bodyStrong, fontSize: 11, color: palette.leaf }}>
+            {showAll ? 'Show less' : `Show all ${assumptions.length} assumptions`}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
 }
 
-function formatCoordinate(value: number) {
-  return value.toFixed(4);
+/* ─── Helpers ──────────────────────────────────────────────── */
+
+function formatCompact(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 100000) return `${(value / 100000).toFixed(1)}L`;
+  if (abs >= 1000) return `${(value / 1000).toFixed(1)}K`;
+  return value.toFixed(0);
 }
 
 const bodyText = {
@@ -674,17 +852,4 @@ const bodyText = {
   fontFamily: typography.bodyRegular,
   fontSize: 13,
   lineHeight: 19,
-};
-
-const bulletText = {
-  color: palette.inkSoft,
-  fontFamily: typography.bodyRegular,
-  fontSize: 12,
-  lineHeight: 18,
-};
-
-const metaText = {
-  color: palette.inkMuted,
-  fontFamily: typography.bodyRegular,
-  fontSize: 12,
 };

@@ -11,6 +11,7 @@ import {
   communityReportReasons,
   communityReportTargets,
   cropSeasonStatuses,
+  deviceStatuses,
   expenseCategories,
   expenseScopes,
   expenseStatuses,
@@ -27,6 +28,10 @@ import {
   predictionStatuses,
   predictionTypes,
   preferredLanguages,
+  pumpCommandStatuses,
+  pumpControlModes,
+  pumpEventSources,
+  pumpStates,
   seasonClimateMethods,
   seasonKeys,
   severityLevels,
@@ -295,21 +300,55 @@ export const dashboardQuerySchema = weatherLocationQuerySchema.extend({
   cropSeasonId: z.string().uuid().optional(),
 });
 
+export const ingestTelemetrySchema = z.object({
+  hardwareId: z.string().trim().min(4).max(120),
+  deviceName: z.string().trim().min(2).max(80).optional(),
+  temperatureC: z.number().min(-40).max(100),
+  humidityPercent: z.number().min(0).max(100),
+  soilMoisturePercent: z.number().min(0).max(100),
+  pumpState: z.enum(pumpStates),
+  pumpControlMode: z.enum(pumpControlModes).optional(),
+  deviceStatus: z.enum(deviceStatuses).optional(),
+  batteryPercent: z.number().min(0).max(100).optional(),
+  signalStrength: z.number().int().min(-150).max(0).optional(),
+  recordedAt: z.coerce.date().optional(),
+  rawPayload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const issuePumpCommandSchema = z.object({
+  targetMode: z.enum(pumpControlModes),
+  reason: z.string().trim().max(160).optional(),
+});
+
+export const updateDeviceSettingsSchema = z
+  .object({
+    autoIrrigationEnabled: bodyBooleanSchema.optional(),
+    moistureLowThreshold: z.coerce.number().min(0).max(100).optional(),
+    moistureRecoveryThreshold: z.coerce.number().min(0).max(100).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'Provide at least one device setting to update',
+  })
+  .superRefine((value, context) => {
+    if (
+      typeof value.moistureLowThreshold === 'number' &&
+      typeof value.moistureRecoveryThreshold === 'number' &&
+      value.moistureLowThreshold >= value.moistureRecoveryThreshold
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Recovery threshold must be greater than low threshold',
+        path: ['moistureRecoveryThreshold'],
+      });
+    }
+  });
+
 export const createDiseaseReportSchema = z
   .object({
     cropSeasonId: z.string().uuid().optional(),
     placeLabel: z.string().trim().min(2).max(80).optional(),
     userNote: z.string().trim().max(500).optional(),
     captureMode: z.enum(diseaseCaptureModes).default('CAMERA_DUAL_ANGLE'),
-  })
-  .superRefine((value, context) => {
-    if (!value.cropSeasonId && !value.placeLabel) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Choose a saved crop season or enter a new place label',
-        path: ['cropSeasonId'],
-      });
-    }
   });
 
 export const soilMetricsSchema = z
@@ -332,12 +371,20 @@ export const seasonProfileSchema = z.object({
   sowingMonth: z.number().int().min(1).max(12),
 });
 
+export const waterSupplyLevels = [
+  'PLENTY',
+  'MODERATE',
+  'LIMITED',
+  'SCARCE',
+] as const;
+
 export const explorerContextSchema = z
   .object({
     state: z.string().trim().min(2).max(80),
     district: z.string().trim().min(2).max(80).optional(),
     village: z.string().trim().min(2).max(80).optional(),
     irrigationType: z.enum(irrigationTypes),
+    farmSizeAcre: z.number().positive().max(500).optional(),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
   })
@@ -378,6 +425,7 @@ export const cropSuggestionPredictionSchema = z.object({
   seasonProfile: seasonProfileSchema,
   soilType: z.enum(soilTypes).optional(),
   soilMetrics: soilMetricsSchema.optional(),
+  waterSupplyLevel: z.enum(waterSupplyLevels).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   weatherOverride: z
@@ -657,6 +705,67 @@ export const weatherSummarySchema = z.object({
   freshness: weatherFreshnessSchema,
 });
 
+export const pumpCommandSummarySchema = z.object({
+  id: z.string().uuid(),
+  targetMode: z.enum(pumpControlModes),
+  status: z.enum(pumpCommandStatuses),
+  reason: z.string().nullable(),
+  issuedAt: z.string(),
+  acknowledgedAt: z.string().nullable(),
+  appliedAt: z.string().nullable(),
+  expiresAt: z.string(),
+});
+
+export const pumpEventSchema = z.object({
+  id: z.string().uuid(),
+  source: z.enum(pumpEventSources),
+  previousState: z.enum(pumpStates).nullable(),
+  nextState: z.enum(pumpStates),
+  reason: z.string(),
+  createdAt: z.string(),
+});
+
+export const deviceTelemetryPointSchema = z.object({
+  id: z.string().uuid(),
+  temperatureC: z.number(),
+  humidityPercent: z.number().min(0).max(100),
+  soilMoisturePercent: z.number().min(0).max(100),
+  pumpState: z.enum(pumpStates),
+  batteryPercent: z.number().nullable(),
+  signalStrength: z.number().nullable(),
+  recordedAt: z.string(),
+});
+
+export const deviceLatestReadingSchema = z.object({
+  temperatureC: z.number(),
+  humidityPercent: z.number().min(0).max(100),
+  soilMoisturePercent: z.number().min(0).max(100),
+  pumpState: z.enum(pumpStates),
+  batteryPercent: z.number().nullable(),
+  signalStrength: z.number().nullable(),
+  recordedAt: z.string(),
+});
+
+export const deviceOverviewSchema = z.object({
+  deviceId: z.string().uuid(),
+  hardwareId: z.string(),
+  name: z.string(),
+  status: z.enum(deviceStatuses),
+  pumpState: z.enum(pumpStates),
+  pumpControlMode: z.enum(pumpControlModes),
+  autoIrrigationEnabled: z.boolean(),
+  latestReading: deviceLatestReadingSchema.nullable(),
+  thresholds: z.object({
+    lowThreshold: z.number(),
+    recoveryThreshold: z.number(),
+  }),
+  lastPumpEvent: pumpEventSchema.nullable(),
+  pendingCommand: pumpCommandSummarySchema.nullable(),
+  offlineMessage: z.string().nullable(),
+  lastSeenAt: z.string().nullable(),
+  lastTelemetryAt: z.string().nullable(),
+});
+
 export const seasonSwitcherItemSchema = z.object({
   cropSeasonId: z.string().uuid(),
   cropName: z.string(),
@@ -779,6 +888,7 @@ export const dashboardResponseSchema = z.object({
   generatedAt: z.string(),
   featuredSeason: featuredSeasonSchema.nullable(),
   seasonSwitcher: z.array(seasonSwitcherItemSchema),
+  deviceOverview: deviceOverviewSchema.nullable(),
   weatherHero: weatherSummarySchema.nullable(),
   taskFocus: taskFocusSchema.nullable(),
   cropHealth: cropHealthSummarySchema.nullable(),
@@ -786,6 +896,28 @@ export const dashboardResponseSchema = z.object({
   schemeSpotlight: schemeSpotlightSchema.nullable(),
   resourcePulse: resourcePulseSchema.nullable(),
   offlineState: dashboardOfflineStateSchema,
+});
+
+export const farmDeviceResponseSchema = z.object({
+  device: deviceOverviewSchema.nullable(),
+  telemetry: z.array(deviceTelemetryPointSchema),
+  pumpEvents: z.array(pumpEventSchema),
+});
+
+export const pumpCommandResponseSchema = z.object({
+  command: pumpCommandSummarySchema,
+  deviceOverview: deviceOverviewSchema.nullable(),
+});
+
+export const deviceSettingsResponseSchema = z.object({
+  deviceOverview: deviceOverviewSchema,
+});
+
+export const deviceIngestResponseSchema = z.object({
+  accepted: z.boolean(),
+  recordedAt: z.string(),
+  deviceOverview: deviceOverviewSchema,
+  pendingCommand: pumpCommandSummarySchema.nullable(),
 });
 
 export const diseaseResultSchema = z.object({
@@ -821,14 +953,33 @@ export const cropSuggestionSchema = z.object({
   rationale: z.string(),
 });
 
+export const ragExplanationSectionSchema = z.object({
+  heading: z.string(),
+  text: z.string(),
+});
+
+export const cropRecommendationSchema = z.object({
+  cropName: z.string(),
+  averageYieldTonnePerHectare: z.number(),
+  bestCaseYieldTonnePerHectare: z.number(),
+  worstCaseYieldTonnePerHectare: z.number(),
+  averageProfitRs: z.number(),
+  averageRevenueRs: z.number(),
+  estimatedCostRs: z.number(),
+  failureRiskPct: z.number(),
+  finalScore: z.number(),
+  ragExplanation: z.array(ragExplanationSectionSchema),
+  suggestion: z.string(),
+});
+
 export const cropPredictionSoilProfileSchema = z.object({
   soilType: z.enum(soilTypes).nullable().optional(),
-  source: z.enum(soilProfileSources),
+  source: z.string(),
   summary: z.string(),
 });
 
 export const cropPredictionSeasonClimateSchema = z.object({
-  method: z.enum(seasonClimateMethods),
+  method: z.string(),
   averageTempC: z.number(),
   averageHumidityPercent: z.number(),
   totalRainfallMm: z.number(),
@@ -838,7 +989,8 @@ export const cropPredictionSeasonClimateSchema = z.object({
 
 export const cropSuggestionPredictionResponseSchema = z.object({
   prediction: predictionSummarySchema.omit({ outputJson: true }),
-  suggestions: z.array(cropSuggestionSchema),
+  topCrops: z.array(cropRecommendationSchema),
+  cropMustNotBeGrown: z.string().nullable(),
   inputConfidence: z.enum(predictionInputConfidenceLevels),
   soilProfile: cropPredictionSoilProfileSchema,
   seasonClimate: cropPredictionSeasonClimateSchema,

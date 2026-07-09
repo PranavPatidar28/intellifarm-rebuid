@@ -113,7 +113,8 @@ export class FacilitiesService {
                 recordDate: latestMarket.recordDate.toISOString(),
                 source: latestMarket.source,
                 trendDirection: 'STABLE' as const,
-                trendLabel: 'Compare with the main mandi feed for the latest movement',
+                trendLabel:
+                  'Compare with the main mandi feed for the latest movement',
                 freshnessLabel: formatFreshnessLabel(latestMarket.recordDate),
               }
             : null,
@@ -133,7 +134,8 @@ export class FacilitiesService {
                 recordDate: latestMarket.recordDate.toISOString(),
                 source: latestMarket.source,
                 trendDirection: 'STABLE' as const,
-                trendLabel: 'Compare with the market tab for a broader trend view',
+                trendLabel:
+                  'Compare with the market tab for a broader trend view',
                 freshnessLabel: formatFreshnessLabel(latestMarket.recordDate),
               }
             : null,

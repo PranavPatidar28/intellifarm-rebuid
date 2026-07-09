@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
+import { validateEnv } from './common/config/env.validation';
 import { AppController } from './app.controller';
 import { AlertsModule } from './alerts/alerts.module';
 import { AssistantModule } from './assistant/assistant.module';
@@ -11,6 +14,7 @@ import { CropCatalogModule } from './crop-catalog/crop-catalog.module';
 import { CommunityModule } from './community/community.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DiseaseReportsModule } from './disease-reports/disease-reports.module';
+import { DevicesModule } from './devices/devices.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { FarmsModule } from './farms/farms.module';
@@ -30,7 +34,15 @@ import { AdminModule } from './admin/admin.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
+      validate: validateEnv,
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
     ScheduleModule.forRoot(),
     PrismaModule,
     StorageModule,
@@ -48,6 +60,7 @@ import { AdminModule } from './admin/admin.module';
     AlertsModule,
     WeatherModule,
     DashboardModule,
+    DevicesModule,
     ExpensesModule,
     FacilitiesModule,
     DiseaseReportsModule,
@@ -56,5 +69,11 @@ import { AdminModule } from './admin/admin.module';
     AdminModule,
   ],
   controllers: [AppController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

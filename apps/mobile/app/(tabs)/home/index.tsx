@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
 
 import { useRouter } from 'expo-router';
@@ -17,6 +17,7 @@ import { HomeNewsCard } from '@/components/home-news-card';
 import { HomePrimaryToolCard } from '@/components/home-primary-tool-card';
 import { HomeSchemeCard } from '@/components/home-scheme-card';
 import { HomeSeasonContextRow } from '@/components/home-season-context-row';
+import { IrrigationDeviceCard } from '@/components/irrigation-device-card';
 import { LoadingScreen } from '@/components/loading-screen';
 import { MetricBadge } from '@/components/metric-badge';
 import { MotionPressable } from '@/components/motion-pressable';
@@ -31,11 +32,13 @@ import { useSession } from '@/features/session/session-provider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 import type {
   AlertsResponse,
   DashboardWeeklyResponse,
+  PumpCommandResponse,
   SchemesResponse,
+  FarmDeviceResponse,
 } from '@/lib/api-types';
 import { storageKeys } from '@/lib/constants';
 import { getFirstName } from '@/lib/format';
@@ -43,6 +46,10 @@ import { getOrderedHomeTasks, readHomeTasks, toggleHomeTask } from '@/lib/home-t
 import { getHomeNewsItems, getHomeSchemeHighlight } from '@/lib/home-news';
 import { useStoredValue } from '@/lib/storage';
 import { palette, radii, spacing, typography } from '@/theme/tokens';
+
+type PumpControlMode = NonNullable<
+  DashboardWeeklyResponse['deviceOverview']
+>['pumpControlMode'];
 
 export default function HomeDashboardRoute() {
   const router = useRouter();
@@ -55,6 +62,9 @@ export default function HomeDashboardRoute() {
   );
   const [pendingUploads] = useStoredValue(storageKeys.pendingDiseaseReports, []);
   const [homeTasks] = useStoredValue(storageKeys.homeTasks, readHomeTasks());
+  const [pumpModeBusy, setPumpModeBusy] = useState<PumpControlMode | null>(null);
+  const [pumpMessage, setPumpMessage] = useState<string | null>(null);
+  const [isWeatherRefreshing, setIsWeatherRefreshing] = useState(false);
   const { location, refreshLocation } = useDeviceLocation();
 
   useEffect(() => {
@@ -79,9 +89,23 @@ export default function HomeDashboardRoute() {
     cacheKey: `dashboard-weekly:${selectedSeasonId || 'default'}:${location?.latitude ?? 'na'}:${location?.longitude ?? 'na'}`,
     queryKey: ['dashboard-weekly', token, selectedSeasonId, location?.latitude, location?.longitude],
     enabled: Boolean(token),
+    refetchInterval: 30_000,
     queryFn: () => apiGet<DashboardWeeklyResponse>(`/dashboard/weekly${queryString}`, token),
     placeholderData: (previous) => previous,
   });
+
+  const dashboard = dashboardQuery.data;
+  const featuredSeason = dashboard?.featuredSeason ?? null;
+
+  const deviceQuery = useCachedQuery({
+    cacheKey: `farm-device-home:${featuredSeason?.farmPlotId}`,
+    queryKey: ['farm-device-home', token, featuredSeason?.farmPlotId],
+    enabled: Boolean(token && featuredSeason?.farmPlotId),
+    refetchInterval: 1_000,
+    queryFn: () =>
+      apiGet<FarmDeviceResponse>(`/farm-plots/${featuredSeason!.farmPlotId}/device`, token),
+  });
+
   const alertsQuery = useCachedQuery({
     cacheKey: 'alerts',
     queryKey: ['alerts', token],
@@ -89,8 +113,6 @@ export default function HomeDashboardRoute() {
     queryFn: () => apiGet<AlertsResponse>('/alerts', token),
   });
 
-  const dashboard = dashboardQuery.data;
-  const featuredSeason = dashboard?.featuredSeason ?? null;
   const homeSchemeQueryString = useMemo(() => {
     const scopedCropName = featuredSeason?.cropName?.trim();
     const scopedState = authUser?.state?.trim() || featuredSeason?.state?.trim();
@@ -123,6 +145,33 @@ export default function HomeDashboardRoute() {
       setSelectedSeasonId(dashboard.featuredSeason.cropSeasonId);
     }
   }, [dashboard?.featuredSeason?.cropSeasonId, selectedSeasonId, setSelectedSeasonId]);
+
+  useEffect(() => {
+    setPumpMessage(null);
+    setPumpModeBusy(null);
+  }, [featuredSeason?.farmPlotId]);
+
+  const handlePumpModeChange = async (targetMode: PumpControlMode) => {
+    if (!token || !featuredSeason) {
+      return;
+    }
+
+    setPumpMessage(null);
+    setPumpModeBusy(targetMode);
+
+    try {
+      await apiPost<PumpCommandResponse>(
+        `/farm-plots/${featuredSeason.farmPlotId}/pump/commands`,
+        { targetMode },
+        token,
+      );
+      await dashboardQuery.refetch();
+    } catch {
+      setPumpMessage('Unable to update the pump right now.');
+    } finally {
+      setPumpModeBusy(null);
+    }
+  };
 
   const visibleHomeTasks = useMemo(
     () => getOrderedHomeTasks(homeTasks).slice(0, 3),
@@ -256,12 +305,14 @@ export default function HomeDashboardRoute() {
         <WeatherHeroCard
           weather={dashboard?.weatherHero ?? null}
           loading={dashboardQuery.isLoading && !dashboard?.weatherHero}
-          refreshing={dashboardQuery.isFetching}
+          refreshing={isWeatherRefreshing}
           errorMessage={
             dashboardQuery.error ? 'Unable to refresh weather data right now.' : null
           }
-          onRefresh={() => {
-            void dashboardQuery.refetch();
+          onRefresh={async () => {
+            setIsWeatherRefreshing(true);
+            await dashboardQuery.refetch();
+            setIsWeatherRefreshing(false);
           }}
           onForecast={() =>
             router.push({
@@ -278,6 +329,18 @@ export default function HomeDashboardRoute() {
       </MotionSection>
 
       <MotionSection delay={80}>
+        <IrrigationDeviceCard
+          device={deviceQuery.data?.device ?? dashboard?.deviceOverview ?? null}
+          busyMode={pumpModeBusy}
+          message={pumpMessage}
+          onChangeMode={handlePumpModeChange}
+          onOpenDetails={() =>
+            router.push(`/device/${featuredSeason.farmPlotId}` as never)
+          }
+        />
+      </MotionSection>
+
+      <MotionSection delay={120}>
         <View style={{ gap: spacing.sm }}>
         <SectionTitle title="Quick tools" />
         <View
@@ -302,7 +365,7 @@ export default function HomeDashboardRoute() {
         </View>
       </MotionSection>
 
-      <MotionSection delay={120}>
+      <MotionSection delay={160}>
         <View style={{ gap: spacing.sm }}>
         <SectionTitle
           title="Your tasks"
@@ -431,7 +494,7 @@ export default function HomeDashboardRoute() {
         </View>
       </MotionSection>
 
-      <MotionSection delay={160}>
+      <MotionSection delay={200}>
         <View style={{ gap: spacing.sm }}>
         <SectionTitle title="News & Schemes" />
         <View

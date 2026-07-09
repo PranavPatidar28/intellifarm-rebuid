@@ -7,6 +7,7 @@ export const palette = {
   leaf: '#2F7D4E',
   leafDark: '#1E5E3B',
   leafMist: '#E3F0E3',
+  brand: '#2F7D4E',
   mustard: '#D9B15D',
   mustardSoft: '#FBF3E0',
   sunrise: '#EAD8B7',

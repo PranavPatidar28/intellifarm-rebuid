@@ -313,8 +313,8 @@ export class AdminService {
         },
         target:
           report.targetType === 'POST'
-            ? postMap.get(report.targetId) ?? null
-            : replyMap.get(report.targetId) ?? null,
+            ? (postMap.get(report.targetId) ?? null)
+            : (replyMap.get(report.targetId) ?? null),
       })),
     };
   }

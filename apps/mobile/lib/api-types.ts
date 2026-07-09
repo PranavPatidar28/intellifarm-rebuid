@@ -19,20 +19,24 @@ import {
   communityPostSummaryResponseSchema,
   cropSuggestionPredictionResponseSchema,
   dashboardResponseSchema,
+  deviceSettingsResponseSchema,
   diseaseReportResponseSchema,
   diseaseReportsResponseSchema,
   diseaseResultSchema,
+  deviceIngestResponseSchema,
   expenseBudgetResponseSchema,
   expenseDeleteResponseSchema,
   expenseListResponseSchema,
   expenseResponseSchema,
   expenseSummaryResponseSchema,
   facilitiesResponseSchema,
+  farmDeviceResponseSchema,
   marketCropDetailResponseSchema,
   marketExplorerCropsResponseSchema,
   marketExplorerMandisResponseSchema,
   marketMandiDetailResponseSchema,
   marketsResponseSchema,
+  pumpCommandResponseSchema,
   schemesResponseSchema,
   weatherSummarySchema,
 } from '@intellifarm/contracts';
@@ -45,6 +49,10 @@ export type DiseaseAnalysisResult = z.infer<typeof diseaseResultSchema>;
 export type WeatherSummary = z.infer<typeof weatherSummarySchema>;
 export type MarketsResponse = z.infer<typeof marketsResponseSchema>;
 export type FacilitiesResponse = z.infer<typeof facilitiesResponseSchema>;
+export type DeviceIngestResponse = z.infer<typeof deviceIngestResponseSchema>;
+export type DeviceSettingsResponse = z.infer<typeof deviceSettingsResponseSchema>;
+export type FarmDeviceResponse = z.infer<typeof farmDeviceResponseSchema>;
+export type PumpCommandResponse = z.infer<typeof pumpCommandResponseSchema>;
 export type MarketExplorerCropsResponse = z.infer<
   typeof marketExplorerCropsResponseSchema
 >;
@@ -237,6 +245,7 @@ export type ResourcePredictionResponse = {
 };
 
 export type CropSuggestionResponse = CropSuggestionPredictionResponse;
+export type CropRecommendation = CropSuggestionResponse['topCrops'][number];
 
 export type MarketRecord = MarketsResponse['records'][number];
 

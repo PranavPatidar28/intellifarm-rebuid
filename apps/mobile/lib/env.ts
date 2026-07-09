@@ -8,7 +8,7 @@ function inferApiBaseUrl() {
 
   const hostUri =
     Constants.expoConfig?.hostUri ??
-    Constants.expoGoConfig?.hostUri ??
+    Constants.expoGoConfig?.debuggerHost ??
     null;
 
   if (hostUri) {

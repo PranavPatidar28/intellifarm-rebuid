@@ -29,7 +29,11 @@ export class AlertsService {
         categoryLabel: describeCategoryLabel(alert.alertType),
         iconKey: resolveIconKey(alert.alertType, alert.severity),
         ctaLabel: resolveCtaLabel(alert.alertType),
-        ctaRoute: resolveCtaRoute(alert.alertType, alert.cropSeasonId, alert.ctaRoute),
+        ctaRoute: resolveCtaRoute(
+          alert.alertType,
+          alert.cropSeasonId,
+          alert.ctaRoute,
+        ),
         freshnessLabel: formatFreshnessLabel(alert.createdAt),
       })),
     };
@@ -100,7 +104,9 @@ function resolveIconKey(
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
 ) {
   if (alertType === 'WEATHER') {
-    return severity === 'HIGH' || severity === 'CRITICAL' ? 'cloud-rain-wind' : 'cloud-sun';
+    return severity === 'HIGH' || severity === 'CRITICAL'
+      ? 'cloud-rain-wind'
+      : 'cloud-sun';
   }
 
   if (alertType === 'DISEASE') {

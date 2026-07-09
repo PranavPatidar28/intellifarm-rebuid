@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import {
   type ExpenseCategory,
@@ -46,15 +43,6 @@ type UpdateExpenseInput = Partial<CreateExpenseInput> & {
 type BudgetInput = {
   cropSeasonId: string;
   amount?: number | null;
-};
-
-type CropSeasonRecord = {
-  id: string;
-  cropName: string;
-  currentStage: string;
-  sowingDate: Date;
-  farmPlotId: string;
-  status: 'PLANNED' | 'ACTIVE' | 'HARVESTED' | 'ARCHIVED';
 };
 
 type ExpenseRecord = Prisma.ExpenseEntryGetPayload<{
@@ -315,9 +303,15 @@ export class ExpensesService {
     return null;
   }
 
-  private async loadSummaryComparison(userId: string, query: ExpenseSummaryQuery) {
+  private async loadSummaryComparison(
+    userId: string,
+    query: ExpenseSummaryQuery,
+  ) {
     if (query.scope === 'season') {
-      const season = await this.getOwnedSeason(userId, query.cropSeasonId as string);
+      const season = await this.getOwnedSeason(
+        userId,
+        query.cropSeasonId as string,
+      );
       const previousSeason = await this.prisma.cropSeason.findFirst({
         where: {
           farmPlot: {
@@ -364,7 +358,10 @@ export class ExpensesService {
     }
 
     const currentRange = this.resolveScopeDateRange(query.scope);
-    const previousRange = resolvePreviousRange(query.scope, currentRange as DateRange);
+    const previousRange = resolvePreviousRange(
+      query.scope,
+      currentRange as DateRange,
+    );
 
     const [currentEntries, previousEntries] = await Promise.all([
       this.prisma.expenseEntry.findMany({
@@ -394,7 +391,8 @@ export class ExpensesService {
         query.scope === 'month'
           ? formatMonthLabel(currentRange!.start)
           : formatYearLabel(currentRange!.start),
-      comparisonLabel: query.scope === 'month' ? 'vs last month' : 'vs last year',
+      comparisonLabel:
+        query.scope === 'month' ? 'vs last month' : 'vs last year',
     };
   }
 
@@ -417,7 +415,9 @@ export class ExpensesService {
     }
 
     const spentAmount = sumAmount(entries);
-    const pendingAmount = sumAmount(entries.filter((entry) => entry.status === 'PENDING'));
+    const pendingAmount = sumAmount(
+      entries.filter((entry) => entry.status === 'PENDING'),
+    );
     const remainingAmount = budget.amount - spentAmount;
 
     return {
@@ -480,7 +480,10 @@ type DateRange = {
   end: Date;
 };
 
-function resolvePreviousRange(scope: 'month' | 'year', currentRange: DateRange): DateRange {
+function resolvePreviousRange(
+  scope: 'month' | 'year',
+  currentRange: DateRange,
+): DateRange {
   if (scope === 'month') {
     const start = new Date(
       Date.UTC(
@@ -499,7 +502,9 @@ function resolvePreviousRange(scope: 'month' | 'year', currentRange: DateRange):
     return { start, end };
   }
 
-  const start = new Date(Date.UTC(currentRange.start.getUTCFullYear() - 1, 0, 1));
+  const start = new Date(
+    Date.UTC(currentRange.start.getUTCFullYear() - 1, 0, 1),
+  );
   const end = new Date(Date.UTC(currentRange.start.getUTCFullYear(), 0, 1));
   return { start, end };
 }
@@ -554,12 +559,20 @@ function buildExpenseSummary({
   } | null;
 }) {
   const totalAmount = sumAmount(currentEntries);
-  const paidAmount = sumAmount(currentEntries.filter((entry) => entry.status === 'PAID'));
-  const pendingAmount = sumAmount(currentEntries.filter((entry) => entry.status === 'PENDING'));
+  const paidAmount = sumAmount(
+    currentEntries.filter((entry) => entry.status === 'PAID'),
+  );
+  const pendingAmount = sumAmount(
+    currentEntries.filter((entry) => entry.status === 'PENDING'),
+  );
   const previousTotal = sumAmount(previousEntries);
   const deltaAmount = totalAmount - previousTotal;
   const percentChange =
-    previousTotal > 0 ? (deltaAmount / previousTotal) * 100 : totalAmount > 0 ? 100 : 0;
+    previousTotal > 0
+      ? (deltaAmount / previousTotal) * 100
+      : totalAmount > 0
+        ? 100
+        : 0;
   const direction =
     Math.abs(deltaAmount) < 0.01 ? 'STABLE' : deltaAmount > 0 ? 'UP' : 'DOWN';
 
@@ -570,7 +583,9 @@ function buildExpenseSummary({
     paidAmount,
     pendingAmount,
     entryCount: currentEntries.length,
-    averageAmount: currentEntries.length ? totalAmount / currentEntries.length : 0,
+    averageAmount: currentEntries.length
+      ? totalAmount / currentEntries.length
+      : 0,
     categories: expenseCategoryOrder.map((category) => {
       const currentCategoryEntries = currentEntries.filter(
         (entry) => entry.category === category,

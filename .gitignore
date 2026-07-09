@@ -27,9 +27,11 @@ next-env.d.ts
 
 # uploads and generated content
 apps/api/uploads/
-apps/api/apps/api/uploads/
+**/uploads/
+apps/api/src/generated/
 .codex-logs/
 .codex-run/
+.opencode/
 
 # logs
 *.log

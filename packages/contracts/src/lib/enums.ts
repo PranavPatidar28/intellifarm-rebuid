@@ -102,6 +102,32 @@ export type PredictionType = (typeof predictionTypes)[number];
 export const predictionStatuses = ['COMPLETED', 'FAILED'] as const;
 export type PredictionStatus = (typeof predictionStatuses)[number];
 
+export const deviceStatuses = ['ONLINE', 'OFFLINE', 'FAULT'] as const;
+export type DeviceStatus = (typeof deviceStatuses)[number];
+
+export const pumpStates = ['ON', 'OFF', 'FAULT'] as const;
+export type PumpState = (typeof pumpStates)[number];
+
+export const pumpControlModes = ['AUTO', 'FORCE_ON', 'FORCE_OFF'] as const;
+export type PumpControlMode = (typeof pumpControlModes)[number];
+
+export const pumpCommandStatuses = [
+  'PENDING',
+  'ACKNOWLEDGED',
+  'APPLIED',
+  'FAILED',
+  'EXPIRED',
+] as const;
+export type PumpCommandStatus = (typeof pumpCommandStatuses)[number];
+
+export const pumpEventSources = [
+  'AUTO_RULE',
+  'MANUAL_COMMAND',
+  'DEVICE_FAILSAFE',
+  'DEVICE_LOCAL',
+] as const;
+export type PumpEventSource = (typeof pumpEventSources)[number];
+
 export const predictionInputConfidenceLevels = ['HIGH', 'MEDIUM', 'LOW'] as const;
 export type PredictionInputConfidenceLevel =
   (typeof predictionInputConfidenceLevels)[number];
